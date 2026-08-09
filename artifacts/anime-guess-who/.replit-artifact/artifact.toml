@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "AnimeWho - Anime Guess Who"
+description = "A real-time 2-player multiplayer game inspired by Guess Who? but with anime characters. Players secretly pick a character and take turns asking yes/no questions to identify the opponent's character. First to correctly guess wins."
+version = "1.0.0"
+id = "artifacts/anime-guess-who"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 20021
+
+[services.development]
+run = "pnpm --filter @workspace/anime-guess-who run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/anime-guess-who", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/anime-guess-who/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "20021"
+BASE_PATH = "/"
