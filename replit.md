@@ -12,6 +12,7 @@ _Replace the heading above with the project's name, and this line with one sente
 - Optional env: `DATABASE_URL` — Postgres connection string. Enables player stats and the leaderboard (tables are created on startup); without it the game runs and those features are hidden.
 - Optional env: `SITE_URL` — public address of the site (e.g. `https://anime-guess-master.replit.app`), used to make the link-preview image URL absolute at build time.
 - Optional env: `ALLOWED_ORIGINS` — comma-separated extra origins allowed by CORS (same-origin only by default).
+- Optional env: `TRUSTED_PROXY_HOPS` — number of proxies in front of the API that append to `X-Forwarded-For` (default 1, Replit's proxy). The client IP is read from the right of that header, never the left (forgeable). On startup the server logs `Client IP taken from X-Forwarded-For` with the entry count, to check this setting.
 
 ## Stack
 

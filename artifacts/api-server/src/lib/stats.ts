@@ -12,6 +12,9 @@ const MIN_RATING = 100;
 const K_FACTOR = 32;
 // Players only show up on the leaderboard after this many ranked games.
 export const MIN_RANKED_GAMES = 5;
+// The same two players can't farm each other: only this many ranked games
+// per pair per 24 h count for the leaderboard.
+const MAX_RANKED_PER_PAIR_PER_DAY = 2;
 const LEADERBOARD_SIZE = 20;
 const LEADERBOARD_CACHE_MS = 15_000;
 
@@ -100,7 +103,7 @@ export async function recordGame(params: {
 }): Promise<{ winner: RatingUpdate; loser: RatingUpdate } | null> {
   if (!statsEnabled) return null;
   const { db, playersTable, gamesTable } = await loadDb();
-  const { sql, eq } = await import("drizzle-orm");
+  const { sql, eq, and, or, gt, count } = await import("drizzle-orm");
 
   return db.transaction(async (tx) => {
     // Creates the profile on its first finished game; the upsert also locks
@@ -122,10 +125,32 @@ export async function recordGame(params: {
       return row!;
     };
 
-    const winner = await upsert(params.winner);
-    const loser = await upsert(params.loser);
+    // Always lock the two rows in the same order (by token hash): two results
+    // for the same pair settling at once could otherwise deadlock.
+    const winnerFirst = hashToken(params.winner.profileToken) <= hashToken(params.loser.profileToken);
+    const first = await upsert(winnerFirst ? params.winner : params.loser);
+    const second = await upsert(winnerFirst ? params.loser : params.winner);
+    const winner = winnerFirst ? first : second;
+    const loser = winnerFirst ? second : first;
+
     // Same profile on both sides (two tabs): never ranked.
-    const ranked = params.ranked && winner.id !== loser.id;
+    let ranked = params.ranked && winner.id !== loser.id;
+    if (ranked) {
+      const [{ value }] = await tx
+        .select({ value: count() })
+        .from(gamesTable)
+        .where(
+          and(
+            eq(gamesTable.ranked, true),
+            gt(gamesTable.createdAt, sql`now() - interval '24 hours'`),
+            or(
+              and(eq(gamesTable.winnerId, winner.id), eq(gamesTable.loserId, loser.id)),
+              and(eq(gamesTable.winnerId, loser.id), eq(gamesTable.loserId, winner.id)),
+            ),
+          ),
+        );
+      if (Number(value) >= MAX_RANKED_PER_PAIR_PER_DAY) ranked = false;
+    }
     const delta = ranked ? eloDelta(winner.rating, loser.rating) : 0;
     const loserRating = Math.max(MIN_RATING, loser.rating - delta);
     const rankedInc = ranked ? 1 : 0;

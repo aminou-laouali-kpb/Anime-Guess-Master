@@ -87,6 +87,7 @@ export interface Room {
   code: string;
   phase: RoomPhase;
   mode: "quick" | "private" | "bot"; // only quick-play games count for the leaderboard
+  round: number; // 1 for the first game, +1 per rematch (rematches are never ranked)
   botLevel: BotLevel | null;
   botTimer: NodeJS.Timeout | null;
   botKey: string | null; // state the pending bot move was planned for
@@ -103,6 +104,10 @@ export interface Room {
   timerKey: string | null;
   timerDeadline: number | null;
   timerPlayerId: string | null; // who must act before the deadline (null = both)
+  // Time left on a clock paused by a disconnect, so a reconnect resumes it
+  // instead of granting a fresh full clock (which allowed stalling forever).
+  pausedTimerKey: string | null;
+  pausedTimerMs: number;
 }
 
 // A session outlives a single socket so a player can reload the page or lose
@@ -126,6 +131,8 @@ const MAX_LIVES = 3;
 // Reactions are picked from a fixed set: no free text, nothing to moderate.
 export const REACTIONS = ["👍", "😂", "😮", "😅", "🤔", "😱", "🔥", "👏"] as const;
 const REACTION_COOLDOWN_MS = 1_000;
+// Questions are free, so cap them: a game can't grow (or last) forever.
+const MAX_QUESTIONS_PER_GAME = 60;
 // Like the original board game: a smaller board keeps games short and readable.
 const BOARD_SIZE = 24;
 export const RECONNECT_GRACE_MS = 45_000;
@@ -207,6 +214,7 @@ function createRoom(code: string, mode: Room["mode"]): Room {
     code,
     phase: "waiting",
     mode,
+    round: 1,
     botLevel: null,
     botTimer: null,
     botKey: null,
@@ -223,6 +231,8 @@ function createRoom(code: string, mode: Room["mode"]): Room {
     timerKey: null,
     timerDeadline: null,
     timerPlayerId: null,
+    pausedTimerKey: null,
+    pausedTimerMs: 0,
   };
 }
 
@@ -366,16 +376,16 @@ export function setupGameEngine(io: SocketIOServer): void {
   }
 
   // Works out who has to act next and (re)arms the deadline. Call it after
-  // every state change. The clock pauses while a player is disconnected,
-  // and restarts in full when they come back (force).
-  function updateTimer(room: Room, force = false): void {
+  // every state change. The clock pauses while a player is disconnected and
+  // resumes with the time that was left when they come back.
+  function updateTimer(room: Room): void {
     let key: string | null = null;
     let duration = 0;
     let actingPlayerId: string | null = null;
 
     const everyoneHere = room.players.length === 2 && room.players.every(isConnected);
     if (everyoneHere && room.phase === "selection") {
-      key = "selection";
+      key = `selection:${room.characterIds[0]}`; // unique per board (rematches)
       duration = SELECTION_TIME_MS;
     } else if (everyoneHere && room.phase === "playing" && room.pendingQuestion) {
       actingPlayerId = room.players.find((p) => p.id !== room.pendingAskerId)?.id ?? null;
@@ -387,14 +397,21 @@ export function setupGameEngine(io: SocketIOServer): void {
       duration = TURN_TIME_MS;
     }
 
-    if (!force && key !== null && key === room.timerKey) {
+    // Same step still running (e.g. a tab takeover): keep the current deadline.
+    if (key !== null && key === room.timerKey && room.timer) {
       driveBot(room);
       return;
     }
     const hadTimer = room.timerKey !== null;
+    if (key === null && room.timer && room.timerKey && room.timerDeadline !== null) {
+      room.pausedTimerKey = room.timerKey;
+      room.pausedTimerMs = Math.max(0, room.timerDeadline - Date.now());
+    }
     clearTimer(room);
 
     if (key !== null) {
+      if (key === room.pausedTimerKey) duration = room.pausedTimerMs;
+      room.pausedTimerKey = null;
       room.timerKey = key;
       room.timerDeadline = Date.now() + duration;
       room.timerPlayerId = actingPlayerId;
@@ -438,7 +455,7 @@ export function setupGameEngine(io: SocketIOServer): void {
         if (opponent) emitToPlayer(opponent, "opponent_ready");
       }
       maybeStartGame(room);
-      updateTimer(room, true);
+      updateTimer(room);
       return;
     }
 
@@ -469,7 +486,7 @@ export function setupGameEngine(io: SocketIOServer): void {
       currentTurnPlayerId: room.currentTurnPlayerId,
       while: answering ? "answering" : "playing",
     });
-    updateTimer(room, true);
+    updateTimer(room);
   }
 
   // Each player gets their own game_over so "opponentCharacterId" is always
@@ -477,8 +494,9 @@ export function setupGameEngine(io: SocketIOServer): void {
   // Saves the result for stats and tells each player how their rating moved.
   function reportResult(room: Room, winner: Player, loser: Player, reason: string): void {
     if (!statsEnabled || room.mode === "bot") return;
-    // Two players on the same network could be one person farming wins.
-    const ranked = room.mode === "quick" && winner.ip !== loser.ip;
+    // Two players on the same network could be one person farming wins, and
+    // endless rematches between two accounts would farm Elo too.
+    const ranked = room.mode === "quick" && room.round === 1 && winner.ip !== loser.ip;
     recordGame({
       winner: { profileToken: winner.profileToken, name: winner.name },
       loser: { profileToken: loser.profileToken, name: loser.name },
@@ -617,6 +635,7 @@ export function setupGameEngine(io: SocketIOServer): void {
 
   function startRematch(room: Room): void {
     room.phase = "selection";
+    room.round += 1;
     room.characterIds = dealBoard(); // fresh board for the rematch
     room.log = [];
     room.pendingQuestion = null;
@@ -843,7 +862,7 @@ export function setupGameEngine(io: SocketIOServer): void {
       socket.emit("state_sync", {
         room: restored ? snapshotFor(restored.room, restored.player) : null,
       });
-      if (restored) updateTimer(restored.room, true);
+      if (restored) updateTimer(restored.room);
     } catch (err) {
       logger.error({ err }, "Failed to restore session");
     }
@@ -999,6 +1018,11 @@ export function setupGameEngine(io: SocketIOServer): void {
 
       const opponent = opponentOf(room, player);
       if (!opponent) return;
+
+      if (room.log.filter((e) => e.type === "qna").length >= MAX_QUESTIONS_PER_GAME) {
+        socket.emit("error", { message: "Plus de questions possibles dans cette partie : il faut deviner !" });
+        return;
+      }
 
       // Verified question: answered right away from the opponent's real character.
       const attr = readAttribute(attribute);
