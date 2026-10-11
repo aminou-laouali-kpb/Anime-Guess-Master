@@ -26,7 +26,7 @@ export const Selection: React.FC = () => {
       {/* Header Sticky */}
       <div className="sticky top-0 z-40 bg-background/80 backdrop-blur-md border-b border-border px-4 py-4 flex flex-col items-center justify-center shadow-sm">
         <h2 className="font-display font-black text-2xl uppercase tracking-tight text-center">
-          {isLockedIn ? "Waiting for Opponent" : "Pick Your Secret Character"}
+          {isLockedIn ? "En attente de l’adversaire" : "Choisis ton personnage secret"}
         </h2>
         <div className="flex items-center gap-4 mt-2 text-sm font-bold">
           <span className={isLockedIn ? "text-primary" : "text-muted-foreground"}>
@@ -34,12 +34,12 @@ export const Selection: React.FC = () => {
           </span>
           <span className="text-muted-foreground/30">VS</span>
           <span className={opponentReady ? "text-secondary" : "text-muted-foreground"}>
-            Opponent {opponentReady ? "✓" : "..."}
+            Adversaire {opponentReady ? "✓" : "…"}
           </span>
         </div>
         {!isLockedIn && secondsLeft !== null && (
           <p className={`mt-1 text-xs font-bold uppercase tracking-widest tabular-nums ${secondsLeft <= 10 ? "text-red-500 animate-pulse" : "text-muted-foreground"}`}>
-            {secondsLeft}s left — then we pick for you
+            encore {secondsLeft} s — sinon on choisit pour toi
           </p>
         )}
       </div>
@@ -77,7 +77,7 @@ export const Selection: React.FC = () => {
               disabled={!localSelection}
               onClick={handleConfirm}
             >
-              Lock In Selection
+              Valider mon choix
             </Button>
           </div>
         </div>
@@ -87,7 +87,7 @@ export const Selection: React.FC = () => {
         <div className="fixed bottom-0 left-0 right-0 p-6 flex justify-center items-center gap-3 bg-background/90 backdrop-blur-md border-t border-border z-50">
           <Loader2 className="w-6 h-6 animate-spin text-primary" />
           <span className="font-bold uppercase tracking-widest text-sm text-muted-foreground">
-            Awaiting Opponent...
+            En attente de l’adversaire…
           </span>
         </div>
       )}

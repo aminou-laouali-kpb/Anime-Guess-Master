@@ -184,7 +184,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // The server drops queued players on disconnect: get back in line.
         socket.emit("join_lobby", { name: myNameRef.current });
       } else if (current !== "home") {
-        toast.error("Connection lost. Your game could not be restored.");
+        toast.error("Connexion perdue. Ta partie n’a pas pu être récupérée.");
         resetGameState();
         setPhase("home");
       }
@@ -215,7 +215,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     socket.on("character_assigned", ({ characterId }) => {
       setMyCharacterId(characterId);
-      toast.info("Time's up! A random character was picked for you.");
+      toast.info("Temps écoulé ! Un personnage a été choisi au hasard pour toi.");
     });
 
     socket.on("turn_timeout", ({ playerId, lives, currentTurnPlayerId, while: during }) => {
@@ -226,18 +226,18 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setCurrentTurnId(currentTurnPlayerId);
       if (playerId === myPlayerIdRef.current) {
         toast.error(during === "answering"
-          ? "Too slow to answer! You lost a life."
-          : "Time's up! You lost a life and your turn.");
+          ? "Pas de réponse à temps ! Tu perds une vie."
+          : "Temps écoulé ! Tu perds une vie et ton tour.");
       } else {
-        toast.success("Your opponent ran out of time and lost a life.");
+        toast.success("Ton adversaire a dépassé le temps et perd une vie.");
       }
     });
 
     socket.on("connect_error", (err) => {
       if (err.message === "too_many_connections") {
-        toast.error("Too many connections from your network. Close some tabs and try again.");
+        toast.error("Trop de connexions depuis ton réseau. Ferme quelques onglets et réessaie.");
       } else if (err.message === "server_full") {
-        toast.error("The server is full right now. Please try again in a moment.");
+        toast.error("Le serveur est complet pour le moment. Réessaie dans un instant.");
       }
     });
 
@@ -280,9 +280,9 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       ));
       setCurrentTurnId(currentTurnPlayerId);
       if (guesserId === myPlayerIdRef.current) {
-        toast.error("Wrong guess! You lost a life.");
+        toast.error("Raté ! Tu perds une vie.");
       } else {
-        toast.success("Opponent guessed wrong!");
+        toast.success("L’adversaire s’est trompé !");
       }
     });
 
@@ -299,14 +299,14 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     socket.on("opponent_disconnected", ({ graceSeconds }) => {
       setOpponentConnected(false);
       if (phaseRef.current !== "ended") {
-        toast.warning(`Opponent lost connection. Waiting up to ${graceSeconds}s for them to come back…`);
+        toast.warning(`Ton adversaire a perdu la connexion. On l’attend jusqu’à ${graceSeconds} s…`);
       }
     });
 
     socket.on("opponent_reconnected", () => {
       setOpponentConnected(true);
       if (phaseRef.current !== "ended") {
-        toast.success("Opponent is back!");
+        toast.success("Ton adversaire est de retour !");
       }
     });
 
@@ -315,19 +315,19 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setRematchRequestedBy(null);
       const current = phaseRef.current;
       if (current === "selection" || current === "playing") {
-        toast.error("Opponent left the game.");
+        toast.error("Ton adversaire a quitté la partie.");
         setPhase("ended");
         setGameOverReason("opponent_left");
         setWinnerId(myPlayerIdRef.current);
       } else if (current === "ended") {
-        toast.info("Opponent left the room.");
+        toast.info("Ton adversaire a quitté la salle.");
       }
     });
 
     socket.on("rematch_requested", ({ byPlayerId }) => {
       setRematchRequestedBy(byPlayerId);
       if (byPlayerId !== myPlayerIdRef.current) {
-        toast.info("Opponent wants a rematch!");
+        toast.info("Ton adversaire veut une revanche !");
       }
     });
 

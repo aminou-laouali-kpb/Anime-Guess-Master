@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Character } from "@workspace/api-client-react";
 import { cn } from "@/lib/utils";
+import { fr } from "@/lib/fr";
 import { User, Skull, Star, Shield } from "lucide-react";
 
 interface CharacterCardProps {
@@ -61,7 +62,7 @@ const Portrait: React.FC<{ character: Character; size: "sm" | "md" | "lg" }> = (
   return (
     <div
       aria-hidden
-      className="absolute inset-0 flex items-center justify-center font-display font-black text-white/90"
+      className="absolute inset-0 flex items-center justify-center pb-[35%] font-display font-black text-white/90"
       style={{ background: `linear-gradient(135deg, hsl(${hue} 70% 55%), hsl(${(hue + 50) % 360} 70% 35%))` }}
     >
       <span className={size === "sm" ? "text-3xl" : "text-5xl"}>{initials(character.name)}</span>
@@ -104,20 +105,20 @@ export const CharacterCard: React.FC<CharacterCardProps> = ({
         <div className="p-2 flex flex-col gap-1.5 text-left">
           <div className="grid grid-cols-2 gap-1">
             <div className="flex flex-col bg-muted/30 rounded p-1">
-              <span className="text-[10px] uppercase text-muted-foreground font-bold">Hair</span>
-              <span className="font-semibold text-xs capitalize truncate">{character.hairColor}</span>
+              <span className="text-[10px] uppercase text-muted-foreground font-bold">Cheveux</span>
+              <span className="font-semibold text-xs capitalize truncate">{fr.hair(character.hairColor)}</span>
             </div>
             <div className="flex flex-col bg-muted/30 rounded p-1">
-              <span className="text-[10px] uppercase text-muted-foreground font-bold">Eyes</span>
-              <span className="font-semibold text-xs capitalize truncate">{character.eyeColor}</span>
+              <span className="text-[10px] uppercase text-muted-foreground font-bold">Yeux</span>
+              <span className="font-semibold text-xs capitalize truncate">{fr.eyes(character.eyeColor)}</span>
             </div>
           </div>
           <div className="text-xs font-semibold capitalize text-muted-foreground truncate">
-            {character.species} • {character.gender} • {character.role} role
+            {fr.species(character.species)} • {fr.gender(character.gender)} • rôle {fr.role(character.role)}
           </div>
           <div className={cn("flex items-center justify-center gap-1 py-0.5 rounded-md text-xs font-bold uppercase", alignmentClass)}>
             {getAlignmentIcon(character.alignment)}
-            {character.alignment}
+            {fr.alignment(character.alignment)}
           </div>
         </div>
       )}
@@ -140,7 +141,7 @@ export const CharacterCard: React.FC<CharacterCardProps> = ({
       type="button"
       onClick={onClick}
       className={classes}
-      aria-label={`${character.name} (${character.anime})${eliminated ? ", eliminated" : ""}`}
+      aria-label={`${character.name} (${character.anime})${eliminated ? ", éliminé" : ""}`}
       aria-pressed={selected || eliminated}
     >
       {content}

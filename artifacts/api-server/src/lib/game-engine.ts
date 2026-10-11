@@ -131,7 +131,7 @@ function readString(raw: unknown, maxLength: number): string | null {
 }
 
 function readName(raw: unknown): string {
-  return readString(raw, 24) ?? "Player";
+  return readString(raw, 24) ?? "Joueur";
 }
 
 function readCharacterId(room: Room, raw: unknown): string | null {
@@ -463,14 +463,14 @@ export function setupGameEngine(io: SocketIOServer): void {
       const previous = socketOf(session);
       session.socketId = socket.id;
       if (previous && previous.id !== socket.id) {
-        previous.emit("error", { message: "The game was opened in another tab." });
+        previous.emit("error", { message: "La partie a été ouverte dans un autre onglet." });
         previous.disconnect(true);
       }
     } else {
       session = {
         token: randomId(24),
         playerId: randomId(12),
-        name: "Player",
+        name: "Joueur",
         socketId: socket.id,
         roomCode: null,
         disconnectTimer: null,
@@ -514,7 +514,7 @@ export function setupGameEngine(io: SocketIOServer): void {
         if (!bucket.take()) {
           droppedEvents += 1;
           if (droppedEvents === 1) {
-            socket.emit("error", { message: "Slow down! Too many actions." });
+            socket.emit("error", { message: "Doucement ! Trop d’actions d’un coup." });
           }
           if (droppedEvents > MAX_DROPPED_EVENTS) {
             logger.warn({ ip: socket.data.ip }, "Disconnecting flooding client");
@@ -606,16 +606,16 @@ export function setupGameEngine(io: SocketIOServer): void {
       const room = roomCode ? rooms.get(roomCode) : undefined;
 
       if (!room || room.players.length === 0) {
-        socket.emit("error", { message: "Room not found. Check the code and try again." });
+        socket.emit("error", { message: "Partie introuvable. Vérifie le code et réessaie." });
         return;
       }
       if (room.code === session.roomCode) return;
       if (room.players.length >= 2) {
-        socket.emit("error", { message: "Room is already full." });
+        socket.emit("error", { message: "Cette partie est déjà complète." });
         return;
       }
       if (room.phase !== "waiting") {
-        socket.emit("error", { message: "Game has already started." });
+        socket.emit("error", { message: "La partie a déjà commencé." });
         return;
       }
 
@@ -662,11 +662,11 @@ export function setupGameEngine(io: SocketIOServer): void {
       const { room, player } = ctx;
 
       if (room.currentTurnPlayerId !== player.id) {
-        socket.emit("error", { message: "It's not your turn." });
+        socket.emit("error", { message: "Ce n’est pas ton tour." });
         return;
       }
       if (room.pendingQuestion) {
-        socket.emit("error", { message: "A question is already pending." });
+        socket.emit("error", { message: "Une question est déjà en attente." });
         return;
       }
 
@@ -690,7 +690,7 @@ export function setupGameEngine(io: SocketIOServer): void {
 
       if (!room.pendingQuestion || !room.pendingAskerId) return;
       if (room.pendingAskerId === player.id) {
-        socket.emit("error", { message: "You can't answer your own question." });
+        socket.emit("error", { message: "Tu ne peux pas répondre à ta propre question." });
         return;
       }
       if (answer !== "yes" && answer !== "no") return;
@@ -723,11 +723,11 @@ export function setupGameEngine(io: SocketIOServer): void {
       const { room, player } = ctx;
 
       if (room.currentTurnPlayerId !== player.id) {
-        socket.emit("error", { message: "It's not your turn." });
+        socket.emit("error", { message: "Ce n’est pas ton tour." });
         return;
       }
       if (room.pendingQuestion) {
-        socket.emit("error", { message: "Wait for the answer to your question first." });
+        socket.emit("error", { message: "Attends d’abord la réponse à ta question." });
         return;
       }
 
