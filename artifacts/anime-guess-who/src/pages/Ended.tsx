@@ -17,6 +17,7 @@ export const Ended: React.FC = () => {
     gameLog,
     players,
     ratingUpdate,
+    roomMode,
     requestRematch,
     acceptRematch,
     leaveGame
@@ -69,6 +70,12 @@ export const Ended: React.FC = () => {
               <span className="text-muted-foreground">Partie non classée — comptée dans tes statistiques</span>
             )}
           </div>
+        )}
+
+        {roomMode === "bot" && (
+          <p className="text-sm font-bold text-muted-foreground">
+            Partie d’entraînement — non comptée au classement
+          </p>
         )}
 
         {/* Reveal */}

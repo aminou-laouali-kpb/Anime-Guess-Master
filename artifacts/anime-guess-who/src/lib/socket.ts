@@ -34,6 +34,9 @@ export interface QnaPayload {
   value: string | null;
 }
 
+export type RoomMode = "quick" | "private" | "bot";
+export type BotLevel = "easy" | "normal" | "hard";
+
 export type GameOverReason = "correct_guess" | "out_of_lives" | "opponent_left";
 
 type ServerLogEntry =
@@ -56,6 +59,7 @@ export interface RoomSnapshot {
   myEliminatedIds: string[];
   opponentReady: boolean;
   opponentConnected: boolean;
+  mode: RoomMode;
   currentTurnPlayerId: string | null;
   pendingQuestion: string | null;
   awaitingAnswerFor: string | null;
@@ -95,6 +99,7 @@ export interface RatingUpdate {
 export interface ClientToServerEvents {
   join_lobby: (payload: { name: string }) => void;
   create_room: (payload: { name: string }) => void;
+  play_vs_bot: (payload: { name: string; level: BotLevel }) => void;
   join_room: (payload: { code: string; name: string }) => void;
   leave_room: () => void;
   select_character: (payload: { characterId: string }) => void;
@@ -122,6 +127,7 @@ export interface ServerToClientEvents {
     phase: string;
     players: PlayerState[];
     characters: Character[];
+    mode: RoomMode;
   }) => void;
   opponent_ready: () => void;
   game_start: (payload: {
@@ -159,6 +165,7 @@ export interface ServerToClientEvents {
     phase: string;
     players: PlayerState[];
     characters: Character[];
+    mode: RoomMode;
   }) => void;
   error: (payload: { message: string }) => void;
 }

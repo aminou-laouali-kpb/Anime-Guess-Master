@@ -28,8 +28,11 @@ export const Playing: React.FC = () => {
     myPlayerId,
     myEliminatedIds,
     opponentConnected,
-    timer
+    timer,
+    roomMode
   } = useGame();
+  // The computer only understands verified questions.
+  const vsBot = roomMode === "bot";
 
   const secondsLeft = useSecondsLeft(timer?.deadline);
   const urgent = secondsLeft !== null && secondsLeft <= 10;
@@ -69,7 +72,7 @@ export const Playing: React.FC = () => {
 
   const handleAsk = (e: React.FormEvent) => {
     e.preventDefault();
-    if (askMode === "verified") {
+    if (askMode === "verified" || vsBot) {
       if (!askValue) return;
       askVerifiedQuestion(askAttribute, askValue);
       setAskValue(null);
@@ -274,7 +277,7 @@ export const Playing: React.FC = () => {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="grid grid-cols-2 gap-1 p-1 bg-muted rounded-lg" role="tablist">
+          {!vsBot && <div className="grid grid-cols-2 gap-1 p-1 bg-muted rounded-lg" role="tablist">
             {(["verified", "free"] as const).map(mode => (
               <button
                 key={mode}
@@ -290,10 +293,10 @@ export const Playing: React.FC = () => {
                 {mode === "verified" ? "Question vérifiée" : "Question libre"}
               </button>
             ))}
-          </div>
+          </div>}
 
           <form onSubmit={handleAsk} className="space-y-4 mt-2">
-            {askMode === "verified" ? (
+            {askMode === "verified" || vsBot ? (
               <>
                 <div className="flex flex-wrap gap-1.5">
                   {ATTRIBUTES.map(({ key, label }) => (
@@ -339,7 +342,7 @@ export const Playing: React.FC = () => {
             <DialogFooter>
               <Button
                 type="submit"
-                disabled={askMode === "verified" ? !askValue : !freeQuestion.trim()}
+                disabled={askMode === "verified" || vsBot ? !askValue : !freeQuestion.trim()}
                 className="w-full h-12 text-lg font-bold"
               >
                 Envoyer
