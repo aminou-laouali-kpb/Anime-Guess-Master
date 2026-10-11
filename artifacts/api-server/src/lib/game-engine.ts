@@ -4,6 +4,13 @@ import characters from "../data/characters.json" assert { type: "json" };
 import { imageUrlFor } from "./character-images";
 import { logger } from "./logger";
 import { TokenBucket, clientIp } from "./rate-limit";
+import {
+  MIN_RANKED_GAMES,
+  getPlayerStats,
+  newProfileToken,
+  recordGame,
+  statsEnabled,
+} from "./stats";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -61,6 +68,8 @@ function readAttribute(raw: unknown): VerifiableAttribute | null {
 export interface Player {
   id: string; // public id, safe to share with the opponent
   token: string; // secret session token, never sent to anyone but its owner
+  profileToken: string; // secret, long-lived: links results to stats
+  ip: string;
   name: string;
   selectedCharacterId: string | null;
   eliminatedIds: string[];
@@ -75,6 +84,7 @@ export type GameOverReason = "correct_guess" | "out_of_lives" | "opponent_left";
 export interface Room {
   code: string;
   phase: RoomPhase;
+  mode: "quick" | "private"; // only quick-play games count for the leaderboard
   characterIds: string[]; // this game's board, a random subset of all characters
   players: Player[];
   currentTurnPlayerId: string | null;
@@ -95,6 +105,8 @@ export interface Room {
 interface Session {
   token: string;
   playerId: string;
+  profileToken: string;
+  ip: string;
   name: string;
   socketId: string | null;
   roomCode: string | null;
@@ -169,6 +181,8 @@ function createPlayer(session: Session): Player {
   return {
     id: session.playerId,
     token: session.token,
+    profileToken: session.profileToken,
+    ip: session.ip,
     name: session.name,
     selectedCharacterId: null,
     eliminatedIds: [],
@@ -177,10 +191,11 @@ function createPlayer(session: Session): Player {
   };
 }
 
-function createRoom(code: string): Room {
+function createRoom(code: string, mode: Room["mode"]): Room {
   return {
     code,
     phase: "waiting",
+    mode,
     characterIds: [],
     players: [],
     currentTurnPlayerId: null,
@@ -439,6 +454,26 @@ export function setupGameEngine(io: SocketIOServer): void {
 
   // Each player gets their own game_over so "opponentCharacterId" is always
   // the *other* player's character.
+  // Saves the result for stats and tells each player how their rating moved.
+  function reportResult(room: Room, winner: Player, loser: Player, reason: string): void {
+    if (!statsEnabled) return;
+    // Two players on the same network could be one person farming wins.
+    const ranked = room.mode === "quick" && winner.ip !== loser.ip;
+    recordGame({
+      winner: { profileToken: winner.profileToken, name: winner.name },
+      loser: { profileToken: loser.profileToken, name: loser.name },
+      ranked,
+      mode: room.mode,
+      reason,
+    })
+      .then((result) => {
+        if (!result) return;
+        emitToPlayer(winner, "rating_update", result.winner);
+        emitToPlayer(loser, "rating_update", result.loser);
+      })
+      .catch((err) => logger.error({ err }, "Failed to record game result"));
+  }
+
   function endGame(room: Room, winnerId: string, reason: GameOverReason): void {
     room.phase = "ended";
     room.winnerId = winnerId;
@@ -455,6 +490,10 @@ export function setupGameEngine(io: SocketIOServer): void {
         opponentCharacterId: opponentOf(room, player)?.selectedCharacterId ?? null,
       });
     }
+
+    const winner = room.players.find((p) => p.id === winnerId);
+    const loser = winner && opponentOf(room, winner);
+    if (winner && loser) reportResult(room, winner, loser, reason);
   }
 
   // Removes the player for good and tells the opponent, whatever the phase.
@@ -464,6 +503,7 @@ export function setupGameEngine(io: SocketIOServer): void {
     if (!room) return;
 
     socketOf(session)?.leave(room.code);
+    const leaver = room.players.find((p) => p.token === session.token);
     room.players = room.players.filter((p) => p.token !== session.token);
 
     const remaining = room.players[0];
@@ -471,6 +511,11 @@ export function setupGameEngine(io: SocketIOServer): void {
       clearTimer(room);
       rooms.delete(room.code);
       return;
+    }
+
+    // Quitting mid-game (or never coming back) counts as a loss.
+    if (room.phase === "playing" && leaver) {
+      reportResult(room, remaining, leaver, "forfeit");
     }
 
     if (room.phase !== "ended") {
@@ -516,6 +561,8 @@ export function setupGameEngine(io: SocketIOServer): void {
       session = {
         token: randomId(24),
         playerId: randomId(12),
+        profileToken: "",
+        ip: "",
         name: "Joueur",
         socketId: socket.id,
         roomCode: null,
@@ -523,6 +570,12 @@ export function setupGameEngine(io: SocketIOServer): void {
       };
       sessions.set(session.token, session);
     }
+
+    // Long-lived profile for stats, kept by the browser across sessions.
+    const profile = auth["profile"];
+    session.profileToken =
+      typeof profile === "string" && TOKEN_RE.test(profile) ? profile : newProfileToken();
+    session.ip = (socket.data.ip as string | undefined) ?? "unknown";
 
     return session;
   }
@@ -586,6 +639,7 @@ export function setupGameEngine(io: SocketIOServer): void {
 
     try {
       socket.emit("session", { token: session.token, playerId: session.playerId });
+      socket.emit("profile", { token: session.profileToken });
 
       const restored = currentRoomAndPlayer();
       if (restored) {
@@ -624,7 +678,7 @@ export function setupGameEngine(io: SocketIOServer): void {
         return;
       }
 
-      const room = createRoom(generateCode());
+      const room = createRoom(generateCode(), "quick");
       rooms.set(room.code, room);
       addToRoom(room, waiting);
       addToRoom(room, session);
@@ -640,7 +694,7 @@ export function setupGameEngine(io: SocketIOServer): void {
       removeFromQueue(session.token);
       leaveRoom(session);
 
-      const room = createRoom(generateCode());
+      const room = createRoom(generateCode(), "private");
       rooms.set(room.code, room);
       addToRoom(room, session);
       socket.emit("room_created", { code: room.code });
@@ -674,6 +728,19 @@ export function setupGameEngine(io: SocketIOServer): void {
       room.characterIds = dealBoard();
       emitRoomJoined(room);
       updateTimer(room);
+    });
+
+    // ── Personal stats ───────────────────────────────────────────────────────
+    on("get_my_stats", () => {
+      if (!statsEnabled) {
+        socket.emit("my_stats", { enabled: false, minRankedGames: MIN_RANKED_GAMES, stats: null });
+        return;
+      }
+      getPlayerStats(session.profileToken)
+        .then((stats) =>
+          socket.emit("my_stats", { enabled: true, minRankedGames: MIN_RANKED_GAMES, stats }),
+        )
+        .catch((err) => logger.error({ err }, "Failed to load player stats"));
     });
 
     // ── Leave the current room or queue on purpose ───────────────────────────

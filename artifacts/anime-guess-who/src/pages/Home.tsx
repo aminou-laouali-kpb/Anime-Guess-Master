@@ -3,11 +3,13 @@ import { useGame } from "@/context/GameContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Gamepad2, Users, UsersRound, HelpCircle, ArrowRight } from "lucide-react";
+import { Gamepad2, Users, UsersRound, HelpCircle, ArrowRight, Trophy } from "lucide-react";
+import { LeaderboardDialog } from "@/components/LeaderboardDialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 
 export const Home: React.FC = () => {
-  const { myName, setMyName, joinQueue, joinRoom, createPrivateRoom } = useGame();
+  const { myName, setMyName, joinQueue, joinRoom, createPrivateRoom, myStats } = useGame();
+  const [showLeaderboard, setShowLeaderboard] = useState(false);
 
   const [showJoin, setShowJoin] = useState(false);
   const [joinCode, setJoinCode] = useState("");
@@ -92,14 +94,26 @@ export const Home: React.FC = () => {
             <UsersRound className="mr-2 w-5 h-5" /> Rejoindre avec un code
           </Button>
 
-          <Button 
-            variant="ghost" 
-            size="lg"
-            className="w-full mt-4 text-muted-foreground hover:text-foreground"
-            onClick={() => setShowHowToPlay(true)}
-          >
-            <HelpCircle className="mr-2 w-5 h-5" /> Comment jouer
-          </Button>
+          <div className={myStats?.enabled ? "grid grid-cols-2 gap-2 mt-4" : "mt-4"}>
+            {myStats?.enabled && (
+              <Button
+                variant="ghost"
+                size="lg"
+                className="w-full text-muted-foreground hover:text-foreground"
+                onClick={() => setShowLeaderboard(true)}
+              >
+                <Trophy className="mr-2 w-5 h-5" /> Classement
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              size="lg"
+              className="w-full text-muted-foreground hover:text-foreground"
+              onClick={() => setShowHowToPlay(true)}
+            >
+              <HelpCircle className="mr-2 w-5 h-5" /> Comment jouer
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -166,6 +180,8 @@ export const Home: React.FC = () => {
           </form>
         </DialogContent>
       </Dialog>
+
+      <LeaderboardDialog open={showLeaderboard} onOpenChange={setShowLeaderboard} />
 
       <Dialog open={showHowToPlay} onOpenChange={setShowHowToPlay}>
         <DialogContent className="sm:max-w-lg">

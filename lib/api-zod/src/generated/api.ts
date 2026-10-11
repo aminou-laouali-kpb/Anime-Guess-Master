@@ -38,3 +38,22 @@ export const ListCharactersResponseItem = zod.object({
 export const ListCharactersResponse = zod.array(ListCharactersResponseItem)
 
 
+/**
+ * Best-rated players (Elo) among those with enough ranked games
+ * @summary Top players
+ */
+export const GetLeaderboardResponse = zod.object({
+  "enabled": zod.boolean().describe('False when the server has no stats database'),
+  "minRankedGames": zod.number(),
+  "entries": zod.array(zod.object({
+  "rank": zod.number(),
+  "id": zod.string(),
+  "name": zod.string(),
+  "rating": zod.number(),
+  "wins": zod.number(),
+  "losses": zod.number(),
+  "rankedGames": zod.number()
+}))
+})
+
+

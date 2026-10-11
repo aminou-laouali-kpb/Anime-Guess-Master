@@ -17,7 +17,9 @@ import type {
 
 import type {
   Character,
-  HealthStatus
+  ErrorResponse,
+  HealthStatus,
+  Leaderboard
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
@@ -191,6 +193,84 @@ export function useListCharacters<TData = Awaited<ReturnType<typeof listCharacte
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getListCharactersQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetLeaderboardUrl = () => {
+
+
+
+
+  return `/api/leaderboard`
+}
+
+/**
+ * Best-rated players (Elo) among those with enough ranked games
+ * @summary Top players
+ */
+export const getLeaderboard = async ( options?: Parameters<typeof customFetch>[1]): Promise<Leaderboard> => {
+
+  return customFetch<Leaderboard>(getGetLeaderboardUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetLeaderboardQueryKey = () => {
+    return [
+    `/api/leaderboard`
+    ] as const;
+    }
+
+
+export const getGetLeaderboardQueryOptions = <TData = Awaited<ReturnType<typeof getLeaderboard>>, TError = ErrorType<ErrorResponse>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getLeaderboard>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetLeaderboardQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getLeaderboard>>> = ({ signal }) => getLeaderboard({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getLeaderboard>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetLeaderboardQueryResult = NonNullable<Awaited<ReturnType<typeof getLeaderboard>>>
+export type GetLeaderboardQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Top players
+ */
+
+export function useGetLeaderboard<TData = Awaited<ReturnType<typeof getLeaderboard>>, TError = ErrorType<ErrorResponse>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getLeaderboard>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetLeaderboardQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

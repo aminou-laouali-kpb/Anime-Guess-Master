@@ -28,6 +28,23 @@ export interface Character {
   imageUrl: string | null;
 }
 
+export interface LeaderboardEntry {
+  rank: number;
+  id: string;
+  name: string;
+  rating: number;
+  wins: number;
+  losses: number;
+  rankedGames: number;
+}
+
+export interface Leaderboard {
+  /** False when the server has no stats database */
+  enabled: boolean;
+  minRankedGames: number;
+  entries: LeaderboardEntry[];
+}
+
 export interface ErrorResponse {
   error: string;
 }
