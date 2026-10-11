@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from "react";
-import { socket, saveSessionToken, GamePhase, GameOverReason, PlayerState, GameLogEntry, RoomSnapshot, TimerPayload } from "../lib/socket";
+import { socket, saveSessionToken, saveProfileToken, MyStatsPayload, RatingUpdate, GamePhase, GameOverReason, PlayerState, GameLogEntry, RoomSnapshot, TimerPayload } from "../lib/socket";
 import { Character, useListCharacters } from "@workspace/api-client-react";
 import type { VerifiableAttribute } from "../lib/questions";
 import { toast } from "sonner";
@@ -25,6 +25,8 @@ interface GameState {
   revealedOpponentCharacterId: string | null;
   rematchRequestedBy: string | null;
   timer: TurnTimer | null;
+  myStats: MyStatsPayload | null;
+  ratingUpdate: RatingUpdate | null; // result of the game that just ended
   isConnected: boolean;
   myName: string;
 }
@@ -53,6 +55,7 @@ interface GameContextType extends GameState {
   requestRematch: () => void;
   acceptRematch: () => void;
   leaveGame: () => void;
+  refreshMyStats: () => void;
 }
 
 const GameContext = createContext<GameContextType | null>(null);
@@ -90,6 +93,8 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [revealedOpponentCharacterId, setRevealedOpponentCharacterId] = useState<string | null>(null);
   const [rematchRequestedBy, setRematchRequestedBy] = useState<string | null>(null);
   const [timer, setTimer] = useState<TurnTimer | null>(null);
+  const [myStats, setMyStats] = useState<MyStatsPayload | null>(null);
+  const [ratingUpdate, setRatingUpdate] = useState<RatingUpdate | null>(null);
 
   // Socket listeners are registered once; they read the live phase from here.
   const phaseRef = useRef(phase);
@@ -118,10 +123,12 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setRevealedOpponentCharacterId(null);
     setRematchRequestedBy(null);
     setTimer(null);
+    setRatingUpdate(null);
   };
 
   const startNewRound = (players: PlayerState[], characters: Character[]) => {
     setPhase("selection");
+    setRatingUpdate(null);
     setPlayers(players);
     setCharacters(characters);
     setOpponentReady(false);
@@ -173,6 +180,18 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     socket.on("session", ({ token, playerId }) => {
       saveSessionToken(token);
       setMyPlayerId(playerId);
+    });
+
+    socket.on("profile", ({ token }) => {
+      saveProfileToken(token);
+      socket.emit("get_my_stats");
+    });
+
+    socket.on("my_stats", (payload) => setMyStats(payload));
+
+    socket.on("rating_update", (update) => {
+      setRatingUpdate(update);
+      socket.emit("get_my_stats");
     });
 
     // Sent on every (re)connection: either our seat in a game, or nothing.
@@ -344,6 +363,9 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       socket.off("connect");
       socket.off("disconnect");
       socket.off("session");
+      socket.off("profile");
+      socket.off("my_stats");
+      socket.off("rating_update");
       socket.off("state_sync");
       socket.off("in_queue");
       socket.off("room_created");
@@ -421,6 +443,10 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     socket.emit("accept_rematch");
   }, []);
 
+  const refreshMyStats = useCallback(() => {
+    socket.emit("get_my_stats");
+  }, []);
+
   const leaveGame = useCallback(() => {
     socket.emit("leave_room");
     resetGameState();
@@ -450,6 +476,8 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
         revealedOpponentCharacterId,
         rematchRequestedBy,
         timer,
+        myStats,
+        ratingUpdate,
         isConnected,
         myName,
         setMyName,
@@ -465,6 +493,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
         requestRematch,
         acceptRematch,
         leaveGame,
+        refreshMyStats,
       }}
     >
       {children}

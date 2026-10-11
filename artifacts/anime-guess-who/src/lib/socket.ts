@@ -67,6 +67,31 @@ export interface RoomSnapshot {
   timer: TimerPayload;
 }
 
+export interface PlayerStats {
+  id: string;
+  name: string;
+  rating: number;
+  rank: number | null;
+  gamesPlayed: number;
+  rankedGames: number;
+  wins: number;
+  losses: number;
+  currentStreak: number;
+  bestStreak: number;
+}
+
+export interface MyStatsPayload {
+  enabled: boolean;
+  minRankedGames: number;
+  stats: PlayerStats | null; // null until the first finished game
+}
+
+export interface RatingUpdate {
+  ranked: boolean;
+  rating: number;
+  delta: number;
+}
+
 export interface ClientToServerEvents {
   join_lobby: (payload: { name: string }) => void;
   create_room: (payload: { name: string }) => void;
@@ -80,11 +105,15 @@ export interface ClientToServerEvents {
   make_guess: (payload: { characterId: string }) => void;
   sync_eliminations: (payload: { eliminatedIds: string[] }) => void;
   request_rematch: () => void;
+  get_my_stats: () => void;
   accept_rematch: () => void;
 }
 
 export interface ServerToClientEvents {
   session: (payload: { token: string; playerId: string }) => void;
+  profile: (payload: { token: string }) => void;
+  my_stats: (payload: MyStatsPayload) => void;
+  rating_update: (payload: RatingUpdate) => void;
   state_sync: (payload: { room: RoomSnapshot | null }) => void;
   in_queue: (payload: { position: number }) => void;
   room_created: (payload: { code: string }) => void;
@@ -135,23 +164,29 @@ export interface ServerToClientEvents {
 }
 
 const SESSION_KEY = "anime_who_session";
+// Long-lived: ties this browser's results to its stats and leaderboard spot.
+const PROFILE_KEY = "anime_who_profile";
 
-export function loadSessionToken(): string | null {
+function load(key: string): string | null {
   try {
-    return localStorage.getItem(SESSION_KEY);
+    return localStorage.getItem(key);
   } catch {
     return null;
   }
 }
 
-export function saveSessionToken(token: string): void {
+function save(key: string, value: string): void {
   try {
-    localStorage.setItem(SESSION_KEY, token);
+    localStorage.setItem(key, value);
   } catch {
     // Private mode / blocked storage: the game still works, it just can't
-    // survive a page reload.
+    // survive a page reload (and stats start over each visit).
   }
 }
+
+export const loadSessionToken = () => load(SESSION_KEY);
+export const saveSessionToken = (token: string) => save(SESSION_KEY, token);
+export const saveProfileToken = (token: string) => save(PROFILE_KEY, token);
 
 // Connect to the same origin — the shared proxy routes /api/* (including
 // /api/socket.io/*) to the API artifact, so no absolute URL is needed.
@@ -161,5 +196,5 @@ export const socket: Socket<ServerToClientEvents, ClientToServerEvents> = io({
   path: "/api/socket.io",
   autoConnect: false,
   transports: ["polling", "websocket"],
-  auth: (cb) => cb({ token: loadSessionToken() }),
+  auth: (cb) => cb({ token: loadSessionToken(), profile: load(PROFILE_KEY) }),
 });

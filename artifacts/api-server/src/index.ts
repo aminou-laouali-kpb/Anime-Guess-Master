@@ -4,6 +4,7 @@ import app, { allowedOrigins } from "./app";
 import { logger } from "./lib/logger";
 import { setupGameEngine } from "./lib/game-engine";
 import { loadCharacterImages } from "./lib/character-images";
+import { initStats } from "./lib/stats";
 import characters from "./data/characters.json" assert { type: "json" };
 
 const rawPort = process.env["PORT"];
@@ -51,5 +52,8 @@ httpServer.listen(port, () => {
   // initials until the portraits are found.
   void loadCharacterImages(characters).catch((err) =>
     logger.warn({ err }, "Character image loading failed"),
+  );
+  void initStats().catch((err) =>
+    logger.error({ err }, "Could not set up the stats database"),
   );
 });

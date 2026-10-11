@@ -16,6 +16,7 @@ export const Ended: React.FC = () => {
     opponentLeft,
     gameLog,
     players,
+    ratingUpdate,
     requestRematch,
     acceptRematch,
     leaveGame
@@ -53,6 +54,22 @@ export const Ended: React.FC = () => {
             {gameOverReason === "correct_guess" && !isWinner && "L’adversaire a deviné ton personnage !"}
           </p>
         </div>
+
+        {/* Rating change (stats enabled only) */}
+        {ratingUpdate && (
+          <div className="bg-card/70 border border-card-border rounded-xl px-4 py-2 text-sm font-bold">
+            {ratingUpdate.ranked ? (
+              <>
+                Score : <span className="font-display text-lg tabular-nums">{ratingUpdate.rating}</span>{" "}
+                <span className={ratingUpdate.delta >= 0 ? "text-green-600" : "text-red-500"}>
+                  ({ratingUpdate.delta >= 0 ? "+" : ""}{ratingUpdate.delta})
+                </span>
+              </>
+            ) : (
+              <span className="text-muted-foreground">Partie non classée — comptée dans tes statistiques</span>
+            )}
+          </div>
+        )}
 
         {/* Reveal */}
         {!isDisconnect && opponentCharacter && (

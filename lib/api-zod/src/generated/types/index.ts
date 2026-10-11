@@ -9,3 +9,5 @@
 export * from './character';
 export * from './errorResponse';
 export * from './healthStatus';
+export * from './leaderboard';
+export * from './leaderboardEntry';

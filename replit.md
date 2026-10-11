@@ -9,7 +9,9 @@ _Replace the heading above with the project's name, and this line with one sente
 - `pnpm run build` — typecheck + build all packages
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
 - `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
-- Required env: `DATABASE_URL` — Postgres connection string
+- Optional env: `DATABASE_URL` — Postgres connection string. Enables player stats and the leaderboard (tables are created on startup); without it the game runs and those features are hidden.
+- Optional env: `SITE_URL` — public address of the site (e.g. `https://anime-guess-master.replit.app`), used to make the link-preview image URL absolute at build time.
+- Optional env: `ALLOWED_ORIGINS` — comma-separated extra origins allowed by CORS (same-origin only by default).
 
 ## Stack
 

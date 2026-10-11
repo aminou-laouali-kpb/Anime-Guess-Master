@@ -12,6 +12,8 @@ tags:
     description: Health operations
   - name: characters
     description: Anime character operations
+  - name: stats
+    description: Player statistics and leaderboard
 paths:
   /healthz:
     get:
@@ -42,6 +44,26 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/Character"
+
+  /leaderboard:
+    get:
+      operationId: getLeaderboard
+      tags: [stats]
+      summary: Top players
+      description: Best-rated players (Elo) among those with enough ranked games
+      responses:
+        "200":
+          description: Leaderboard
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Leaderboard"
+        "503":
+          description: Stats database unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
 components:
   schemas:
@@ -96,6 +118,39 @@ components:
         imageUrl:
           type: ["string", "null"]
           description: Portrait URL, or null when no image is available yet
+
+    Leaderboard:
+      type: object
+      required: [enabled, minRankedGames, entries]
+      properties:
+        enabled:
+          type: boolean
+          description: False when the server has no stats database
+        minRankedGames:
+          type: number
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/LeaderboardEntry"
+
+    LeaderboardEntry:
+      type: object
+      required: [rank, id, name, rating, wins, losses, rankedGames]
+      properties:
+        rank:
+          type: number
+        id:
+          type: string
+        name:
+          type: string
+        rating:
+          type: number
+        wins:
+          type: number
+        losses:
+          type: number
+        rankedGames:
+          type: number
 
     ErrorResponse:
       type: object
