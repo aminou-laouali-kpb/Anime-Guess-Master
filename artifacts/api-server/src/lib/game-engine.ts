@@ -4,6 +4,7 @@ import characters from "../data/characters.json" assert { type: "json" };
 import { imageUrlFor } from "./character-images";
 import { logger } from "./logger";
 import { TokenBucket, clientIp } from "./rate-limit";
+import { BOT_LEVELS, BOT_NAMES, type BotLevel, type BotMemory, chooseBotMove } from "./bot";
 import {
   MIN_RANKED_GAMES,
   getPlayerStats,
@@ -70,6 +71,7 @@ export interface Player {
   token: string; // secret session token, never sent to anyone but its owner
   profileToken: string; // secret, long-lived: links results to stats
   ip: string;
+  isBot: boolean;
   name: string;
   selectedCharacterId: string | null;
   eliminatedIds: string[];
@@ -84,7 +86,10 @@ export type GameOverReason = "correct_guess" | "out_of_lives" | "opponent_left";
 export interface Room {
   code: string;
   phase: RoomPhase;
-  mode: "quick" | "private"; // only quick-play games count for the leaderboard
+  mode: "quick" | "private" | "bot"; // only quick-play games count for the leaderboard
+  botLevel: BotLevel | null;
+  botTimer: NodeJS.Timeout | null;
+  botKey: string | null; // state the pending bot move was planned for
   characterIds: string[]; // this game's board, a random subset of all characters
   players: Player[];
   currentTurnPlayerId: string | null;
@@ -183,6 +188,7 @@ function createPlayer(session: Session): Player {
     token: session.token,
     profileToken: session.profileToken,
     ip: session.ip,
+    isBot: false,
     name: session.name,
     selectedCharacterId: null,
     eliminatedIds: [],
@@ -196,6 +202,9 @@ function createRoom(code: string, mode: Room["mode"]): Room {
     code,
     phase: "waiting",
     mode,
+    botLevel: null,
+    botTimer: null,
+    botKey: null,
     characterIds: [],
     players: [],
     currentTurnPlayerId: null,
@@ -210,6 +219,10 @@ function createRoom(code: string, mode: Room["mode"]): Room {
     timerDeadline: null,
     timerPlayerId: null,
   };
+}
+
+function isPlayerConnected(player: Player): boolean {
+  return player.isBot || sessions.get(player.token)?.socketId != null;
 }
 
 function publicPlayers(room: Room) {
@@ -269,9 +282,8 @@ function snapshotFor(room: Room, player: Player) {
     myCharacterId: player.selectedCharacterId,
     myEliminatedIds: player.eliminatedIds,
     opponentReady: opponent?.isReady ?? false,
-    opponentConnected: opponent
-      ? sessions.get(opponent.token)?.socketId != null
-      : false,
+    opponentConnected: opponent ? isPlayerConnected(opponent) : false,
+    mode: room.mode,
     currentTurnPlayerId: room.currentTurnPlayerId,
     pendingQuestion: room.pendingQuestion && !iAsked ? room.pendingQuestion : null,
     awaitingAnswerFor: room.pendingQuestion && iAsked ? room.pendingQuestion : null,
@@ -334,12 +346,11 @@ export function setupGameEngine(io: SocketIOServer): void {
       phase: room.phase,
       players: publicPlayers(room),
       characters: boardOf(room),
+      mode: room.mode,
     });
   }
 
-  function isConnected(player: Player): boolean {
-    return sessions.get(player.token)?.socketId != null;
-  }
+  const isConnected = isPlayerConnected;
 
   function clearTimer(room: Room): void {
     if (room.timer) clearTimeout(room.timer);
@@ -371,7 +382,10 @@ export function setupGameEngine(io: SocketIOServer): void {
       duration = TURN_TIME_MS;
     }
 
-    if (!force && key !== null && key === room.timerKey) return;
+    if (!force && key !== null && key === room.timerKey) {
+      driveBot(room);
+      return;
+    }
     const hadTimer = room.timerKey !== null;
     clearTimer(room);
 
@@ -389,6 +403,7 @@ export function setupGameEngine(io: SocketIOServer): void {
     }
 
     if (key !== null || hadTimer) io.to(room.code).emit("timer", timerPayload(room));
+    driveBot(room);
   }
 
   function maybeStartGame(room: Room): void {
@@ -456,7 +471,7 @@ export function setupGameEngine(io: SocketIOServer): void {
   // the *other* player's character.
   // Saves the result for stats and tells each player how their rating moved.
   function reportResult(room: Room, winner: Player, loser: Player, reason: string): void {
-    if (!statsEnabled) return;
+    if (!statsEnabled || room.mode === "bot") return;
     // Two players on the same network could be one person farming wins.
     const ranked = room.mode === "quick" && winner.ip !== loser.ip;
     recordGame({
@@ -507,8 +522,9 @@ export function setupGameEngine(io: SocketIOServer): void {
     room.players = room.players.filter((p) => p.token !== session.token);
 
     const remaining = room.players[0];
-    if (!remaining) {
+    if (!remaining || remaining.isBot) {
       clearTimer(room);
+      cancelBot(room);
       rooms.delete(room.code);
       return;
     }
@@ -528,6 +544,166 @@ export function setupGameEngine(io: SocketIOServer): void {
     room.rematchRequestedBy = null;
     updateTimer(room);
     emitToPlayer(remaining, "opponent_left");
+  }
+
+  // ── Game actions shared by human players (socket handlers) and the bot ────
+
+  function selectCharacter(room: Room, player: Player, characterId: string): void {
+    player.selectedCharacterId = characterId;
+    player.isReady = true;
+    // Tell the other player this player is ready (without revealing the character)
+    const opponent = opponentOf(room, player);
+    if (opponent) emitToPlayer(opponent, "opponent_ready");
+    maybeStartGame(room);
+    updateTimer(room);
+  }
+
+  function askVerified(room: Room, player: Player, attribute: VerifiableAttribute, value: string): void {
+    const opponent = opponentOf(room, player);
+    const secret = allCharacters.find((c) => c.id === opponent?.selectedCharacterId);
+    if (!opponent || !secret) return;
+
+    const entry: LogEntry = {
+      type: "qna",
+      question: null,
+      verified: true,
+      attribute,
+      value,
+      answer: secret[attribute].toLowerCase() === value.toLowerCase() ? "yes" : "no",
+      askerId: player.id,
+    };
+    room.log.push(entry);
+    room.currentTurnPlayerId = opponent.id;
+    io.to(room.code).emit("question_answered", {
+      ...entry,
+      currentTurnPlayerId: room.currentTurnPlayerId,
+    });
+    updateTimer(room);
+  }
+
+  function makeGuess(room: Room, player: Player, characterId: string): void {
+    const opponent = opponentOf(room, player);
+    if (!opponent) return;
+
+    if (opponent.selectedCharacterId === characterId) {
+      endGame(room, player.id, "correct_guess");
+      return;
+    }
+
+    player.lives -= 1;
+    room.log.push({ type: "guess", guesserId: player.id, guessedCharacterId: characterId });
+
+    if (player.lives <= 0) {
+      endGame(room, opponent.id, "out_of_lives");
+      return;
+    }
+
+    room.currentTurnPlayerId = opponent.id;
+    io.to(room.code).emit("wrong_guess", {
+      guesserId: player.id,
+      guessedCharacterId: characterId,
+      lives: player.lives,
+      currentTurnPlayerId: room.currentTurnPlayerId,
+    });
+    updateTimer(room);
+  }
+
+  function startRematch(room: Room): void {
+    room.phase = "selection";
+    room.characterIds = dealBoard(); // fresh board for the rematch
+    room.log = [];
+    room.pendingQuestion = null;
+    room.pendingAskerId = null;
+    room.winnerId = null;
+    room.gameOverReason = null;
+    room.rematchRequestedBy = null;
+    room.currentTurnPlayerId = null;
+    for (const p of room.players) {
+      p.selectedCharacterId = null;
+      p.eliminatedIds = [];
+      p.lives = MAX_LIVES;
+      p.isReady = false;
+    }
+
+    io.to(room.code).emit("rematch_started", {
+      code: room.code,
+      phase: room.phase,
+      players: publicPlayers(room),
+      characters: boardOf(room),
+      mode: room.mode,
+    });
+    updateTimer(room);
+  }
+
+  // ── Computer opponent ─────────────────────────────────────────────────────
+
+  function cancelBot(room: Room): void {
+    if (room.botTimer) clearTimeout(room.botTimer);
+    room.botTimer = null;
+    room.botKey = null;
+  }
+
+  // Works out whether the bot has something to do in the current state and
+  // schedules it after a short, human-like pause. Called after every change.
+  function driveBot(room: Room): void {
+    const bot = room.players.find((p) => p.isBot);
+    if (!bot) return;
+    const human = opponentOf(room, bot);
+    // The bot waits while its opponent is disconnected (the clock is paused too).
+    if (!human || !isConnected(human) || !rooms.has(room.code)) {
+      cancelBot(room);
+      return;
+    }
+
+    let delay = 0;
+    let act: (() => void) | null = null;
+    if (room.phase === "selection" && !bot.isReady) {
+      delay = 1200;
+      act = () => selectCharacter(room, bot, pickRandomCharacterId(room));
+    } else if (room.phase === "playing" && room.currentTurnPlayerId === bot.id && !room.pendingQuestion) {
+      delay = 1800 + Math.random() * 1500;
+      act = () => playBotTurn(room, bot);
+    } else if (room.phase === "ended" && room.rematchRequestedBy === human.id) {
+      delay = 900;
+      act = () => startRematch(room);
+    }
+
+    const key = `${room.phase}:${room.currentTurnPlayerId}:${room.log.length}:${bot.isReady}:${room.rematchRequestedBy}`;
+    if (!act) {
+      cancelBot(room);
+      return;
+    }
+    if (room.botTimer && room.botKey === key) return; // already planned
+    cancelBot(room);
+    room.botKey = key;
+    room.botTimer = setTimeout(() => {
+      room.botTimer = null;
+      room.botKey = null;
+      try {
+        act();
+      } catch (err) {
+        logger.error({ err }, "Bot move failed");
+      }
+    }, delay);
+  }
+
+  function playBotTurn(room: Room, bot: Player): void {
+    // Only what the bot legitimately knows: the board and its own answers.
+    const memory: BotMemory = { answers: [], wrongGuesses: [] };
+    for (const entry of room.log) {
+      if (entry.type === "qna" && entry.askerId === bot.id && entry.verified && entry.attribute && entry.value) {
+        memory.answers.push({ attribute: entry.attribute, value: entry.value, answer: entry.answer });
+      } else if (entry.type === "guess" && entry.guesserId === bot.id) {
+        memory.wrongGuesses.push(entry.guessedCharacterId);
+      }
+    }
+    const board = room.characterIds
+      .map((id) => allCharacters.find((c) => c.id === id))
+      .filter((c): c is Character => Boolean(c));
+
+    const move = chooseBotMove(board, memory, room.botLevel ?? "normal");
+    if (move.type === "ask") askVerified(room, bot, move.attribute, move.value);
+    else makeGuess(room, bot, move.characterId);
   }
 
   function endSession(session: Session): void {
@@ -688,6 +864,35 @@ export function setupGameEngine(io: SocketIOServer): void {
       updateTimer(room);
     });
 
+    // ── Play against the computer ────────────────────────────────────────────
+    on("play_vs_bot", ({ name, level }) => {
+      const botLevel = BOT_LEVELS.find((l) => l === level) ?? "normal";
+      session.name = readName(name);
+      removeFromQueue(session.token);
+      leaveRoom(session);
+
+      const room = createRoom(generateCode(), "bot");
+      room.botLevel = botLevel;
+      rooms.set(room.code, room);
+      addToRoom(room, session);
+      room.players.push({
+        id: randomId(12),
+        token: `bot:${randomId(12)}`, // never matches a session
+        profileToken: "",
+        ip: "",
+        isBot: true,
+        name: BOT_NAMES[botLevel],
+        selectedCharacterId: null,
+        eliminatedIds: [],
+        lives: MAX_LIVES,
+        isReady: false,
+      });
+      room.phase = "selection";
+      room.characterIds = dealBoard();
+      emitRoomJoined(room);
+      updateTimer(room);
+    });
+
     // ── Create private room ──────────────────────────────────────────────────
     on("create_room", ({ name }) => {
       session.name = readName(name);
@@ -757,15 +962,7 @@ export function setupGameEngine(io: SocketIOServer): void {
 
       const id = readCharacterId(room, characterId);
       if (!id || player.isReady) return;
-
-      player.selectedCharacterId = id;
-      player.isReady = true;
-
-      // Tell the other player this player is ready (without revealing the character)
-      socket.to(room.code).emit("opponent_ready");
-
-      maybeStartGame(room);
-      updateTimer(room);
+      selectCharacter(room, player, id);
     });
 
     // ── Ask a question ───────────────────────────────────────────────────────
@@ -790,25 +987,13 @@ export function setupGameEngine(io: SocketIOServer): void {
       const attr = readAttribute(attribute);
       if (attr) {
         const asked = readString(value, 60);
-        const secret = allCharacters.find((c) => c.id === opponent.selectedCharacterId);
-        if (!asked || !secret) return;
+        if (asked) askVerified(room, player, attr, asked);
+        return;
+      }
 
-        const entry: LogEntry = {
-          type: "qna",
-          question: null,
-          verified: true,
-          attribute: attr,
-          value: asked,
-          answer: secret[attr].toLowerCase() === asked.toLowerCase() ? "yes" : "no",
-          askerId: player.id,
-        };
-        room.log.push(entry);
-        room.currentTurnPlayerId = opponent.id;
-        io.to(room.code).emit("question_answered", {
-          ...entry,
-          currentTurnPlayerId: room.currentTurnPlayerId,
-        });
-        updateTimer(room);
+      // The computer can't read free text: verified questions only.
+      if (opponent.isBot) {
+        socket.emit("error", { message: "L’ordinateur ne comprend que les questions vérifiées." });
         return;
       }
 
@@ -874,30 +1059,7 @@ export function setupGameEngine(io: SocketIOServer): void {
       }
 
       const id = readCharacterId(room, characterId);
-      const opponent = opponentOf(room, player);
-      if (!id || !opponent) return;
-
-      if (opponent.selectedCharacterId === id) {
-        endGame(room, player.id, "correct_guess");
-        return;
-      }
-
-      player.lives -= 1;
-      room.log.push({ type: "guess", guesserId: player.id, guessedCharacterId: id });
-
-      if (player.lives <= 0) {
-        endGame(room, opponent.id, "out_of_lives");
-        return;
-      }
-
-      room.currentTurnPlayerId = opponent.id;
-      io.to(room.code).emit("wrong_guess", {
-        guesserId: player.id,
-        guessedCharacterId: id,
-        lives: player.lives,
-        currentTurnPlayerId: room.currentTurnPlayerId,
-      });
-      updateTimer(room);
+      if (id) makeGuess(room, player, id);
     });
 
     // ── Remember eliminated characters so they survive a reconnect ──────────
@@ -916,6 +1078,7 @@ export function setupGameEngine(io: SocketIOServer): void {
 
       ctx.room.rematchRequestedBy = ctx.player.id;
       io.to(ctx.room.code).emit("rematch_requested", { byPlayerId: ctx.player.id });
+      driveBot(ctx.room); // the computer always accepts
     });
 
     on("accept_rematch", () => {
@@ -925,30 +1088,7 @@ export function setupGameEngine(io: SocketIOServer): void {
       if (room.phase !== "ended" || room.players.length < 2) return;
       // Only the player who did *not* ask can accept.
       if (!room.rematchRequestedBy || room.rematchRequestedBy === player.id) return;
-
-      room.phase = "selection";
-      room.characterIds = dealBoard(); // fresh board for the rematch
-      room.log = [];
-      room.pendingQuestion = null;
-      room.pendingAskerId = null;
-      room.winnerId = null;
-      room.gameOverReason = null;
-      room.rematchRequestedBy = null;
-      room.currentTurnPlayerId = null;
-      for (const p of room.players) {
-        p.selectedCharacterId = null;
-        p.eliminatedIds = [];
-        p.lives = MAX_LIVES;
-        p.isReady = false;
-      }
-
-      io.to(room.code).emit("rematch_started", {
-        code: room.code,
-        phase: room.phase,
-        players: publicPlayers(room),
-        characters: boardOf(room),
-      });
-      updateTimer(room);
+      startRematch(room);
     });
 
     // ── Disconnect ───────────────────────────────────────────────────────────

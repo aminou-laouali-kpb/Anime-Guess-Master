@@ -3,12 +3,14 @@ import { useGame } from "@/context/GameContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Gamepad2, Users, UsersRound, HelpCircle, ArrowRight, Trophy } from "lucide-react";
+import { Gamepad2, Users, UsersRound, HelpCircle, ArrowRight, Trophy, Bot } from "lucide-react";
+import type { BotLevel } from "@/lib/socket";
 import { LeaderboardDialog } from "@/components/LeaderboardDialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 
 export const Home: React.FC = () => {
-  const { myName, setMyName, joinQueue, joinRoom, createPrivateRoom, myStats } = useGame();
+  const { myName, setMyName, joinQueue, joinRoom, createPrivateRoom, playVsBot, myStats } = useGame();
+  const [showBot, setShowBot] = useState(false);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
 
   const [showJoin, setShowJoin] = useState(false);
@@ -92,6 +94,15 @@ export const Home: React.FC = () => {
             onClick={() => handleAction(() => setShowJoin(true))}
           >
             <UsersRound className="mr-2 w-5 h-5" /> Rejoindre avec un code
+          </Button>
+
+          <Button
+            variant="outline"
+            size="lg"
+            className="w-full h-14 font-bold border-2 hover:scale-[1.02] transition-transform"
+            onClick={() => handleAction(() => setShowBot(true))}
+          >
+            <Bot className="mr-2 w-5 h-5" /> Contre l’ordinateur
           </Button>
 
           <div className={myStats?.enabled ? "grid grid-cols-2 gap-2 mt-4" : "mt-4"}>
@@ -182,6 +193,34 @@ export const Home: React.FC = () => {
       </Dialog>
 
       <LeaderboardDialog open={showLeaderboard} onOpenChange={setShowLeaderboard} />
+
+      <Dialog open={showBot} onOpenChange={setShowBot}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="font-display text-2xl">Contre l’ordinateur</DialogTitle>
+            <DialogDescription>
+              Entraîne-toi seul. Ces parties ne comptent pas dans le classement.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-2 pt-2">
+            {([
+              ["easy", "Facile", "Pose des questions au hasard et devine trop vite."],
+              ["normal", "Normal", "Joue correctement, sans être parfait."],
+              ["hard", "Difficile", "Choisit toujours la meilleure question."],
+            ] as [BotLevel, string, string][]).map(([level, label, hint]) => (
+              <Button
+                key={level}
+                variant="outline"
+                className="h-auto py-3 flex flex-col items-start text-left border-2"
+                onClick={() => { setShowBot(false); playVsBot(level); }}
+              >
+                <span className="font-display font-bold text-lg">{label}</span>
+                <span className="text-xs text-muted-foreground font-normal whitespace-normal">{hint}</span>
+              </Button>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={showHowToPlay} onOpenChange={setShowHowToPlay}>
         <DialogContent className="sm:max-w-lg">

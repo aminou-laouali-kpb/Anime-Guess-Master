@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from "react";
-import { socket, saveSessionToken, saveProfileToken, MyStatsPayload, RatingUpdate, GamePhase, GameOverReason, PlayerState, GameLogEntry, RoomSnapshot, TimerPayload } from "../lib/socket";
+import { socket, saveSessionToken, saveProfileToken, MyStatsPayload, RatingUpdate, RoomMode, BotLevel, GamePhase, GameOverReason, PlayerState, GameLogEntry, RoomSnapshot, TimerPayload } from "../lib/socket";
 import { Character, useListCharacters } from "@workspace/api-client-react";
 import type { VerifiableAttribute } from "../lib/questions";
 import { toast } from "sonner";
@@ -7,6 +7,7 @@ import { toast } from "sonner";
 interface GameState {
   phase: GamePhase;
   roomCode: string | null;
+  roomMode: RoomMode | null;
   queuePosition: number | null;
   players: PlayerState[];
   characters: Character[];
@@ -46,6 +47,7 @@ interface GameContextType extends GameState {
   joinQueue: () => void;
   joinRoom: (code: string) => void;
   createPrivateRoom: () => void;
+  playVsBot: (level: BotLevel) => void;
   selectCharacter: (id: string) => void;
   askQuestion: (q: string) => void;
   askVerifiedQuestion: (attribute: VerifiableAttribute, value: string) => void;
@@ -75,6 +77,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isConnected, setIsConnected] = useState(false);
   const [phase, setPhase] = useState<GamePhase>("home");
   const [roomCode, setRoomCode] = useState<string | null>(null);
+  const [roomMode, setRoomMode] = useState<RoomMode | null>(null);
   const [queuePosition, setQueuePosition] = useState<number | null>(null);
   const [players, setPlayers] = useState<PlayerState[]>([]);
   const [characters, setCharacters] = useState<Character[]>([]);
@@ -106,6 +109,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const resetGameState = () => {
     setRoomCode(null);
+    setRoomMode(null);
     setQueuePosition(null);
     setPlayers([]);
     setCharacters([]);
@@ -149,6 +153,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const applySnapshot = (room: RoomSnapshot) => {
     setPhase(SNAPSHOT_PHASES[room.phase]);
     setRoomCode(room.code);
+    setRoomMode(room.mode);
     setQueuePosition(null);
     setPlayers(room.players);
     setCharacters(room.characters);
@@ -221,8 +226,9 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setRoomCode(code);
     });
 
-    socket.on("room_joined", ({ code, players, characters }) => {
+    socket.on("room_joined", ({ code, players, characters, mode }) => {
       setRoomCode(code);
+      setRoomMode(mode);
       startNewRound(players, characters);
     });
 
@@ -346,7 +352,8 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     });
 
-    socket.on("rematch_started", ({ players, characters }) => {
+    socket.on("rematch_started", ({ players, characters, mode }) => {
+      setRoomMode(mode);
       startNewRound(players, characters);
     });
 
@@ -410,6 +417,12 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     socket.emit("create_room", { name: myName });
   }, [myName]);
 
+  const playVsBot = useCallback((level: BotLevel) => {
+    if (!myName) return;
+    resetGameState();
+    socket.emit("play_vs_bot", { name: myName, level });
+  }, [myName]);
+
   const selectCharacter = useCallback((id: string) => {
     setMyCharacterId(id);
     socket.emit("select_character", { characterId: id });
@@ -458,6 +471,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       value={{
         phase,
         roomCode,
+        roomMode,
         queuePosition,
         players,
         characters,
@@ -484,6 +498,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
         joinQueue,
         joinRoom,
         createPrivateRoom,
+        playVsBot,
         selectCharacter,
         askQuestion,
         askVerifiedQuestion,
