@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useGame } from "@/context/GameContext";
 import { CharacterCard } from "@/components/CharacterCard";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,9 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { useSecondsLeft } from "@/hooks/use-seconds-left";
+import { LogEntryView } from "@/components/LogEntryView";
+import { ATTRIBUTES, VerifiableAttribute, hasTrait, questionText, valueLabel, valuesOnBoard } from "@/lib/questions";
+import { toast } from "sonner";
 
 export const Playing: React.FC = () => {
   const {
@@ -18,6 +21,7 @@ export const Playing: React.FC = () => {
     awaitingAnswerFor,
     gameLog,
     askQuestion,
+    askVerifiedQuestion,
     answerQuestion,
     makeGuess,
     syncEliminations,
@@ -34,7 +38,10 @@ export const Playing: React.FC = () => {
   
   // Modals
   const [showAskModal, setShowAskModal] = useState(false);
-  const [questionText, setQuestionText] = useState("");
+  const [askMode, setAskMode] = useState<"verified" | "free">("verified");
+  const [freeQuestion, setFreeQuestion] = useState("");
+  const [askAttribute, setAskAttribute] = useState<VerifiableAttribute>("hairColor");
+  const [askValue, setAskValue] = useState<string | null>(null);
 
   const [showGuessModal, setShowGuessModal] = useState(false);
   const [guessSearch, setGuessSearch] = useState("");
@@ -62,12 +69,48 @@ export const Playing: React.FC = () => {
 
   const handleAsk = (e: React.FormEvent) => {
     e.preventDefault();
-    if (questionText.trim()) {
-      askQuestion(questionText.trim());
-      setQuestionText("");
+    if (askMode === "verified") {
+      if (!askValue) return;
+      askVerifiedQuestion(askAttribute, askValue);
+      setAskValue(null);
+      setShowAskModal(false);
+    } else if (freeQuestion.trim()) {
+      askQuestion(freeQuestion.trim());
+      setFreeQuestion("");
       setShowAskModal(false);
     }
   };
+
+  // After one of my verified questions, offer to cross out every character
+  // the answer rules out (the answer is guaranteed true, so this is safe).
+  const lastLog = gameLog[gameLog.length - 1];
+  useEffect(() => {
+    if (!lastLog || lastLog.type !== "qna" || !lastLog.verified) return;
+    if (lastLog.askerId !== myPlayerId || !lastLog.attribute || !lastLog.value) return;
+    const { attribute, value } = lastLog;
+    const keep = lastLog.answer === "yes";
+    const ruledOut = characters
+      .filter(c => !eliminatedIds.has(c.id) && hasTrait(c, attribute, value) !== keep)
+      .map(c => c.id);
+    if (ruledOut.length === 0) return;
+    toast(`Réponse : ${keep ? "OUI" : "NON"}`, {
+      description: `${ruledOut.length} personnage${ruledOut.length > 1 ? "s ne correspondent" : " ne correspond"} pas.`,
+      action: {
+        label: "Les écarter",
+        onClick: () => {
+          setEliminatedIds(prev => {
+            const next = new Set(prev);
+            ruledOut.forEach(id => next.add(id));
+            syncEliminations(Array.from(next));
+            return next;
+          });
+        },
+      },
+      duration: 8000,
+    });
+    // Only react to new log entries.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lastLog?.id]);
 
   const handleGuess = (id: string) => {
     makeGuess(id);
@@ -183,6 +226,9 @@ export const Playing: React.FC = () => {
                 Réponds dans les {secondsLeft} s ou tu perds une vie
               </p>
             )}
+            <p className="text-xs text-muted-foreground mt-1">
+              Réponds honnêtement : ton personnage et toutes tes réponses seront révélés à la fin.
+            </p>
           </DialogHeader>
           <div className="flex gap-4 mt-6 pointer-events-auto">
             <Button className="flex-1 h-14 bg-green-600 hover:bg-green-700 text-xl font-bold" onClick={() => answerQuestion("yes")}>
@@ -218,23 +264,84 @@ export const Playing: React.FC = () => {
 
       {/* Ask Question Modal */}
       <Dialog open={showAskModal} onOpenChange={setShowAskModal}>
-        <DialogContent>
+        <DialogContent className="max-h-[90dvh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="font-display text-2xl">Poser une question</DialogTitle>
             <DialogDescription>
-              Pose une question fermée (oui / non) sur le personnage de l’adversaire.
+              {askMode === "verified"
+                ? "Le jeu répond à ta place à partir de la fiche du personnage : impossible de mentir."
+                : "C’est ton adversaire qui répond : sa réponse pourra être vérifiée à la fin de la partie."}
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleAsk} className="space-y-4 mt-4">
-            <Input 
-              autoFocus
-              placeholder="ex. Ton personnage se bat-il avec une épée ?"
-              value={questionText}
-              onChange={e => setQuestionText(e.target.value)}
-              className="h-12"
-            />
+
+          <div className="grid grid-cols-2 gap-1 p-1 bg-muted rounded-lg" role="tablist">
+            {(["verified", "free"] as const).map(mode => (
+              <button
+                key={mode}
+                type="button"
+                role="tab"
+                aria-selected={askMode === mode}
+                onClick={() => setAskMode(mode)}
+                className={cn(
+                  "py-2 rounded-md text-sm font-bold transition-colors",
+                  askMode === mode ? "bg-background shadow-sm" : "text-muted-foreground"
+                )}
+              >
+                {mode === "verified" ? "Question vérifiée" : "Question libre"}
+              </button>
+            ))}
+          </div>
+
+          <form onSubmit={handleAsk} className="space-y-4 mt-2">
+            {askMode === "verified" ? (
+              <>
+                <div className="flex flex-wrap gap-1.5">
+                  {ATTRIBUTES.map(({ key, label }) => (
+                    <Button
+                      key={key}
+                      type="button"
+                      size="sm"
+                      variant={askAttribute === key ? "default" : "outline"}
+                      onClick={() => { setAskAttribute(key); setAskValue(null); }}
+                    >
+                      {label}
+                    </Button>
+                  ))}
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {valuesOnBoard(characters, askAttribute).map(value => (
+                    <Button
+                      key={value}
+                      type="button"
+                      size="sm"
+                      variant={askValue === value ? "secondary" : "ghost"}
+                      className={cn("border", askValue === value && "ring-2 ring-secondary")}
+                      onClick={() => setAskValue(value)}
+                    >
+                      {valueLabel(askAttribute, value)}
+                    </Button>
+                  ))}
+                </div>
+                <p className="min-h-6 text-center font-bold italic">
+                  {askValue ? `« ${questionText(askAttribute, askValue)} »` : "Choisis une réponse possible ci-dessus."}
+                </p>
+              </>
+            ) : (
+              <Input
+                autoFocus
+                placeholder="ex. Ton personnage se bat-il avec une épée ?"
+                value={freeQuestion}
+                onChange={e => setFreeQuestion(e.target.value)}
+                maxLength={200}
+                className="h-12"
+              />
+            )}
             <DialogFooter>
-              <Button type="submit" disabled={!questionText.trim()} className="w-full h-12 text-lg font-bold">
+              <Button
+                type="submit"
+                disabled={askMode === "verified" ? !askValue : !freeQuestion.trim()}
+                className="w-full h-12 text-lg font-bold"
+              >
                 Envoyer
               </Button>
             </DialogFooter>
@@ -299,41 +406,15 @@ export const Playing: React.FC = () => {
             {gameLog.length === 0 ? (
               <p className="text-center text-muted-foreground text-sm py-4">Aucune action pour l’instant.</p>
             ) : (
-              gameLog.map((log) => {
-                if (log.type === "qna") {
-                  const askerName = log.askerId === myPlayerId ? "Toi" : opponent?.name;
-                  return (
-                    <div key={log.id} className="bg-muted/50 p-3 rounded-lg text-sm border border-border">
-                      <div className="font-bold text-primary mb-1">{askerName} :</div>
-                      <p className="italic mb-2">« {log.question} »</p>
-                      <div className="flex items-center gap-2 font-black uppercase">
-                        Réponse : 
-                        <span className={log.answer === "yes" ? "text-green-500" : "text-red-500"}>
-                          {log.answer === "yes" ? "oui" : "non"}
-                        </span>
-                      </div>
-                    </div>
-                  );
-                } else if (log.type === "guess") {
-                  const guesserName = log.guesserId === myPlayerId ? "Toi" : opponent?.name;
-                  const guessedChar = characters.find(c => c.id === log.guessedCharacterId);
-                  return (
-                    <div key={log.id} className="bg-red-500/10 p-3 rounded-lg text-sm border border-red-500/30">
-                      <div className="font-bold text-red-500 mb-1">{guesserName} a tenté :</div>
-                      <p className="font-bold">{guessedChar?.name}</p>
-                      <div className="text-red-600 font-black uppercase mt-1">Raté ! Une vie en moins.</div>
-                    </div>
-                  );
-                } else if (log.type === "timeout") {
-                  const name = log.playerId === myPlayerId ? "Toi" : opponent?.name;
-                  return (
-                    <div key={log.id} className="bg-amber-500/10 p-3 rounded-lg text-sm border border-amber-500/30">
-                      <div className="font-bold text-amber-600">{name} : temps écoulé — une vie en moins.</div>
-                    </div>
-                  );
-                }
-                return null;
-              })
+              gameLog.map((log) => (
+                <LogEntryView
+                  key={log.id}
+                  log={log}
+                  myPlayerId={myPlayerId}
+                  opponentName={opponent?.name}
+                  characters={characters}
+                />
+              ))
             )}
           </div>
         </ScrollArea>

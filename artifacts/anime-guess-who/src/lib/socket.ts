@@ -1,5 +1,6 @@
 import { io, Socket } from "socket.io-client";
 import { Character } from "@workspace/api-client-react";
+import type { VerifiableAttribute } from "./questions";
 
 export type GamePhase = "home" | "queue" | "lobby" | "selection" | "playing" | "ended";
 
@@ -14,16 +15,29 @@ export interface GameLogEntry {
   type: "qna" | "guess" | "timeout";
   playerId?: string;
   askerId?: string;
-  question?: string;
+  question?: string | null;
+  verified?: boolean;
+  attribute?: VerifiableAttribute | null;
+  value?: string | null;
   answer?: "yes" | "no";
   guesserId?: string;
   guessedCharacterId?: string;
 }
 
+export interface QnaPayload {
+  type: "qna";
+  answer: "yes" | "no";
+  askerId: string;
+  question: string | null;
+  verified: boolean;
+  attribute: VerifiableAttribute | null;
+  value: string | null;
+}
+
 export type GameOverReason = "correct_guess" | "out_of_lives" | "opponent_left";
 
 type ServerLogEntry =
-  | { type: "qna"; question: string; answer: "yes" | "no"; askerId: string }
+  | QnaPayload
   | { type: "guess"; guesserId: string; guessedCharacterId: string }
   | { type: "timeout"; playerId: string };
 
@@ -59,7 +73,9 @@ export interface ClientToServerEvents {
   join_room: (payload: { code: string; name: string }) => void;
   leave_room: () => void;
   select_character: (payload: { characterId: string }) => void;
-  ask_question: (payload: { question: string }) => void;
+  ask_question: (
+    payload: { question: string } | { attribute: VerifiableAttribute; value: string },
+  ) => void;
   answer_question: (payload: { answer: "yes" | "no" }) => void;
   make_guess: (payload: { characterId: string }) => void;
   sync_eliminations: (payload: { eliminatedIds: string[] }) => void;
@@ -85,12 +101,7 @@ export interface ServerToClientEvents {
   }) => void;
   question_asked: (payload: { question: string; askerId: string }) => void;
   awaiting_answer: (payload: { question: string }) => void;
-  question_answered: (payload: {
-    question: string;
-    answer: "yes" | "no";
-    askerId: string;
-    currentTurnPlayerId: string;
-  }) => void;
+  question_answered: (payload: QnaPayload & { currentTurnPlayerId: string }) => void;
   wrong_guess: (payload: {
     guesserId: string;
     guessedCharacterId: string;

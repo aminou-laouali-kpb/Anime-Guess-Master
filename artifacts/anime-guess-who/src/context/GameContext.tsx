@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from "react";
 import { socket, saveSessionToken, GamePhase, GameOverReason, PlayerState, GameLogEntry, RoomSnapshot, TimerPayload } from "../lib/socket";
 import { Character, useListCharacters } from "@workspace/api-client-react";
+import type { VerifiableAttribute } from "../lib/questions";
 import { toast } from "sonner";
 
 interface GameState {
@@ -45,6 +46,7 @@ interface GameContextType extends GameState {
   createPrivateRoom: () => void;
   selectCharacter: (id: string) => void;
   askQuestion: (q: string) => void;
+  askVerifiedQuestion: (attribute: VerifiableAttribute, value: string) => void;
   answerQuestion: (a: "yes" | "no") => void;
   makeGuess: (id: string) => void;
   syncEliminations: (ids: string[]) => void;
@@ -255,16 +257,10 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setAwaitingAnswerFor(question);
     });
 
-    socket.on("question_answered", ({ question, answer, askerId, currentTurnPlayerId }) => {
+    socket.on("question_answered", ({ currentTurnPlayerId, ...entry }) => {
       setPendingQuestion(null);
       setAwaitingAnswerFor(null);
-      setGameLog(prev => [...prev, {
-        id: Math.random().toString(),
-        type: "qna",
-        question,
-        answer,
-        askerId
-      }]);
+      setGameLog(prev => [...prev, { ...entry, id: Math.random().toString() }]);
       setCurrentTurnId(currentTurnPlayerId);
     });
 
@@ -401,6 +397,10 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     socket.emit("ask_question", { question: q });
   }, []);
 
+  const askVerifiedQuestion = useCallback((attribute: VerifiableAttribute, value: string) => {
+    socket.emit("ask_question", { attribute, value });
+  }, []);
+
   const answerQuestion = useCallback((a: "yes" | "no") => {
     socket.emit("answer_question", { answer: a });
   }, []);
@@ -458,6 +458,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
         createPrivateRoom,
         selectCharacter,
         askQuestion,
+        askVerifiedQuestion,
         answerQuestion,
         makeGuess,
         syncEliminations,

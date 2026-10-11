@@ -2,6 +2,7 @@ import React from "react";
 import { useGame } from "@/context/GameContext";
 import { Button } from "@/components/ui/button";
 import { CharacterCard } from "@/components/CharacterCard";
+import { LogEntryView } from "@/components/LogEntryView";
 import { Home, RotateCcw, Trophy, Skull } from "lucide-react";
 
 export const Ended: React.FC = () => {
@@ -13,6 +14,8 @@ export const Ended: React.FC = () => {
     rematchRequestedBy,
     myPlayerId,
     opponentLeft,
+    gameLog,
+    players,
     requestRematch,
     acceptRematch,
     leaveGame
@@ -22,6 +25,10 @@ export const Ended: React.FC = () => {
   const isDisconnect = gameOverReason === "opponent_left";
 
   const opponentCharacter = characters.find(c => c.id === revealedOpponentCharacterId);
+  const opponentName = players.find(p => p.id !== myPlayerId)?.name;
+  const hasFreeAnswersFromOpponent = gameLog.some(
+    log => log.type === "qna" && !log.verified && log.askerId === myPlayerId
+  );
 
   return (
     <div className="min-h-[100dvh] w-full flex flex-col items-center justify-center p-6 bg-background relative overflow-hidden">
@@ -88,6 +95,31 @@ export const Ended: React.FC = () => {
             <Home className="w-5 h-5 mr-2" /> Retour à l’accueil
           </Button>
         </div>
+
+        {/* Recap: with the secret character revealed, every free answer can be checked */}
+        {gameLog.length > 0 && (
+          <section className="w-full text-left space-y-3">
+            <h2 className="text-sm font-bold uppercase tracking-widest text-muted-foreground text-center">
+              Récapitulatif de la partie
+            </h2>
+            {hasFreeAnswersFromOpponent && opponentCharacter && (
+              <p className="text-xs text-muted-foreground text-center">
+                Compare les réponses « non vérifiées » de ton adversaire avec la fiche de {opponentCharacter.name} ci-dessus.
+              </p>
+            )}
+            <div className="space-y-2">
+              {gameLog.map(log => (
+                <LogEntryView
+                  key={log.id}
+                  log={log}
+                  myPlayerId={myPlayerId}
+                  opponentName={opponentName}
+                  characters={characters}
+                />
+              ))}
+            </div>
+          </section>
+        )}
 
       </div>
     </div>

@@ -27,9 +27,36 @@ export interface CharacterWithImage extends Omit<Character, "image"> {
 }
 
 export type LogEntry =
-  | { type: "qna"; question: string; answer: "yes" | "no"; askerId: string }
+  | {
+      type: "qna";
+      answer: "yes" | "no";
+      askerId: string;
+      // Free question: typed by the asker, answered (honestly or not) by the opponent.
+      question: string | null;
+      // Verified question: a trait/value pair the server answers from the data.
+      verified: boolean;
+      attribute: VerifiableAttribute | null;
+      value: string | null;
+    }
   | { type: "guess"; guesserId: string; guessedCharacterId: string }
   | { type: "timeout"; playerId: string };
+
+// Traits the server can check itself, so the answer can't be a lie.
+export const VERIFIABLE_ATTRIBUTES = [
+  "hairColor",
+  "eyeColor",
+  "gender",
+  "ageRange",
+  "species",
+  "alignment",
+  "role",
+  "anime",
+] as const;
+export type VerifiableAttribute = (typeof VERIFIABLE_ATTRIBUTES)[number];
+
+function readAttribute(raw: unknown): VerifiableAttribute | null {
+  return VERIFIABLE_ATTRIBUTES.find((a) => a === raw) ?? null;
+}
 
 export interface Player {
   id: string; // public id, safe to share with the opponent
@@ -656,7 +683,7 @@ export function setupGameEngine(io: SocketIOServer): void {
     });
 
     // ── Ask a question ───────────────────────────────────────────────────────
-    on("ask_question", ({ question }) => {
+    on("ask_question", ({ question, attribute, value }) => {
       const ctx = currentRoomAndPlayer();
       if (!ctx || ctx.room.phase !== "playing") return;
       const { room, player } = ctx;
@@ -670,9 +697,37 @@ export function setupGameEngine(io: SocketIOServer): void {
         return;
       }
 
-      const q = readString(question, 200);
       const opponent = opponentOf(room, player);
-      if (!q || !opponent) return;
+      if (!opponent) return;
+
+      // Verified question: answered right away from the opponent's real character.
+      const attr = readAttribute(attribute);
+      if (attr) {
+        const asked = readString(value, 60);
+        const secret = allCharacters.find((c) => c.id === opponent.selectedCharacterId);
+        if (!asked || !secret) return;
+
+        const entry: LogEntry = {
+          type: "qna",
+          question: null,
+          verified: true,
+          attribute: attr,
+          value: asked,
+          answer: secret[attr].toLowerCase() === asked.toLowerCase() ? "yes" : "no",
+          askerId: player.id,
+        };
+        room.log.push(entry);
+        room.currentTurnPlayerId = opponent.id;
+        io.to(room.code).emit("question_answered", {
+          ...entry,
+          currentTurnPlayerId: room.currentTurnPlayerId,
+        });
+        updateTimer(room);
+        return;
+      }
+
+      const q = readString(question, 200);
+      if (!q) return;
 
       room.pendingQuestion = q;
       room.pendingAskerId = player.id;
@@ -698,6 +753,9 @@ export function setupGameEngine(io: SocketIOServer): void {
       const entry: LogEntry = {
         type: "qna",
         question: room.pendingQuestion,
+        verified: false,
+        attribute: null,
+        value: null,
         answer,
         askerId: room.pendingAskerId,
       };
@@ -708,9 +766,7 @@ export function setupGameEngine(io: SocketIOServer): void {
       room.currentTurnPlayerId = player.id;
 
       io.to(room.code).emit("question_answered", {
-        question: entry.question,
-        answer: entry.answer,
-        askerId: entry.askerId,
+        ...entry,
         currentTurnPlayerId: room.currentTurnPlayerId,
       });
       updateTimer(room);
