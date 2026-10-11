@@ -111,7 +111,7 @@ export const Playing: React.FC = () => {
       </div>
 
       {/* Game Board (Grid) */}
-      <div className="flex-1 p-3 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-2 max-w-7xl mx-auto w-full">
+      <div className="p-3 grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-8 gap-2 max-w-6xl mx-auto w-full content-start">
         {characters.map(char => (
           <CharacterCard
             key={char.id}
@@ -260,7 +260,7 @@ export const Playing: React.FC = () => {
             />
           </div>
           <ScrollArea className="flex-1 p-4 bg-muted/30">
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
               {characters
                 .filter(c => !eliminatedIds.has(c.id)) // Only show non-eliminated
                 .filter(c => c.name.toLowerCase().includes(guessSearch.toLowerCase()))

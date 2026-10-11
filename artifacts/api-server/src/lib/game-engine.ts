@@ -1,6 +1,7 @@
 import { randomBytes } from "crypto";
 import type { Server as SocketIOServer, Socket } from "socket.io";
 import characters from "../data/characters.json" assert { type: "json" };
+import { imageUrlFor } from "./character-images";
 import { logger } from "./logger";
 import { TokenBucket, clientIp } from "./rate-limit";
 
@@ -18,6 +19,11 @@ export interface Character {
   powers: string[];
   alignment: string;
   role: string;
+  image?: string; // optional manual override for the portrait URL
+}
+
+export interface CharacterWithImage extends Omit<Character, "image"> {
+  imageUrl: string | null;
 }
 
 export type LogEntry =
@@ -42,6 +48,7 @@ export type GameOverReason = "correct_guess" | "out_of_lives" | "opponent_left";
 export interface Room {
   code: string;
   phase: RoomPhase;
+  characterIds: string[]; // this game's board, a random subset of all characters
   players: Player[];
   currentTurnPlayerId: string | null;
   log: LogEntry[];
@@ -70,6 +77,8 @@ interface Session {
 // ─── State ─────────────────────────────────────────────────────────────────────
 
 const MAX_LIVES = 3;
+// Like the original board game: a smaller board keeps games short and readable.
+const BOARD_SIZE = 24;
 export const RECONNECT_GRACE_MS = 45_000;
 
 // Nobody can stall a game forever: each step has a deadline.
@@ -89,7 +98,7 @@ const rooms = new Map<string, Room>();
 const sessions = new Map<string, Session>(); // token → session
 const matchmakingQueue: string[] = []; // tokens
 
-const characterIds = new Set((characters as Character[]).map((c) => c.id));
+const allCharacters = characters as Character[];
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -125,8 +134,8 @@ function readName(raw: unknown): string {
   return readString(raw, 24) ?? "Player";
 }
 
-function readCharacterId(raw: unknown): string | null {
-  return typeof raw === "string" && characterIds.has(raw) ? raw : null;
+function readCharacterId(room: Room, raw: unknown): string | null {
+  return typeof raw === "string" && room.characterIds.includes(raw) ? raw : null;
 }
 
 function createPlayer(session: Session): Player {
@@ -145,6 +154,7 @@ function createRoom(code: string): Room {
   return {
     code,
     phase: "waiting",
+    characterIds: [],
     players: [],
     currentTurnPlayerId: null,
     log: [],
@@ -168,8 +178,22 @@ function opponentOf(room: Room, player: Player): Player | undefined {
   return room.players.find((p) => p.id !== player.id);
 }
 
-export function getCharacters(): Character[] {
-  return characters as Character[];
+export function getCharacters(): CharacterWithImage[] {
+  return allCharacters.map(({ image: _image, ...c }) => ({ ...c, imageUrl: imageUrlFor(c.id) }));
+}
+
+function dealBoard(): string[] {
+  const ids = allCharacters.map((c) => c.id);
+  for (let i = ids.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [ids[i], ids[j]] = [ids[j]!, ids[i]!];
+  }
+  return ids.slice(0, BOARD_SIZE);
+}
+
+function boardOf(room: Room): CharacterWithImage[] {
+  const byId = new Map(getCharacters().map((c) => [c.id, c]));
+  return room.characterIds.map((id) => byId.get(id)!).filter(Boolean);
 }
 
 // Everything a player needs to rebuild their screen after a reconnect.
@@ -180,7 +204,7 @@ function snapshotFor(room: Room, player: Player) {
     code: room.code,
     phase: room.phase,
     players: publicPlayers(room),
-    characters: getCharacters(),
+    characters: boardOf(room),
     myCharacterId: player.selectedCharacterId,
     myEliminatedIds: player.eliminatedIds,
     opponentReady: opponent?.isReady ?? false,
@@ -210,9 +234,8 @@ function timerPayload(room: Room) {
       };
 }
 
-function pickRandomCharacterId(): string {
-  const all = getCharacters();
-  return all[Math.floor(Math.random() * all.length)]!.id;
+function pickRandomCharacterId(room: Room): string {
+  return room.characterIds[Math.floor(Math.random() * room.characterIds.length)]!;
 }
 
 // ─── Socket.IO game logic ─────────────────────────────────────────────────────
@@ -249,7 +272,7 @@ export function setupGameEngine(io: SocketIOServer): void {
       code: room.code,
       phase: room.phase,
       players: publicPlayers(room),
-      characters: getCharacters(),
+      characters: boardOf(room),
     });
   }
 
@@ -327,7 +350,7 @@ export function setupGameEngine(io: SocketIOServer): void {
     if (room.phase === "selection") {
       // Pick a random character for whoever didn't choose in time.
       for (const player of room.players.filter((p) => !p.isReady)) {
-        player.selectedCharacterId = pickRandomCharacterId();
+        player.selectedCharacterId = pickRandomCharacterId(room);
         player.isReady = true;
         emitToPlayer(player, "character_assigned", { characterId: player.selectedCharacterId });
         const opponent = opponentOf(room, player);
@@ -560,6 +583,7 @@ export function setupGameEngine(io: SocketIOServer): void {
       addToRoom(room, waiting);
       addToRoom(room, session);
       room.phase = "selection";
+      room.characterIds = dealBoard();
       emitRoomJoined(room);
       updateTimer(room);
     });
@@ -601,6 +625,7 @@ export function setupGameEngine(io: SocketIOServer): void {
 
       addToRoom(room, session);
       room.phase = "selection";
+      room.characterIds = dealBoard();
       emitRoomJoined(room);
       updateTimer(room);
     });
@@ -617,7 +642,7 @@ export function setupGameEngine(io: SocketIOServer): void {
       if (!ctx || ctx.room.phase !== "selection") return;
       const { room, player } = ctx;
 
-      const id = readCharacterId(characterId);
+      const id = readCharacterId(room, characterId);
       if (!id || player.isReady) return;
 
       player.selectedCharacterId = id;
@@ -706,7 +731,7 @@ export function setupGameEngine(io: SocketIOServer): void {
         return;
       }
 
-      const id = readCharacterId(characterId);
+      const id = readCharacterId(room, characterId);
       const opponent = opponentOf(room, player);
       if (!id || !opponent) return;
 
@@ -738,7 +763,7 @@ export function setupGameEngine(io: SocketIOServer): void {
       const ctx = currentRoomAndPlayer();
       if (!ctx || !Array.isArray(eliminatedIds)) return;
       ctx.player.eliminatedIds = [
-        ...new Set(eliminatedIds.filter((id): id is string => readCharacterId(id) !== null)),
+        ...new Set(eliminatedIds.filter((id): id is string => readCharacterId(ctx.room, id) !== null)),
       ];
     });
 
@@ -760,6 +785,7 @@ export function setupGameEngine(io: SocketIOServer): void {
       if (!room.rematchRequestedBy || room.rematchRequestedBy === player.id) return;
 
       room.phase = "selection";
+      room.characterIds = dealBoard(); // fresh board for the rematch
       room.log = [];
       room.pendingQuestion = null;
       room.pendingAskerId = null;
@@ -778,7 +804,7 @@ export function setupGameEngine(io: SocketIOServer): void {
         code: room.code,
         phase: room.phase,
         players: publicPlayers(room),
-        characters: getCharacters(),
+        characters: boardOf(room),
       });
       updateTimer(room);
     });

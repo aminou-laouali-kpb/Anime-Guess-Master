@@ -1,7 +1,7 @@
-import React from "react";
+import React, { useState } from "react";
 import { Character } from "@workspace/api-client-react";
 import { cn } from "@/lib/utils";
-import { User, Skull, Star, Shield, Zap, Sparkles } from "lucide-react";
+import { User, Skull, Star, Shield } from "lucide-react";
 
 interface CharacterCardProps {
   character: Character;
@@ -28,6 +28,47 @@ const getAlignmentIcon = (alignment: string) => {
   }
 };
 
+// Stable color per character for the no-image fallback.
+function hueFor(id: string): number {
+  let hash = 0;
+  for (const ch of id) hash = (hash * 31 + ch.charCodeAt(0)) % 360;
+  return hash;
+}
+
+function initials(name: string): string {
+  return name.split(/\s+/).map((w) => w[0]).join("").slice(0, 2).toUpperCase();
+}
+
+const Portrait: React.FC<{ character: Character; size: "sm" | "md" | "lg" }> = ({ character, size }) => {
+  const [failed, setFailed] = useState(false);
+  const hue = hueFor(character.id);
+
+  if (character.imageUrl && !failed) {
+    return (
+      <img
+        src={character.imageUrl}
+        alt=""
+        loading="lazy"
+        decoding="async"
+        referrerPolicy="no-referrer"
+        draggable={false}
+        onError={() => setFailed(true)}
+        className="absolute inset-0 w-full h-full object-cover object-top"
+      />
+    );
+  }
+
+  return (
+    <div
+      aria-hidden
+      className="absolute inset-0 flex items-center justify-center font-display font-black text-white/90"
+      style={{ background: `linear-gradient(135deg, hsl(${hue} 70% 55%), hsl(${(hue + 50) % 360} 70% 35%))` }}
+    >
+      <span className={size === "sm" ? "text-3xl" : "text-5xl"}>{initials(character.name)}</span>
+    </div>
+  );
+};
+
 export const CharacterCard: React.FC<CharacterCardProps> = ({
   character,
   selected = false,
@@ -37,70 +78,72 @@ export const CharacterCard: React.FC<CharacterCardProps> = ({
   size = "md"
 }) => {
   const alignmentClass = alignmentColors[character.alignment?.toLowerCase()] || alignmentColors.neutral;
+  const compact = size === "sm";
 
-  return (
-    <div
-      onClick={onClick}
-      className={cn(
-        "relative rounded-xl border-2 overflow-hidden bg-card text-card-foreground select-none",
-        onClick && "cursor-pointer anime-card-hover",
-        selected && "border-primary ring-4 ring-primary/20",
-        !selected && "border-card-border",
-        eliminated && "eliminated-card",
-        className
-      )}
-    >
-      {eliminated && (
-        <div className="eliminated-overlay font-display text-6xl tracking-tighter">
-          X
-        </div>
-      )}
-      
-      {/* Top Banner (Anime Name) */}
-      <div className={cn(
-        "w-full px-2 py-1 text-xs font-bold text-center truncate border-b-2 bg-muted/50 border-card-border uppercase tracking-wider",
-        size === "sm" ? "text-[10px] py-0.5" : ""
-      )}>
-        {character.anime}
-      </div>
-
-      <div className={cn("p-3 flex flex-col gap-2", size === "sm" && "p-2 gap-1")}>
-        {/* Name & Role */}
-        <div className="flex flex-col">
-          <h3 className={cn("font-display font-bold leading-tight", size === "sm" ? "text-sm" : "text-lg")}>
+  const content = (
+    <>
+      <div className="relative w-full aspect-[3/4] bg-muted overflow-hidden">
+        <Portrait character={character} size={size} />
+        {/* Name over the picture, like the board game */}
+        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/50 to-transparent px-2 pt-6 pb-1.5 text-left">
+          <h3 className={cn("font-display font-bold leading-tight text-white drop-shadow", compact ? "text-xs" : "text-base")}>
             {character.name}
           </h3>
-          <span className={cn("text-muted-foreground font-semibold uppercase tracking-wider", size === "sm" ? "text-[8px]" : "text-[10px]")}>
-            {character.role} Role
-          </span>
+          <p className={cn("text-white/75 font-semibold uppercase tracking-wider truncate", compact ? "text-[9px]" : "text-[10px]")}>
+            {character.anime}
+          </p>
         </div>
-
-        {/* Traits Grid */}
-        <div className={cn("grid grid-cols-2 gap-1", size === "sm" && "text-[10px]")}>
-          <div className="flex flex-col bg-muted/30 rounded p-1">
-            <span className="text-[9px] uppercase text-muted-foreground font-bold">Hair</span>
-            <span className="font-semibold text-xs capitalize truncate">{character.hairColor}</span>
+        {eliminated && (
+          <div className="eliminated-overlay font-display text-6xl tracking-tighter" aria-hidden>
+            X
           </div>
-          <div className="flex flex-col bg-muted/30 rounded p-1">
-            <span className="text-[9px] uppercase text-muted-foreground font-bold">Eyes</span>
-            <span className="font-semibold text-xs capitalize truncate">{character.eyeColor}</span>
-          </div>
-          <div className="flex flex-col bg-muted/30 rounded p-1 col-span-2">
-            <span className="text-[9px] uppercase text-muted-foreground font-bold">Species & Gender</span>
-            <span className="font-semibold text-xs capitalize truncate">{character.species} • {character.gender}</span>
-          </div>
-        </div>
-
-        {/* Alignment Badge */}
-        <div className={cn(
-          "mt-auto flex items-center justify-center gap-1 py-1 rounded-md text-xs font-bold uppercase",
-          alignmentClass,
-          size === "sm" && "text-[10px] py-0.5"
-        )}>
-          {getAlignmentIcon(character.alignment)}
-          {character.alignment}
-        </div>
+        )}
       </div>
-    </div>
+
+      {!compact && (
+        <div className="p-2 flex flex-col gap-1.5 text-left">
+          <div className="grid grid-cols-2 gap-1">
+            <div className="flex flex-col bg-muted/30 rounded p-1">
+              <span className="text-[10px] uppercase text-muted-foreground font-bold">Hair</span>
+              <span className="font-semibold text-xs capitalize truncate">{character.hairColor}</span>
+            </div>
+            <div className="flex flex-col bg-muted/30 rounded p-1">
+              <span className="text-[10px] uppercase text-muted-foreground font-bold">Eyes</span>
+              <span className="font-semibold text-xs capitalize truncate">{character.eyeColor}</span>
+            </div>
+          </div>
+          <div className="text-xs font-semibold capitalize text-muted-foreground truncate">
+            {character.species} • {character.gender} • {character.role} role
+          </div>
+          <div className={cn("flex items-center justify-center gap-1 py-0.5 rounded-md text-xs font-bold uppercase", alignmentClass)}>
+            {getAlignmentIcon(character.alignment)}
+            {character.alignment}
+          </div>
+        </div>
+      )}
+    </>
+  );
+
+  const classes = cn(
+    "relative block w-full rounded-xl border-2 overflow-hidden bg-card text-card-foreground select-none",
+    onClick && "cursor-pointer anime-card-hover focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/50",
+    selected && "border-primary ring-4 ring-primary/20",
+    !selected && "border-card-border",
+    eliminated && "eliminated-card",
+    className
+  );
+
+  if (!onClick) return <div className={classes}>{content}</div>;
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={classes}
+      aria-label={`${character.name} (${character.anime})${eliminated ? ", eliminated" : ""}`}
+      aria-pressed={selected || eliminated}
+    >
+      {content}
+    </button>
   );
 };

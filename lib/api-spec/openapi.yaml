@@ -67,6 +67,7 @@ components:
         - powers
         - alignment
         - role
+        - imageUrl
       properties:
         id:
           type: string
@@ -92,6 +93,9 @@ components:
           type: string
         role:
           type: string
+        imageUrl:
+          type: ["string", "null"]
+          description: Portrait URL, or null when no image is available yet
 
     ErrorResponse:
       type: object

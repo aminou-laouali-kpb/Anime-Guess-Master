@@ -3,6 +3,8 @@ import { Server as SocketIOServer } from "socket.io";
 import app, { allowedOrigins } from "./app";
 import { logger } from "./lib/logger";
 import { setupGameEngine } from "./lib/game-engine";
+import { loadCharacterImages } from "./lib/character-images";
+import characters from "./data/characters.json" assert { type: "json" };
 
 const rawPort = process.env["PORT"];
 
@@ -45,4 +47,9 @@ setupGameEngine(io);
 
 httpServer.listen(port, () => {
   logger.info({ port }, "Server listening");
+  // In the background: the game is playable right away, cards just show
+  // initials until the portraits are found.
+  void loadCharacterImages(characters).catch((err) =>
+    logger.warn({ err }, "Character image loading failed"),
+  );
 });

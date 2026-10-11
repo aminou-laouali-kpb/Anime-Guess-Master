@@ -32,7 +32,8 @@ export const ListCharactersResponseItem = zod.object({
   "species": zod.string(),
   "powers": zod.array(zod.string()),
   "alignment": zod.string(),
-  "role": zod.string()
+  "role": zod.string(),
+  "imageUrl": zod.string().nullable().describe('Portrait URL, or null when no image is available yet')
 })
 export const ListCharactersResponse = zod.array(ListCharactersResponseItem)
 

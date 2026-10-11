@@ -45,7 +45,7 @@ export const Selection: React.FC = () => {
       </div>
 
       {/* Grid */}
-      <div className="p-4 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 max-w-7xl mx-auto w-full">
+      <div className="p-3 grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-8 gap-2 max-w-6xl mx-auto w-full">
         {characters.map((char, index) => (
           <motion.div
             key={char.id}
@@ -55,6 +55,7 @@ export const Selection: React.FC = () => {
           >
             <CharacterCard
               character={char}
+              size="sm"
               selected={localSelection === char.id || myCharacterId === char.id}
               onClick={() => {
                 if (!isLockedIn) {
