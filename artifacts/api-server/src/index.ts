@@ -2,6 +2,7 @@ import { createServer } from "http";
 import { Server as SocketIOServer } from "socket.io";
 import app, { allowedOrigins } from "./app";
 import { logger } from "./lib/logger";
+import { makeOriginCheck } from "./lib/origin";
 import { setupGameEngine } from "./lib/game-engine";
 import { loadCharacterImages } from "./lib/character-images";
 import { initStats } from "./lib/stats";
@@ -33,6 +34,8 @@ const io = new SocketIOServer(httpServer, {
   path: "/api/socket.io",
   // Game messages are tiny; refuse anything big instead of buffering 1 MB.
   maxHttpBufferSize: 16 * 1024,
+  // Browsers on other websites can't open game connections.
+  allowRequest: makeOriginCheck(allowedOrigins),
 });
 
 // Games live in memory, so a crash ends every match in progress. Socket
