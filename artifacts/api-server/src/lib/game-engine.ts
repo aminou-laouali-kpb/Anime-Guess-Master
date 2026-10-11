@@ -116,11 +116,16 @@ interface Session {
   socketId: string | null;
   roomCode: string | null;
   disconnectTimer: NodeJS.Timeout | null;
+  lastReactionAt: number;
 }
 
 // ─── State ─────────────────────────────────────────────────────────────────────
 
 const MAX_LIVES = 3;
+
+// Reactions are picked from a fixed set: no free text, nothing to moderate.
+export const REACTIONS = ["👍", "😂", "😮", "😅", "🤔", "😱", "🔥", "👏"] as const;
+const REACTION_COOLDOWN_MS = 1_000;
 // Like the original board game: a smaller board keeps games short and readable.
 const BOARD_SIZE = 24;
 export const RECONNECT_GRACE_MS = 45_000;
@@ -509,6 +514,7 @@ export function setupGameEngine(io: SocketIOServer): void {
     const winner = room.players.find((p) => p.id === winnerId);
     const loser = winner && opponentOf(room, winner);
     if (winner && loser) reportResult(room, winner, loser, reason);
+    botReact(room, winner?.isBot ? "🔥" : "👏", 0.9);
   }
 
   // Removes the player for good and tells the opponent, whatever the phase.
@@ -592,6 +598,7 @@ export function setupGameEngine(io: SocketIOServer): void {
 
     player.lives -= 1;
     room.log.push({ type: "guess", guesserId: player.id, guessedCharacterId: characterId });
+    botReact(room, player.isBot ? "😅" : "😮");
 
     if (player.lives <= 0) {
       endGame(room, opponent.id, "out_of_lives");
@@ -636,6 +643,15 @@ export function setupGameEngine(io: SocketIOServer): void {
   }
 
   // ── Computer opponent ─────────────────────────────────────────────────────
+
+  // The computer reacts now and then, so it feels less like a machine.
+  function botReact(room: Room, emoji: (typeof REACTIONS)[number], chance = 0.6): void {
+    const bot = room.players.find((p) => p.isBot);
+    if (!bot || Math.random() > chance) return;
+    setTimeout(() => {
+      if (rooms.has(room.code)) io.to(room.code).emit("reaction", { playerId: bot.id, emoji });
+    }, 700 + Math.random() * 800);
+  }
 
   function cancelBot(room: Room): void {
     if (room.botTimer) clearTimeout(room.botTimer);
@@ -743,6 +759,7 @@ export function setupGameEngine(io: SocketIOServer): void {
         socketId: socket.id,
         roomCode: null,
         disconnectTimer: null,
+        lastReactionAt: 0,
       };
       sessions.set(session.token, session);
     }
@@ -1063,6 +1080,17 @@ export function setupGameEngine(io: SocketIOServer): void {
     });
 
     // ── Remember eliminated characters so they survive a reconnect ──────────
+    // ── Emoji reactions ──────────────────────────────────────────────────────
+    on("react", ({ emoji }) => {
+      const ctx = currentRoomAndPlayer();
+      if (!ctx || ctx.room.players.length < 2) return;
+      const reaction = REACTIONS.find((r) => r === emoji);
+      const now = Date.now();
+      if (!reaction || now - session.lastReactionAt < REACTION_COOLDOWN_MS) return;
+      session.lastReactionAt = now;
+      io.to(ctx.room.code).emit("reaction", { playerId: ctx.player.id, emoji: reaction });
+    });
+
     on("sync_eliminations", ({ eliminatedIds }) => {
       const ctx = currentRoomAndPlayer();
       if (!ctx || !Array.isArray(eliminatedIds)) return;

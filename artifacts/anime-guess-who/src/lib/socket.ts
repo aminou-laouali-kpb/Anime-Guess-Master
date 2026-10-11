@@ -34,6 +34,10 @@ export interface QnaPayload {
   value: string | null;
 }
 
+// Must match REACTIONS in the API server's game engine.
+export const REACTIONS = ["👍", "😂", "😮", "😅", "🤔", "😱", "🔥", "👏"] as const;
+export type Reaction = (typeof REACTIONS)[number];
+
 export type RoomMode = "quick" | "private" | "bot";
 export type BotLevel = "easy" | "normal" | "hard";
 
@@ -111,6 +115,7 @@ export interface ClientToServerEvents {
   sync_eliminations: (payload: { eliminatedIds: string[] }) => void;
   request_rematch: () => void;
   get_my_stats: () => void;
+  react: (payload: { emoji: Reaction }) => void;
   accept_rematch: () => void;
 }
 
@@ -150,6 +155,7 @@ export interface ServerToClientEvents {
   }) => void;
   opponent_left: () => void;
   timer: (payload: TimerPayload) => void;
+  reaction: (payload: { playerId: string; emoji: Reaction }) => void;
   character_assigned: (payload: { characterId: string }) => void;
   turn_timeout: (payload: {
     playerId: string;

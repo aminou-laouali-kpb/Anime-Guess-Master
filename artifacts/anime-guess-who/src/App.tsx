@@ -4,6 +4,7 @@ import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/sonner'; // Using sonner instead of toast since I used sonner in GameContext
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { GameProvider, useGame } from '@/context/GameContext';
+import { FloatingReactions } from '@/components/Reactions';
 
 // Pages
 import { Home } from '@/pages/Home';
@@ -41,6 +42,7 @@ function App() {
         <ErrorBoundary>
           <GameProvider>
             <MainGame />
+            <FloatingReactions />
           </GameProvider>
         </ErrorBoundary>
         <Toaster position="top-center" theme="system" richColors />

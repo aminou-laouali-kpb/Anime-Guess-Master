@@ -3,6 +3,7 @@ import { useGame } from "@/context/GameContext";
 import { Button } from "@/components/ui/button";
 import { CharacterCard } from "@/components/CharacterCard";
 import { LogEntryView } from "@/components/LogEntryView";
+import { ReactionRow } from "@/components/Reactions";
 import { Home, RotateCcw, Trophy, Skull } from "lucide-react";
 
 export const Ended: React.FC = () => {
@@ -89,6 +90,9 @@ export const Ended: React.FC = () => {
             </div>
           </div>
         )}
+
+        {/* Reactions ("GG 👏") while the opponent is still here */}
+        {!opponentLeft && !isDisconnect && <ReactionRow showMute={false} />}
 
         {/* Actions */}
         <div className="flex flex-col w-full gap-3 mt-4">
