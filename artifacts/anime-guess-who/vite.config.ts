@@ -1,7 +1,7 @@
 import path from 'path';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
 
 import runtimeErrorOverlay from '@replit/vite-plugin-runtime-error-modal';
 
@@ -27,12 +27,33 @@ if (!basePath) {
   );
 }
 
+// Link previews (Facebook, LinkedIn, X…) need absolute image URLs. The site's
+// public address comes from SITE_URL, or from Replit's deployment domain;
+// without either, the relative path is kept (fine for WhatsApp, Discord…).
+function absoluteShareImage(): Plugin {
+  const domain = process.env.REPLIT_DOMAINS?.split(',')[0]?.trim();
+  const siteUrl = (process.env.SITE_URL ?? (domain ? `https://${domain}` : ''))
+    .replace(/\/+$/, '');
+  return {
+    name: 'absolute-share-image',
+    transformIndexHtml(html) {
+      if (!siteUrl) return html;
+      const prefix = siteUrl + basePath.replace(/\/+$/, '');
+      return html.replace(
+        /(<meta (?:property|name)="(?:og:image|twitter:image)" content=")\//g,
+        `$1${prefix}/`,
+      );
+    },
+  };
+}
+
 export default defineConfig({
   base: basePath,
   plugins: [
     react(),
     tailwindcss(),
     runtimeErrorOverlay(),
+    absoluteShareImage(),
     ...(process.env.NODE_ENV !== 'production' &&
     process.env.REPL_ID !== undefined
       ? [
