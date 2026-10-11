@@ -40,7 +40,7 @@ function initials(name: string): string {
   return name.split(/\s+/).map((w) => w[0]).join("").slice(0, 2).toUpperCase();
 }
 
-const Portrait: React.FC<{ character: Character; size: "sm" | "md" | "lg" }> = ({ character, size }) => {
+export const Portrait: React.FC<{ character: Character; size: "sm" | "md" | "lg" }> = ({ character, size }) => {
   const [failed, setFailed] = useState(false);
   const hue = hueFor(character.id);
 

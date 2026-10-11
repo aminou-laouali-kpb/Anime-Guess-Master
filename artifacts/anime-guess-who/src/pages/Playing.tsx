@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useGame } from "@/context/GameContext";
 import { CharacterCard } from "@/components/CharacterCard";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,8 @@ import { cn } from "@/lib/utils";
 import { useSecondsLeft } from "@/hooks/use-seconds-left";
 import { LogEntryView } from "@/components/LogEntryView";
 import { ReactionPicker } from "@/components/Reactions";
+import { LeaveGameButton } from "@/components/LeaveGameButton";
+import { MyCharacterChip } from "@/components/MyCharacterChip";
 import { ATTRIBUTES, VerifiableAttribute, hasTrait, questionText, valueLabel, valuesOnBoard } from "@/lib/questions";
 import { toast } from "sonner";
 
@@ -30,8 +32,10 @@ export const Playing: React.FC = () => {
     myEliminatedIds,
     opponentConnected,
     timer,
-    roomMode
+    roomMode,
+    myCharacterId
   } = useGame();
+  const myCharacter = characters.find(c => c.id === myCharacterId);
   // The computer only understands verified questions.
   const vsBot = roomMode === "bot";
 
@@ -49,6 +53,21 @@ export const Playing: React.FC = () => {
 
   const [showGuessModal, setShowGuessModal] = useState(false);
   const [guessSearch, setGuessSearch] = useState("");
+  const [guessCandidate, setGuessCandidate] = useState<string | null>(null);
+
+  // The board is padded by the bottom bar's real height (it varies with the
+  // screen width and the phone's safe area), so the last row is never hidden.
+  const hudRef = useRef<HTMLDivElement>(null);
+  const [hudHeight, setHudHeight] = useState(150);
+  useLayoutEffect(() => {
+    const el = hudRef.current;
+    if (!el) return;
+    const update = () => setHudHeight(el.getBoundingClientRect().height);
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
   
   const [showLog, setShowLog] = useState(false);
 
@@ -56,6 +75,17 @@ export const Playing: React.FC = () => {
   const opponent = players.find(p => p.id !== myPlayerId);
 
   const isMyTurn = currentTurnId === myPlayerId;
+  const canAct = isMyTurn && !awaitingAnswerFor;
+
+  // If my turn ends while a dialog is open (time out), close it: acting now
+  // would only get "Ce n'est pas ton tour."
+  useEffect(() => {
+    if (!canAct) {
+      setShowAskModal(false);
+      setShowGuessModal(false);
+      setGuessCandidate(null);
+    }
+  }, [canAct]);
 
   const toggleElimination = (id: string) => {
     setEliminatedIds(prev => {
@@ -116,15 +146,21 @@ export const Playing: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lastLog?.id]);
 
-  const handleGuess = (id: string) => {
-    makeGuess(id);
+  // Two steps so a mis-tap while scrolling doesn't cost a life.
+  const confirmGuess = () => {
+    if (!guessCandidate) return;
+    makeGuess(guessCandidate);
+    setGuessCandidate(null);
     setShowGuessModal(false);
   };
+  const guessCandidateChar = characters.find(c => c.id === guessCandidate);
+  const guessable = characters.filter(c => !eliminatedIds.has(c.id));
+  const guessResults = guessable.filter(c => c.name.toLowerCase().includes(guessSearch.toLowerCase()));
 
   // Scroll log to bottom effect could go here if we were showing it inline permanently
 
   return (
-    <div className="min-h-[100dvh] w-full flex flex-col bg-background relative pb-28 md:pb-32">
+    <div className="min-h-[100dvh] w-full flex flex-col bg-background relative" style={{ paddingBottom: hudHeight + 16 }}>
       
       {/* Top HUD (Opponent) + turn banner stay visible while scrolling the board */}
       <div className="sticky top-0 z-40">
@@ -135,13 +171,16 @@ export const Playing: React.FC = () => {
               {opponent?.name || "Joueur 2"}
             </span>
           </div>
-          <div className="flex gap-1">
-            {Array.from({ length: 3 }).map((_, i) => (
-              <Heart 
-                key={i} 
-                className={cn("w-5 h-5", i < (opponent?.lives || 0) ? "fill-secondary text-secondary" : "fill-muted text-muted-foreground opacity-30")} 
-              />
-            ))}
+          <div className="flex items-center gap-2">
+            <div className="flex gap-1" aria-label={`Vies de l’adversaire : ${opponent?.lives ?? 0} sur 3`}>
+              {Array.from({ length: 3 }).map((_, i) => (
+                <Heart
+                  key={i}
+                  className={cn("w-5 h-5", i < (opponent?.lives || 0) ? "fill-secondary text-secondary" : "fill-muted text-muted-foreground opacity-30")}
+                />
+              ))}
+            </div>
+            <LeaveGameButton countsAsLoss={!vsBot} className="text-muted-foreground" />
           </div>
         </div>
 
@@ -170,48 +209,65 @@ export const Playing: React.FC = () => {
         ))}
       </div>
 
-      {/* Bottom HUD (Me & Actions) */}
-      <div className="fixed bottom-0 left-0 right-0 bg-card border-t-4 border-card-border z-50 animate-in slide-in-from-bottom">
-        <div className="p-3 flex justify-between items-center border-b border-border/50 bg-background/50">
-          <div className="flex flex-col">
-            <span className="text-xs uppercase font-bold text-muted-foreground tracking-wider">Toi</span>
-            <span className="font-display font-black text-lg text-primary truncate max-w-[150px]">
+      {/* Bottom HUD (Me & Actions) — must fit a 360px-wide phone */}
+      <div
+        ref={hudRef}
+        className="fixed bottom-0 left-0 right-0 bg-card border-t-4 border-card-border z-50 animate-in slide-in-from-bottom"
+        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+      >
+        <div className="px-3 py-2 flex items-center gap-2 border-b border-border/50 bg-background/50">
+          <MyCharacterChip character={myCharacter} />
+          <div className="flex flex-col min-w-0 flex-1">
+            <span className="text-xs uppercase font-bold text-muted-foreground tracking-wider truncate">
+              Toi{myCharacter ? ` · ${myCharacter.name}` : ""}
+            </span>
+            <span className="font-display font-black text-lg text-primary truncate">
               {me?.name || "Joueur 1"}
             </span>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 shrink-0">
             <ReactionPicker />
-            <Button variant="ghost" size="sm" onClick={() => setShowLog(!showLog)} className="font-bold relative">
-              <MessageSquare className="w-4 h-4 mr-2" /> Historique
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowLog(!showLog)}
+              className="font-bold relative px-2"
+              aria-label="Historique"
+              aria-expanded={showLog}
+            >
+              <MessageSquare className="w-5 h-5 sm:mr-2" />
+              <span className="hidden sm:inline">Historique</span>
               {gameLog.length > 0 && (
-                <span className="absolute -top-1 -right-1 w-3 h-3 bg-primary rounded-full" />
+                <span className="absolute top-0 right-0 w-2.5 h-2.5 bg-primary rounded-full" />
               )}
             </Button>
-            <div className="flex gap-1">
+            <div className="flex gap-0.5" aria-label={`Tes vies : ${me?.lives ?? 0} sur 3`}>
               {Array.from({ length: 3 }).map((_, i) => (
-                <Heart 
-                  key={i} 
-                  className={cn("w-5 h-5", i < (me?.lives || 0) ? "fill-primary text-primary" : "fill-muted text-muted-foreground opacity-30")} 
+                <Heart
+                  key={i}
+                  className={cn("w-5 h-5", i < (me?.lives || 0) ? "fill-primary text-primary" : "fill-muted text-muted-foreground opacity-30")}
                 />
               ))}
             </div>
           </div>
         </div>
 
-        <div className="p-3 flex gap-3 max-w-2xl mx-auto">
-          <Button 
-            className="flex-1 h-12 font-bold text-base bg-blue-600 hover:bg-blue-700" 
-            disabled={!isMyTurn || !!awaitingAnswerFor}
+        <div className="p-3 flex gap-2 sm:gap-3 max-w-2xl mx-auto">
+          <Button
+            className="flex-1 min-w-0 h-12 font-bold text-sm sm:text-base bg-blue-600 hover:bg-blue-700"
+            disabled={!canAct}
             onClick={() => setShowAskModal(true)}
           >
-            <Search className="w-5 h-5 mr-2" /> Poser une question
+            <Search className="w-5 h-5 mr-1.5 shrink-0" />
+            <span className="sm:hidden">Question</span>
+            <span className="hidden sm:inline">Poser une question</span>
           </Button>
-          <Button 
-            className="flex-1 h-12 font-bold text-base bg-red-600 hover:bg-red-700" 
-            disabled={!isMyTurn || !!awaitingAnswerFor}
+          <Button
+            className="flex-1 min-w-0 h-12 font-bold text-sm sm:text-base bg-red-600 hover:bg-red-700"
+            disabled={!canAct}
             onClick={() => setShowGuessModal(true)}
           >
-            <Crosshair className="w-5 h-5 mr-2" /> Deviner
+            <Crosshair className="w-5 h-5 mr-1.5 shrink-0" /> Deviner
           </Button>
         </div>
       </div>
@@ -229,6 +285,12 @@ export const Playing: React.FC = () => {
             {secondsLeft !== null && (
               <p className={cn("text-sm font-bold mt-2 tabular-nums", urgent ? "text-red-500" : "text-muted-foreground")}>
                 Réponds dans les {secondsLeft} s ou tu perds une vie
+              </p>
+            )}
+            {myCharacter && (
+              <p className="text-sm font-bold mt-2">
+                Ton personnage : <span className="text-primary">{myCharacter.name}</span>
+                <span className="text-muted-foreground font-normal"> ({myCharacter.anime})</span>
               </p>
             )}
             <p className="text-xs text-muted-foreground mt-1">
@@ -355,54 +417,73 @@ export const Playing: React.FC = () => {
       </Dialog>
 
       {/* Make a Guess Modal */}
-      <Dialog open={showGuessModal} onOpenChange={setShowGuessModal}>
-        <DialogContent className="max-w-3xl h-[80vh] flex flex-col p-0 overflow-hidden gap-0">
+      <Dialog open={showGuessModal} onOpenChange={(open) => { setShowGuessModal(open); if (!open) setGuessCandidate(null); }}>
+        <DialogContent
+          className="max-w-3xl h-[85dvh] flex flex-col p-0 overflow-hidden gap-0"
+          // Don't focus the search box: on phones it opens the keyboard over the grid.
+          onOpenAutoFocus={(e) => e.preventDefault()}
+        >
           <div className="p-4 border-b bg-card">
             <DialogTitle className="font-display text-2xl text-red-500 flex items-center">
               <Crosshair className="w-6 h-6 mr-2" /> Qui est-ce ?
             </DialogTitle>
-            <p className="text-sm text-muted-foreground mt-1 font-bold">
-              Attention : une mauvaise réponse te coûte 1 vie !
-            </p>
-            <Input 
-              placeholder="Rechercher un personnage…" 
+            <DialogDescription className="text-sm text-muted-foreground mt-1 font-bold">
+              Choisis un personnage puis confirme. Une mauvaise réponse te coûte 1 vie !
+            </DialogDescription>
+            <Input
+              placeholder="Rechercher un personnage…"
               value={guessSearch}
               onChange={e => setGuessSearch(e.target.value)}
-              className="mt-4"
+              className="mt-3"
+              aria-label="Rechercher un personnage"
             />
           </div>
           <ScrollArea className="flex-1 p-4 bg-muted/30">
             <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
-              {characters
-                .filter(c => !eliminatedIds.has(c.id)) // Only show non-eliminated
-                .filter(c => c.name.toLowerCase().includes(guessSearch.toLowerCase()))
-                .map(char => (
-                  <CharacterCard
-                    key={char.id}
-                    character={char}
-                    size="sm"
-                    className="cursor-pointer hover:border-red-500 hover:ring-2 ring-red-500/50"
-                    onClick={() => handleGuess(char.id)}
-                  />
+              {guessResults.map(char => (
+                <CharacterCard
+                  key={char.id}
+                  character={char}
+                  size="sm"
+                  selected={guessCandidate === char.id}
+                  className="cursor-pointer hover:border-red-500 hover:ring-2 ring-red-500/50"
+                  onClick={() => setGuessCandidate(char.id)}
+                />
               ))}
-              {characters.filter(c => !eliminatedIds.has(c.id)).length === 0 && (
+              {guessable.length === 0 ? (
                 <div className="col-span-full py-12 text-center text-muted-foreground">
                   Plus aucun personnage ! Remets-en un sur ta grille d’abord.
+                </div>
+              ) : guessResults.length === 0 && (
+                <div className="col-span-full py-12 text-center text-muted-foreground">
+                  Aucun personnage ne correspond à « {guessSearch} ».
                 </div>
               )}
             </div>
           </ScrollArea>
+          <div className="p-3 border-t bg-card flex items-center gap-2">
+            <p className="flex-1 min-w-0 text-sm font-bold truncate">
+              {guessCandidateChar ? `Deviner ${guessCandidateChar.name} ?` : "Touche un personnage pour le choisir."}
+            </p>
+            <Button
+              className="bg-red-600 hover:bg-red-700 font-bold shrink-0"
+              disabled={!guessCandidate}
+              onClick={confirmGuess}
+            >
+              Confirmer
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
 
       {/* Game Log Drawer */}
       <div className={cn(
-        "fixed inset-x-0 bottom-[140px] md:bottom-[130px] z-40 bg-card/95 backdrop-blur-xl border-t-2 border-border shadow-2xl transition-transform duration-300 ease-out",
-        showLog ? "translate-y-0 h-[40vh]" : "translate-y-[120%]"
-      )}>
+        "fixed inset-x-0 z-40 bg-card/95 backdrop-blur-xl border-t-2 border-border shadow-2xl transition-transform duration-300 ease-out",
+        showLog ? "translate-y-0 h-[40vh]" : "translate-y-[120%] invisible"
+      )} style={{ bottom: hudHeight }} aria-hidden={!showLog}>
         <div className="flex items-center justify-between p-3 border-b">
           <h3 className="font-bold uppercase tracking-wider text-sm">Historique</h3>
-          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setShowLog(false)}>
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setShowLog(false)} aria-label="Fermer l’historique">
             <ChevronDown className="w-4 h-4" />
           </Button>
         </div>

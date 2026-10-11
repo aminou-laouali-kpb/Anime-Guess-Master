@@ -1,13 +1,15 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useGame } from "@/context/GameContext";
 import { CharacterCard } from "@/components/CharacterCard";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
 import { useSecondsLeft } from "@/hooks/use-seconds-left";
+import { LeaveGameButton } from "@/components/LeaveGameButton";
 
 export const Selection: React.FC = () => {
-  const { characters, selectCharacter, myCharacterId, opponentReady, myName, timer } = useGame();
+  const { characters, selectCharacter, myCharacterId, opponentReady, myName, timer, players, myPlayerId } = useGame();
+  const opponentName = players.find(p => p.id !== myPlayerId)?.name ?? "Adversaire";
   const secondsLeft = useSecondsLeft(timer?.deadline);
   
   // Local state to hold choice before confirming
@@ -21,20 +23,27 @@ export const Selection: React.FC = () => {
 
   const isLockedIn = myCharacterId !== null;
 
+  // If the clock ran out and a character was picked for me, forget the one I
+  // had tapped without confirming, so only the real choice is highlighted.
+  useEffect(() => {
+    if (myCharacterId) setLocalSelection(null);
+  }, [myCharacterId]);
+
   return (
     <div className="min-h-[100dvh] w-full flex flex-col bg-background relative pb-24">
       {/* Header Sticky */}
       <div className="sticky top-0 z-40 bg-background/80 backdrop-blur-md border-b border-border px-4 py-4 flex flex-col items-center justify-center shadow-sm">
-        <h2 className="font-display font-black text-2xl uppercase tracking-tight text-center">
+        <LeaveGameButton countsAsLoss={false} className="absolute top-2 right-2 text-muted-foreground" />
+        <h2 className="font-display font-black text-2xl uppercase tracking-tight text-center px-8">
           {isLockedIn ? "En attente de l’adversaire" : "Choisis ton personnage secret"}
         </h2>
         <div className="flex items-center gap-4 mt-2 text-sm font-bold">
           <span className={isLockedIn ? "text-primary" : "text-muted-foreground"}>
-            {myName} {isLockedIn ? "✓" : "..."}
+            {myName} {isLockedIn ? "✓" : "…"}
           </span>
           <span className="text-muted-foreground/30">VS</span>
           <span className={opponentReady ? "text-secondary" : "text-muted-foreground"}>
-            Adversaire {opponentReady ? "✓" : "…"}
+            {opponentName} {opponentReady ? "✓" : "…"}
           </span>
         </div>
         {!isLockedIn && secondsLeft !== null && (
@@ -56,7 +65,7 @@ export const Selection: React.FC = () => {
             <CharacterCard
               character={char}
               size="sm"
-              selected={localSelection === char.id || myCharacterId === char.id}
+              selected={(myCharacterId ?? localSelection) === char.id}
               onClick={() => {
                 if (!isLockedIn) {
                   setLocalSelection(char.id);
