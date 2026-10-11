@@ -7,7 +7,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
-import { socket } from "@/lib/socket";
 
 export const Playing: React.FC = () => {
   const {
@@ -20,10 +19,13 @@ export const Playing: React.FC = () => {
     askQuestion,
     answerQuestion,
     makeGuess,
-    syncEliminations
+    syncEliminations,
+    myPlayerId,
+    myEliminatedIds,
+    opponentConnected
   } = useGame();
 
-  const [eliminatedIds, setEliminatedIds] = useState<Set<string>>(new Set());
+  const [eliminatedIds, setEliminatedIds] = useState<Set<string>>(() => new Set(myEliminatedIds));
   
   // Modals
   const [showAskModal, setShowAskModal] = useState(false);
@@ -34,10 +36,10 @@ export const Playing: React.FC = () => {
   
   const [showLog, setShowLog] = useState(false);
 
-  const me = players.find(p => p.socketId === socket.id);
-  const opponent = players.find(p => p.socketId !== socket.id);
+  const me = players.find(p => p.id === myPlayerId);
+  const opponent = players.find(p => p.id !== myPlayerId);
 
-  const isMyTurn = currentTurnId === socket.id;
+  const isMyTurn = currentTurnId === myPlayerId;
 
   const toggleElimination = (id: string) => {
     setEliminatedIds(prev => {
@@ -95,7 +97,7 @@ export const Playing: React.FC = () => {
         "py-1.5 px-4 text-center font-bold uppercase tracking-widest text-xs transition-colors shadow-sm z-30 relative",
         isMyTurn ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
       )}>
-        {isMyTurn ? "Your Turn" : "Opponent's Turn"}
+        {!opponentConnected ? "Opponent disconnected — waiting for them…" : isMyTurn ? "Your Turn" : "Opponent's Turn"}
       </div>
 
       {/* Game Board (Grid) */}
@@ -279,7 +281,7 @@ export const Playing: React.FC = () => {
             ) : (
               gameLog.map((log) => {
                 if (log.type === "qna") {
-                  const askerName = log.askerId === socket.id ? "You" : opponent?.name;
+                  const askerName = log.askerId === myPlayerId ? "You" : opponent?.name;
                   return (
                     <div key={log.id} className="bg-muted/50 p-3 rounded-lg text-sm border border-border">
                       <div className="font-bold text-primary mb-1">{askerName} asked:</div>
@@ -293,7 +295,7 @@ export const Playing: React.FC = () => {
                     </div>
                   );
                 } else if (log.type === "guess") {
-                  const guesserName = log.guesserId === socket.id ? "You" : opponent?.name;
+                  const guesserName = log.guesserId === myPlayerId ? "You" : opponent?.name;
                   const guessedChar = characters.find(c => c.id === log.guessedCharacterId);
                   return (
                     <div key={log.id} className="bg-red-500/10 p-3 rounded-lg text-sm border border-red-500/30">

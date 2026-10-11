@@ -3,7 +3,6 @@ import { useGame } from "@/context/GameContext";
 import { Button } from "@/components/ui/button";
 import { CharacterCard } from "@/components/CharacterCard";
 import { Home, RotateCcw, Trophy, Skull } from "lucide-react";
-import { socket } from "@/lib/socket";
 
 export const Ended: React.FC = () => {
   const { 
@@ -12,12 +11,14 @@ export const Ended: React.FC = () => {
     revealedOpponentCharacterId, 
     characters,
     rematchRequestedBy,
+    myPlayerId,
+    opponentLeft,
     requestRematch,
     acceptRematch,
     leaveGame
   } = useGame();
 
-  const isWinner = winnerId === socket.id;
+  const isWinner = winnerId === myPlayerId;
   const isDisconnect = gameOverReason === "opponent_left";
 
   const opponentCharacter = characters.find(c => c.id === revealedOpponentCharacterId);
@@ -60,9 +61,14 @@ export const Ended: React.FC = () => {
 
         {/* Actions */}
         <div className="flex flex-col w-full gap-3 mt-4">
-          {!isDisconnect && (
+          {opponentLeft && !isDisconnect && (
+            <p className="text-sm font-bold uppercase tracking-widest text-muted-foreground">
+              Your opponent left the room.
+            </p>
+          )}
+          {!isDisconnect && !opponentLeft && (
             <>
-              {rematchRequestedBy === socket.id ? (
+              {rematchRequestedBy === myPlayerId ? (
                 <Button size="lg" disabled className="w-full h-14 text-lg bg-secondary/50 font-bold">
                   Waiting for opponent...
                 </Button>

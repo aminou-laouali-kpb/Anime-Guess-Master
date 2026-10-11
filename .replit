@@ -2,7 +2,10 @@ modules = ["nodejs-24"]
 
 [deployment]
 router = "application"
-deploymentTarget = "autoscale"
+# Reserved VM: games and matchmaking live in server memory, so the app must run
+# as one always-on instance (autoscale can split players across instances and
+# scale to zero mid-game).
+deploymentTarget = "gce"
 
 [deployment.postBuild]
 args = ["pnpm", "store", "prune"]

@@ -4,10 +4,9 @@ import { Character } from "@workspace/api-client-react";
 export type GamePhase = "home" | "queue" | "lobby" | "selection" | "playing" | "ended";
 
 export interface PlayerState {
-  socketId: string;
+  id: string;
   name: string;
   lives: number;
-  eliminatedIds?: string[];
 }
 
 export interface GameLogEntry {
@@ -18,13 +17,38 @@ export interface GameLogEntry {
   answer?: "yes" | "no";
   guesserId?: string;
   guessedCharacterId?: string;
-  correct?: boolean;
+}
+
+export type GameOverReason = "correct_guess" | "out_of_lives" | "opponent_left";
+
+type ServerLogEntry =
+  | { type: "qna"; question: string; answer: "yes" | "no"; askerId: string }
+  | { type: "guess"; guesserId: string; guessedCharacterId: string };
+
+export interface RoomSnapshot {
+  code: string;
+  phase: "waiting" | "selection" | "playing" | "ended";
+  players: PlayerState[];
+  characters: Character[];
+  myCharacterId: string | null;
+  myEliminatedIds: string[];
+  opponentReady: boolean;
+  opponentConnected: boolean;
+  currentTurnPlayerId: string | null;
+  pendingQuestion: string | null;
+  awaitingAnswerFor: string | null;
+  log: ServerLogEntry[];
+  winnerId: string | null;
+  gameOverReason: GameOverReason | null;
+  opponentCharacterId: string | null;
+  rematchRequestedBy: string | null;
 }
 
 export interface ClientToServerEvents {
   join_lobby: (payload: { name: string }) => void;
   create_room: (payload: { name: string }) => void;
   join_room: (payload: { code: string; name: string }) => void;
+  leave_room: () => void;
   select_character: (payload: { characterId: string }) => void;
   ask_question: (payload: { question: string }) => void;
   answer_question: (payload: { answer: "yes" | "no" }) => void;
@@ -35,6 +59,8 @@ export interface ClientToServerEvents {
 }
 
 export interface ServerToClientEvents {
+  session: (payload: { token: string; playerId: string }) => void;
+  state_sync: (payload: { room: RoomSnapshot | null }) => void;
   in_queue: (payload: { position: number }) => void;
   room_created: (payload: { code: string }) => void;
   room_joined: (payload: {
@@ -45,31 +71,32 @@ export interface ServerToClientEvents {
   }) => void;
   opponent_ready: () => void;
   game_start: (payload: {
-    currentTurnSocketId: string;
+    currentTurnPlayerId: string;
     players: PlayerState[];
   }) => void;
-  question_asked: (payload: { question: string; askerSocketId: string }) => void;
+  question_asked: (payload: { question: string; askerId: string }) => void;
   awaiting_answer: (payload: { question: string }) => void;
   question_answered: (payload: {
     question: string;
     answer: "yes" | "no";
-    askerSocketId: string;
-    currentTurnSocketId: string;
+    askerId: string;
+    currentTurnPlayerId: string;
   }) => void;
   wrong_guess: (payload: {
-    guesserSocketId: string;
+    guesserId: string;
     guessedCharacterId: string;
     lives: number;
-    currentTurnSocketId: string;
+    currentTurnPlayerId: string;
   }) => void;
   game_over: (payload: {
     winnerId: string;
-    loserOpponentCharacterId?: string;
-    guesserCharacterId?: string;
-    reason: "correct_guess" | "out_of_lives" | "opponent_left";
+    reason: GameOverReason;
+    opponentCharacterId: string | null;
   }) => void;
   opponent_left: () => void;
-  rematch_requested: (payload: { bySocketId: string }) => void;
+  opponent_disconnected: (payload: { graceSeconds: number }) => void;
+  opponent_reconnected: () => void;
+  rematch_requested: (payload: { byPlayerId: string }) => void;
   rematch_started: (payload: {
     code: string;
     phase: string;
@@ -79,10 +106,32 @@ export interface ServerToClientEvents {
   error: (payload: { message: string }) => void;
 }
 
+const SESSION_KEY = "anime_who_session";
+
+export function loadSessionToken(): string | null {
+  try {
+    return localStorage.getItem(SESSION_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function saveSessionToken(token: string): void {
+  try {
+    localStorage.setItem(SESSION_KEY, token);
+  } catch {
+    // Private mode / blocked storage: the game still works, it just can't
+    // survive a page reload.
+  }
+}
+
 // Connect to the same origin — the shared proxy routes /api/* (including
 // /api/socket.io/*) to the API artifact, so no absolute URL is needed.
+// The session token lets the server hand us back our seat after a reload or
+// a dropped connection.
 export const socket: Socket<ServerToClientEvents, ClientToServerEvents> = io({
   path: "/api/socket.io",
   autoConnect: false,
   transports: ["polling", "websocket"],
+  auth: (cb) => cb({ token: loadSessionToken() }),
 });

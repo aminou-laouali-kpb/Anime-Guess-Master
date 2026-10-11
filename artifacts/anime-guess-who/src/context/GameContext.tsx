@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from "react";
-import { socket, GamePhase, PlayerState, GameLogEntry } from "../lib/socket";
+import { socket, saveSessionToken, GamePhase, GameOverReason, PlayerState, GameLogEntry, RoomSnapshot } from "../lib/socket";
 import { Character, useListCharacters } from "@workspace/api-client-react";
 import { toast } from "sonner";
 
@@ -9,14 +9,18 @@ interface GameState {
   queuePosition: number | null;
   players: PlayerState[];
   characters: Character[];
+  myPlayerId: string | null;
   myCharacterId: string | null; // For playing phase (secret selection)
+  myEliminatedIds: string[]; // Restored from the server after a reconnect
   opponentReady: boolean;
+  opponentConnected: boolean;
+  opponentLeft: boolean;
   currentTurnId: string | null;
   pendingQuestion: string | null; // A question I need to answer
   awaitingAnswerFor: string | null; // A question I asked, waiting for answer
   gameLog: GameLogEntry[];
   winnerId: string | null;
-  gameOverReason: string | null;
+  gameOverReason: GameOverReason | null;
   revealedOpponentCharacterId: string | null;
   rematchRequestedBy: string | null;
   isConnected: boolean;
@@ -40,6 +44,13 @@ interface GameContextType extends GameState {
 
 const GameContext = createContext<GameContextType | null>(null);
 
+const SNAPSHOT_PHASES: Record<RoomSnapshot["phase"], GamePhase> = {
+  waiting: "lobby",
+  selection: "selection",
+  playing: "playing",
+  ended: "ended",
+};
+
 export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // Pre-fetch characters to satisfy requirements and prime cache
   useListCharacters();
@@ -51,16 +62,28 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [queuePosition, setQueuePosition] = useState<number | null>(null);
   const [players, setPlayers] = useState<PlayerState[]>([]);
   const [characters, setCharacters] = useState<Character[]>([]);
+  const [myPlayerId, setMyPlayerId] = useState<string | null>(null);
   const [myCharacterId, setMyCharacterId] = useState<string | null>(null);
+  const [myEliminatedIds, setMyEliminatedIds] = useState<string[]>([]);
   const [opponentReady, setOpponentReady] = useState(false);
+  const [opponentConnected, setOpponentConnected] = useState(true);
+  const [opponentLeft, setOpponentLeft] = useState(false);
   const [currentTurnId, setCurrentTurnId] = useState<string | null>(null);
   const [pendingQuestion, setPendingQuestion] = useState<string | null>(null);
   const [awaitingAnswerFor, setAwaitingAnswerFor] = useState<string | null>(null);
   const [gameLog, setGameLog] = useState<GameLogEntry[]>([]);
   const [winnerId, setWinnerId] = useState<string | null>(null);
-  const [gameOverReason, setGameOverReason] = useState<string | null>(null);
+  const [gameOverReason, setGameOverReason] = useState<GameOverReason | null>(null);
   const [revealedOpponentCharacterId, setRevealedOpponentCharacterId] = useState<string | null>(null);
   const [rematchRequestedBy, setRematchRequestedBy] = useState<string | null>(null);
+
+  // Socket listeners are registered once; they read the live phase from here.
+  const phaseRef = useRef(phase);
+  phaseRef.current = phase;
+  const myNameRef = useRef(myName);
+  myNameRef.current = myName;
+  const myPlayerIdRef = useRef(myPlayerId);
+  myPlayerIdRef.current = myPlayerId;
 
   const resetGameState = () => {
     setRoomCode(null);
@@ -68,7 +91,10 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setPlayers([]);
     setCharacters([]);
     setMyCharacterId(null);
+    setMyEliminatedIds([]);
     setOpponentReady(false);
+    setOpponentConnected(true);
+    setOpponentLeft(false);
     setCurrentTurnId(null);
     setPendingQuestion(null);
     setAwaitingAnswerFor(null);
@@ -79,16 +105,76 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setRematchRequestedBy(null);
   };
 
+  const startNewRound = (players: PlayerState[], characters: Character[]) => {
+    setPhase("selection");
+    setPlayers(players);
+    setCharacters(characters);
+    setOpponentReady(false);
+    setOpponentConnected(true);
+    setOpponentLeft(false);
+    setMyCharacterId(null);
+    setMyEliminatedIds([]);
+    setCurrentTurnId(null);
+    setPendingQuestion(null);
+    setAwaitingAnswerFor(null);
+    setGameLog([]);
+    setWinnerId(null);
+    setGameOverReason(null);
+    setRevealedOpponentCharacterId(null);
+    setRematchRequestedBy(null);
+  };
+
+  const applySnapshot = (room: RoomSnapshot) => {
+    setPhase(SNAPSHOT_PHASES[room.phase]);
+    setRoomCode(room.code);
+    setQueuePosition(null);
+    setPlayers(room.players);
+    setCharacters(room.characters);
+    setMyCharacterId(room.myCharacterId);
+    setMyEliminatedIds(room.myEliminatedIds);
+    setOpponentReady(room.opponentReady);
+    setOpponentConnected(room.opponentConnected);
+    setOpponentLeft(room.phase !== "waiting" && room.players.length < 2);
+    setCurrentTurnId(room.currentTurnPlayerId);
+    setPendingQuestion(room.pendingQuestion);
+    setAwaitingAnswerFor(room.awaitingAnswerFor);
+    setGameLog(room.log.map((entry, i) => ({ ...entry, id: `restored-${i}` })));
+    setWinnerId(room.winnerId);
+    setGameOverReason(room.gameOverReason);
+    setRevealedOpponentCharacterId(room.opponentCharacterId);
+    setRematchRequestedBy(room.rematchRequestedBy);
+  };
+
   const setMyName = (name: string) => {
     localStorage.setItem("anime_who_name", name);
     setMyNameState(name);
   };
 
   useEffect(() => {
-    socket.connect();
-
     socket.on("connect", () => setIsConnected(true));
     socket.on("disconnect", () => setIsConnected(false));
+
+    socket.on("session", ({ token, playerId }) => {
+      saveSessionToken(token);
+      setMyPlayerId(playerId);
+    });
+
+    // Sent on every (re)connection: either our seat in a game, or nothing.
+    socket.on("state_sync", ({ room }) => {
+      if (room) {
+        applySnapshot(room);
+        return;
+      }
+      const current = phaseRef.current;
+      if (current === "queue") {
+        // The server drops queued players on disconnect: get back in line.
+        socket.emit("join_lobby", { name: myNameRef.current });
+      } else if (current !== "home") {
+        toast.error("Connection lost. Your game could not be restored.");
+        resetGameState();
+        setPhase("home");
+      }
+    });
 
     socket.on("in_queue", ({ position }) => {
       setPhase("queue");
@@ -100,29 +186,22 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setRoomCode(code);
     });
 
-    socket.on("room_joined", ({ code, phase, players, characters }) => {
+    socket.on("room_joined", ({ code, players, characters }) => {
       setRoomCode(code);
-      setPhase("selection");
-      setPlayers(players);
-      setCharacters(characters);
-      setOpponentReady(false);
-      setMyCharacterId(null);
-      setGameLog([]);
-      setWinnerId(null);
-      setRematchRequestedBy(null);
+      startNewRound(players, characters);
     });
 
     socket.on("opponent_ready", () => {
       setOpponentReady(true);
     });
 
-    socket.on("game_start", ({ currentTurnSocketId, players }) => {
+    socket.on("game_start", ({ currentTurnPlayerId, players }) => {
       setPhase("playing");
-      setCurrentTurnId(currentTurnSocketId);
+      setCurrentTurnId(currentTurnPlayerId);
       setPlayers(players);
     });
 
-    socket.on("question_asked", ({ question, askerSocketId }) => {
+    socket.on("question_asked", ({ question }) => {
       setPendingQuestion(question);
     });
 
@@ -130,7 +209,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setAwaitingAnswerFor(question);
     });
 
-    socket.on("question_answered", ({ question, answer, askerSocketId, currentTurnSocketId }) => {
+    socket.on("question_answered", ({ question, answer, askerId, currentTurnPlayerId }) => {
       setPendingQuestion(null);
       setAwaitingAnswerFor(null);
       setGameLog(prev => [...prev, {
@@ -138,77 +217,92 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
         type: "qna",
         question,
         answer,
-        askerId: askerSocketId
+        askerId
       }]);
-      setCurrentTurnId(currentTurnSocketId);
+      setCurrentTurnId(currentTurnPlayerId);
     });
 
-    socket.on("wrong_guess", ({ guesserSocketId, guessedCharacterId, lives, currentTurnSocketId }) => {
+    socket.on("wrong_guess", ({ guesserId, guessedCharacterId, lives, currentTurnPlayerId }) => {
       setGameLog(prev => [...prev, {
         id: Math.random().toString(),
         type: "guess",
-        guesserId: guesserSocketId,
-        guessedCharacterId,
-        correct: false
+        guesserId,
+        guessedCharacterId
       }]);
-      setPlayers(prev => prev.map(p => 
-        p.socketId === guesserSocketId ? { ...p, lives } : p
+      setPlayers(prev => prev.map(p =>
+        p.id === guesserId ? { ...p, lives } : p
       ));
-      setCurrentTurnId(currentTurnSocketId);
-      if (guesserSocketId === socket.id) {
+      setCurrentTurnId(currentTurnPlayerId);
+      if (guesserId === myPlayerIdRef.current) {
         toast.error("Wrong guess! You lost a life.");
       } else {
         toast.success("Opponent guessed wrong!");
       }
     });
 
-    socket.on("game_over", ({ winnerId, loserOpponentCharacterId, guesserCharacterId, reason }) => {
+    socket.on("game_over", ({ winnerId, opponentCharacterId, reason }) => {
       setPhase("ended");
       setWinnerId(winnerId);
-      setRevealedOpponentCharacterId(loserOpponentCharacterId || guesserCharacterId || null);
+      setRevealedOpponentCharacterId(opponentCharacterId);
       setGameOverReason(reason);
       setPendingQuestion(null);
       setAwaitingAnswerFor(null);
+      setRematchRequestedBy(null);
     });
 
-    socket.on("opponent_left", () => {
-      if (phase !== "home" && phase !== "ended") {
-        toast.error("Opponent disconnected.");
-        setPhase("ended");
-        setGameOverReason("opponent_left");
-        setWinnerId(socket.id || "unknown");
+    socket.on("opponent_disconnected", ({ graceSeconds }) => {
+      setOpponentConnected(false);
+      if (phaseRef.current !== "ended") {
+        toast.warning(`Opponent lost connection. Waiting up to ${graceSeconds}s for them to come back…`);
       }
     });
 
-    socket.on("rematch_requested", ({ bySocketId }) => {
-      setRematchRequestedBy(bySocketId);
-      if (bySocketId !== socket.id) {
+    socket.on("opponent_reconnected", () => {
+      setOpponentConnected(true);
+      if (phaseRef.current !== "ended") {
+        toast.success("Opponent is back!");
+      }
+    });
+
+    socket.on("opponent_left", () => {
+      setOpponentLeft(true);
+      setRematchRequestedBy(null);
+      const current = phaseRef.current;
+      if (current === "selection" || current === "playing") {
+        toast.error("Opponent left the game.");
+        setPhase("ended");
+        setGameOverReason("opponent_left");
+        setWinnerId(myPlayerIdRef.current);
+      } else if (current === "ended") {
+        toast.info("Opponent left the room.");
+      }
+    });
+
+    socket.on("rematch_requested", ({ byPlayerId }) => {
+      setRematchRequestedBy(byPlayerId);
+      if (byPlayerId !== myPlayerIdRef.current) {
         toast.info("Opponent wants a rematch!");
       }
     });
 
-    socket.on("rematch_started", ({ code, phase, players, characters }) => {
-      setPhase("selection");
-      setPlayers(players);
-      setCharacters(characters);
-      setOpponentReady(false);
-      setMyCharacterId(null);
-      setGameLog([]);
-      setWinnerId(null);
-      setRematchRequestedBy(null);
-      setRevealedOpponentCharacterId(null);
+    socket.on("rematch_started", ({ players, characters }) => {
+      startNewRound(players, characters);
     });
 
     socket.on("error", ({ message }) => {
       toast.error(message);
-      if (phase === "queue" || phase === "lobby") {
+      if (phaseRef.current === "queue" || phaseRef.current === "lobby") {
         setPhase("home");
       }
     });
 
+    socket.connect();
+
     return () => {
       socket.off("connect");
       socket.off("disconnect");
+      socket.off("session");
+      socket.off("state_sync");
       socket.off("in_queue");
       socket.off("room_created");
       socket.off("room_joined");
@@ -219,12 +313,14 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       socket.off("question_answered");
       socket.off("wrong_guess");
       socket.off("game_over");
+      socket.off("opponent_disconnected");
+      socket.off("opponent_reconnected");
       socket.off("opponent_left");
       socket.off("rematch_requested");
       socket.off("rematch_started");
       socket.off("error");
     };
-  }, [phase]);
+  }, []);
 
   const joinQueue = useCallback(() => {
     if (!myName) return;
@@ -268,7 +364,6 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const requestRematch = useCallback(() => {
-    setRematchRequestedBy(socket.id as string);
     socket.emit("request_rematch");
   }, []);
 
@@ -277,8 +372,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const leaveGame = useCallback(() => {
-    socket.disconnect();
-    setTimeout(() => socket.connect(), 100);
+    socket.emit("leave_room");
     resetGameState();
     setPhase("home");
   }, []);
@@ -291,8 +385,12 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
         queuePosition,
         players,
         characters,
+        myPlayerId,
         myCharacterId,
+        myEliminatedIds,
         opponentReady,
+        opponentConnected,
+        opponentLeft,
         currentTurnId,
         pendingQuestion,
         awaitingAnswerFor,

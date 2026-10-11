@@ -1,5 +1,7 @@
+import { randomBytes } from "crypto";
 import type { Server as SocketIOServer, Socket } from "socket.io";
 import characters from "../data/characters.json" assert { type: "json" };
+import { logger } from "./logger";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -17,14 +19,13 @@ export interface Character {
   role: string;
 }
 
-export interface QAEntry {
-  question: string;
-  answer: "yes" | "no";
-  askerSocketId: string;
-}
+export type LogEntry =
+  | { type: "qna"; question: string; answer: "yes" | "no"; askerId: string }
+  | { type: "guess"; guesserId: string; guessedCharacterId: string };
 
 export interface Player {
-  socketId: string;
+  id: string; // public id, safe to share with the opponent
+  token: string; // secret session token, never sent to anyone but its owner
   name: string;
   selectedCharacterId: string | null;
   eliminatedIds: string[];
@@ -34,24 +35,50 @@ export interface Player {
 
 export type RoomPhase = "waiting" | "selection" | "playing" | "ended";
 
+export type GameOverReason = "correct_guess" | "out_of_lives" | "opponent_left";
+
 export interface Room {
   code: string;
   phase: RoomPhase;
   players: Player[];
-  currentTurnSocketId: string | null;
-  qaLog: QAEntry[];
+  currentTurnPlayerId: string | null;
+  log: LogEntry[];
   pendingQuestion: string | null;
-  pendingAskerSocketId: string | null;
+  pendingAskerId: string | null;
   winnerId: string | null;
+  gameOverReason: GameOverReason | null;
+  rematchRequestedBy: string | null;
+}
+
+// A session outlives a single socket so a player can reload the page or lose
+// the network for a moment without forfeiting the game.
+interface Session {
+  token: string;
+  playerId: string;
+  name: string;
+  socketId: string | null;
+  roomCode: string | null;
+  disconnectTimer: NodeJS.Timeout | null;
 }
 
 // ─── State ─────────────────────────────────────────────────────────────────────
 
+const MAX_LIVES = 3;
+export const RECONNECT_GRACE_MS = 45_000;
+
 const rooms = new Map<string, Room>();
-const matchmakingQueue: string[] = []; // socketIds
-const socketToRoom = new Map<string, string>(); // socketId → roomCode
+const sessions = new Map<string, Session>(); // token → session
+const matchmakingQueue: string[] = []; // tokens
+
+const characterIds = new Set((characters as Character[]).map((c) => c.id));
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
+
+const TOKEN_RE = /^[A-Za-z0-9_-]{32}$/;
+
+function randomId(bytes: number): string {
+  return randomBytes(bytes).toString("base64url");
+}
 
 function generateCode(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -62,13 +89,35 @@ function generateCode(): string {
   return rooms.has(code) ? generateCode() : code;
 }
 
-function createPlayer(socketId: string, name: string): Player {
+// Socket payloads come straight from the client: never trust their shape.
+function payloadOf(raw: unknown): Record<string, unknown> {
+  return raw !== null && typeof raw === "object"
+    ? (raw as Record<string, unknown>)
+    : {};
+}
+
+function readString(raw: unknown, maxLength: number): string | null {
+  if (typeof raw !== "string") return null;
+  const value = raw.trim().slice(0, maxLength);
+  return value || null;
+}
+
+function readName(raw: unknown): string {
+  return readString(raw, 24) ?? "Player";
+}
+
+function readCharacterId(raw: unknown): string | null {
+  return typeof raw === "string" && characterIds.has(raw) ? raw : null;
+}
+
+function createPlayer(session: Session): Player {
   return {
-    socketId,
-    name,
+    id: session.playerId,
+    token: session.token,
+    name: session.name,
     selectedCharacterId: null,
     eliminatedIds: [],
-    lives: 3,
+    lives: MAX_LIVES,
     isReady: false,
   };
 }
@@ -78,12 +127,22 @@ function createRoom(code: string): Room {
     code,
     phase: "waiting",
     players: [],
-    currentTurnSocketId: null,
-    qaLog: [],
+    currentTurnPlayerId: null,
+    log: [],
     pendingQuestion: null,
-    pendingAskerSocketId: null,
+    pendingAskerId: null,
     winnerId: null,
+    gameOverReason: null,
+    rematchRequestedBy: null,
   };
+}
+
+function publicPlayers(room: Room) {
+  return room.players.map((p) => ({ id: p.id, name: p.name, lives: p.lives }));
+}
+
+function opponentOf(room: Room, player: Player): Player | undefined {
+  return room.players.find((p) => p.id !== player.id);
 }
 
 export function getRoomPublicState(room: Room) {
@@ -99,9 +158,37 @@ export function getCharacters(): Character[] {
   return characters as Character[];
 }
 
+// Everything a player needs to rebuild their screen after a reconnect.
+function snapshotFor(room: Room, player: Player) {
+  const opponent = opponentOf(room, player);
+  const iAsked = room.pendingAskerId === player.id;
+  return {
+    code: room.code,
+    phase: room.phase,
+    players: publicPlayers(room),
+    characters: getCharacters(),
+    myCharacterId: player.selectedCharacterId,
+    myEliminatedIds: player.eliminatedIds,
+    opponentReady: opponent?.isReady ?? false,
+    opponentConnected: opponent
+      ? sessions.get(opponent.token)?.socketId != null
+      : false,
+    currentTurnPlayerId: room.currentTurnPlayerId,
+    pendingQuestion: room.pendingQuestion && !iAsked ? room.pendingQuestion : null,
+    awaitingAnswerFor: room.pendingQuestion && iAsked ? room.pendingQuestion : null,
+    log: room.log,
+    winnerId: room.winnerId,
+    gameOverReason: room.gameOverReason,
+    // Only reveal the opponent's character once the game is over.
+    opponentCharacterId:
+      room.phase === "ended" ? (opponent?.selectedCharacterId ?? null) : null,
+    rematchRequestedBy: room.rematchRequestedBy,
+  };
+}
+
 // ─── Room management (used by REST routes) ────────────────────────────────────
 
-export function createRoomRest(hostName?: string): Room {
+export function createRoomRest(_hostName?: string): Room {
   const code = generateCode();
   const room = createRoom(code);
   rooms.set(code, room);
@@ -115,156 +202,277 @@ export function getRoomByCode(code: string): Room | undefined {
 // ─── Socket.IO game logic ─────────────────────────────────────────────────────
 
 export function setupGameEngine(io: SocketIOServer): void {
-  io.on("connection", (socket: Socket) => {
-    // ── Join matchmaking queue ───────────────────────────────────────────────
-    socket.on("join_lobby", ({ name }: { name: string }) => {
-      const playerName = (name || "Player").slice(0, 24);
+  function socketOf(session: Session | undefined): Socket | undefined {
+    return session?.socketId ? io.sockets.sockets.get(session.socketId) : undefined;
+  }
 
-      if (matchmakingQueue.length > 0) {
-        // Pair with the waiting player
-        const waitingId = matchmakingQueue.shift()!;
-        const code = generateCode();
-        const room = createRoom(code);
+  function emitToPlayer(player: Player, event: string, payload?: unknown): void {
+    socketOf(sessions.get(player.token))?.emit(event, payload);
+  }
 
-        const waitingSocket = io.sockets.sockets.get(waitingId);
-        const waitingName =
-          (waitingSocket?.data as { name?: string })?.name ?? "Player";
+  function roomOf(session: Session): Room | undefined {
+    if (!session.roomCode) return undefined;
+    const room = rooms.get(session.roomCode);
+    if (!room) session.roomCode = null;
+    return room;
+  }
 
-        room.players.push(createPlayer(waitingId, waitingName));
-        room.players.push(createPlayer(socket.id, playerName));
-        room.phase = "selection";
+  function removeFromQueue(token: string): void {
+    const idx = matchmakingQueue.indexOf(token);
+    if (idx !== -1) matchmakingQueue.splice(idx, 1);
+  }
 
-        rooms.set(code, room);
-        socketToRoom.set(waitingId, code);
-        socketToRoom.set(socket.id, code);
+  function addToRoom(room: Room, session: Session): void {
+    room.players.push(createPlayer(session));
+    session.roomCode = room.code;
+    socketOf(session)?.join(room.code);
+  }
 
-        socket.data = { name: playerName };
+  function emitRoomJoined(room: Room): void {
+    io.to(room.code).emit("room_joined", {
+      code: room.code,
+      phase: room.phase,
+      players: publicPlayers(room),
+      characters: getCharacters(),
+    });
+  }
 
-        waitingSocket?.join(code);
-        socket.join(code);
+  // Each player gets their own game_over so "opponentCharacterId" is always
+  // the *other* player's character.
+  function endGame(room: Room, winnerId: string, reason: GameOverReason): void {
+    room.phase = "ended";
+    room.winnerId = winnerId;
+    room.gameOverReason = reason;
+    room.pendingQuestion = null;
+    room.pendingAskerId = null;
+    room.rematchRequestedBy = null;
 
-        io.to(code).emit("room_joined", {
-          code,
-          phase: room.phase,
-          players: room.players.map((p) => ({
-            socketId: p.socketId,
-            name: p.name,
-            lives: p.lives,
-          })),
-          characters: getCharacters(),
-          yourSocketId: null, // clients will use their own socket.id
-        });
-      } else {
-        // Wait in queue
-        socket.data = { name: playerName };
-        matchmakingQueue.push(socket.id);
-        socket.emit("in_queue", { position: matchmakingQueue.length });
+    for (const player of room.players) {
+      emitToPlayer(player, "game_over", {
+        winnerId,
+        reason,
+        opponentCharacterId: opponentOf(room, player)?.selectedCharacterId ?? null,
+      });
+    }
+  }
+
+  // Removes the player for good and tells the opponent, whatever the phase.
+  function leaveRoom(session: Session): void {
+    const room = roomOf(session);
+    session.roomCode = null;
+    if (!room) return;
+
+    socketOf(session)?.leave(room.code);
+    room.players = room.players.filter((p) => p.token !== session.token);
+
+    const remaining = room.players[0];
+    if (!remaining) {
+      rooms.delete(room.code);
+      return;
+    }
+
+    if (room.phase !== "ended") {
+      room.phase = "ended";
+      room.winnerId = remaining.id;
+      room.gameOverReason = "opponent_left";
+      room.pendingQuestion = null;
+      room.pendingAskerId = null;
+    }
+    room.rematchRequestedBy = null;
+    emitToPlayer(remaining, "opponent_left");
+  }
+
+  function endSession(session: Session): void {
+    if (session.disconnectTimer) clearTimeout(session.disconnectTimer);
+    removeFromQueue(session.token);
+    leaveRoom(session);
+    sessions.delete(session.token);
+  }
+
+  function attachSession(socket: Socket): Session {
+    const auth = payloadOf(socket.handshake.auth);
+    const token =
+      typeof auth["token"] === "string" && TOKEN_RE.test(auth["token"])
+        ? auth["token"]
+        : null;
+    let session = token ? sessions.get(token) : undefined;
+
+    if (session) {
+      if (session.disconnectTimer) {
+        clearTimeout(session.disconnectTimer);
+        session.disconnectTimer = null;
       }
+      // Same player opened the game in another tab: the newest tab wins.
+      const previous = socketOf(session);
+      session.socketId = socket.id;
+      if (previous && previous.id !== socket.id) {
+        previous.emit("error", { message: "The game was opened in another tab." });
+        previous.disconnect(true);
+      }
+    } else {
+      session = {
+        token: randomId(24),
+        playerId: randomId(12),
+        name: "Player",
+        socketId: socket.id,
+        roomCode: null,
+        disconnectTimer: null,
+      };
+      sessions.set(session.token, session);
+    }
+
+    return session;
+  }
+
+  io.on("connection", (socket: Socket) => {
+    const session = attachSession(socket);
+
+    // Wraps every handler so a malformed payload or a bug can never crash
+    // the process (which would kill every game in progress).
+    function on(event: string, handler: (payload: Record<string, unknown>) => void) {
+      socket.on(event, (raw: unknown) => {
+        try {
+          handler(payloadOf(raw));
+        } catch (err) {
+          logger.error({ err, event }, "Socket handler failed");
+        }
+      });
+    }
+
+    function currentRoomAndPlayer(): { room: Room; player: Player } | null {
+      const room = roomOf(session);
+      if (!room) return null;
+      const player = room.players.find((p) => p.token === session.token);
+      return player ? { room, player } : null;
+    }
+
+    try {
+      socket.emit("session", { token: session.token, playerId: session.playerId });
+
+      const restored = currentRoomAndPlayer();
+      if (restored) {
+        socket.join(restored.room.code);
+        const opponent = opponentOf(restored.room, restored.player);
+        if (opponent) emitToPlayer(opponent, "opponent_reconnected");
+      }
+      socket.emit("state_sync", {
+        room: restored ? snapshotFor(restored.room, restored.player) : null,
+      });
+    } catch (err) {
+      logger.error({ err }, "Failed to restore session");
+    }
+
+    // ── Join matchmaking queue ───────────────────────────────────────────────
+    on("join_lobby", ({ name }) => {
+      session.name = readName(name);
+      leaveRoom(session);
+
+      if (matchmakingQueue.includes(session.token)) {
+        socket.emit("in_queue", { position: matchmakingQueue.indexOf(session.token) + 1 });
+        return;
+      }
+
+      // Skip anyone who disconnected while waiting.
+      let waiting: Session | undefined;
+      while (!waiting && matchmakingQueue.length > 0) {
+        const candidate = sessions.get(matchmakingQueue.shift()!);
+        if (candidate?.socketId) waiting = candidate;
+      }
+
+      if (!waiting) {
+        matchmakingQueue.push(session.token);
+        socket.emit("in_queue", { position: matchmakingQueue.length });
+        return;
+      }
+
+      const room = createRoom(generateCode());
+      rooms.set(room.code, room);
+      addToRoom(room, waiting);
+      addToRoom(room, session);
+      room.phase = "selection";
+      emitRoomJoined(room);
     });
 
     // ── Create private room ──────────────────────────────────────────────────
-    socket.on("create_room", ({ name }: { name: string }) => {
-      const playerName = (name || "Player").slice(0, 24);
-      socket.data = { name: playerName };
+    on("create_room", ({ name }) => {
+      session.name = readName(name);
+      removeFromQueue(session.token);
+      leaveRoom(session);
 
-      const code = generateCode();
-      const room = createRoom(code);
-      room.players.push(createPlayer(socket.id, playerName));
-      rooms.set(code, room);
-      socketToRoom.set(socket.id, code);
-
-      socket.join(code);
-      socket.emit("room_created", { code });
+      const room = createRoom(generateCode());
+      rooms.set(room.code, room);
+      addToRoom(room, session);
+      socket.emit("room_created", { code: room.code });
     });
 
     // ── Join private room ────────────────────────────────────────────────────
-    socket.on(
-      "join_room",
-      ({ code, name }: { code: string; name: string }) => {
-        const roomCode = code.toUpperCase().trim();
-        const room = rooms.get(roomCode);
+    on("join_room", ({ code, name }) => {
+      const roomCode = readString(code, 6)?.toUpperCase();
+      const room = roomCode ? rooms.get(roomCode) : undefined;
 
-        if (!room) {
-          socket.emit("error", { message: "Room not found. Check the code and try again." });
-          return;
-        }
-        if (room.players.length >= 2) {
-          socket.emit("error", { message: "Room is already full." });
-          return;
-        }
-        if (room.phase !== "waiting") {
-          socket.emit("error", { message: "Game has already started." });
-          return;
-        }
+      if (!room || room.players.length === 0) {
+        socket.emit("error", { message: "Room not found. Check the code and try again." });
+        return;
+      }
+      if (room.code === session.roomCode) return;
+      if (room.players.length >= 2) {
+        socket.emit("error", { message: "Room is already full." });
+        return;
+      }
+      if (room.phase !== "waiting") {
+        socket.emit("error", { message: "Game has already started." });
+        return;
+      }
 
-        const playerName = (name || "Player").slice(0, 24);
-        socket.data = { name: playerName };
+      session.name = readName(name);
+      removeFromQueue(session.token);
+      leaveRoom(session);
 
-        room.players.push(createPlayer(socket.id, playerName));
-        room.phase = "selection";
-        socketToRoom.set(socket.id, roomCode);
+      addToRoom(room, session);
+      room.phase = "selection";
+      emitRoomJoined(room);
+    });
 
-        socket.join(roomCode);
-
-        io.to(roomCode).emit("room_joined", {
-          code: roomCode,
-          phase: room.phase,
-          players: room.players.map((p) => ({
-            socketId: p.socketId,
-            name: p.name,
-            lives: p.lives,
-          })),
-          characters: getCharacters(),
-          yourSocketId: null,
-        });
-      },
-    );
+    // ── Leave the current room or queue on purpose ───────────────────────────
+    on("leave_room", () => {
+      removeFromQueue(session.token);
+      leaveRoom(session);
+    });
 
     // ── Select character ─────────────────────────────────────────────────────
-    socket.on("select_character", ({ characterId }: { characterId: string }) => {
-      const code = socketToRoom.get(socket.id);
-      if (!code) return;
-      const room = rooms.get(code);
-      if (!room || room.phase !== "selection") return;
+    on("select_character", ({ characterId }) => {
+      const ctx = currentRoomAndPlayer();
+      if (!ctx || ctx.room.phase !== "selection") return;
+      const { room, player } = ctx;
 
-      const player = room.players.find((p) => p.socketId === socket.id);
-      if (!player) return;
+      const id = readCharacterId(characterId);
+      if (!id || player.isReady) return;
 
-      const char = getCharacters().find((c) => c.id === characterId);
-      if (!char) return;
-
-      player.selectedCharacterId = characterId;
+      player.selectedCharacterId = id;
       player.isReady = true;
 
       // Tell the other player this player is ready (without revealing the character)
-      socket.to(code).emit("opponent_ready");
+      socket.to(room.code).emit("opponent_ready");
 
-      // If both players are ready, start the game
-      if (room.players.every((p) => p.isReady)) {
+      if (room.players.length === 2 && room.players.every((p) => p.isReady)) {
         room.phase = "playing";
-        // Randomly pick who goes first
         const firstIdx = Math.floor(Math.random() * 2);
-        room.currentTurnSocketId = room.players[firstIdx]!.socketId;
+        room.currentTurnPlayerId = room.players[firstIdx]!.id;
 
-        io.to(code).emit("game_start", {
-          currentTurnSocketId: room.currentTurnSocketId,
-          players: room.players.map((p) => ({
-            socketId: p.socketId,
-            name: p.name,
-            lives: p.lives,
-            eliminatedIds: p.eliminatedIds,
-          })),
+        io.to(room.code).emit("game_start", {
+          currentTurnPlayerId: room.currentTurnPlayerId,
+          players: publicPlayers(room),
         });
       }
     });
 
     // ── Ask a question ───────────────────────────────────────────────────────
-    socket.on("ask_question", ({ question }: { question: string }) => {
-      const code = socketToRoom.get(socket.id);
-      if (!code) return;
-      const room = rooms.get(code);
-      if (!room || room.phase !== "playing") return;
-      if (room.currentTurnSocketId !== socket.id) {
+    on("ask_question", ({ question }) => {
+      const ctx = currentRoomAndPlayer();
+      if (!ctx || ctx.room.phase !== "playing") return;
+      const { room, player } = ctx;
+
+      if (room.currentTurnPlayerId !== player.id) {
         socket.emit("error", { message: "It's not your turn." });
         return;
       }
@@ -273,196 +481,169 @@ export function setupGameEngine(io: SocketIOServer): void {
         return;
       }
 
-      const q = question.slice(0, 200).trim();
-      if (!q) return;
+      const q = readString(question, 200);
+      const opponent = opponentOf(room, player);
+      if (!q || !opponent) return;
 
       room.pendingQuestion = q;
-      room.pendingAskerSocketId = socket.id;
+      room.pendingAskerId = player.id;
 
-      // Forward question to the other player to answer
-      const opponent = room.players.find((p) => p.socketId !== socket.id);
-      if (!opponent) return;
-
-      io.to(opponent.socketId).emit("question_asked", {
-        question: q,
-        askerSocketId: socket.id,
-      });
-      // Tell the asker to wait
+      emitToPlayer(opponent, "question_asked", { question: q, askerId: player.id });
       socket.emit("awaiting_answer", { question: q });
     });
 
     // ── Answer a question ────────────────────────────────────────────────────
-    socket.on("answer_question", ({ answer }: { answer: "yes" | "no" }) => {
-      const code = socketToRoom.get(socket.id);
-      if (!code) return;
-      const room = rooms.get(code);
-      if (!room || room.phase !== "playing") return;
-      if (room.pendingAskerSocketId === socket.id) {
+    on("answer_question", ({ answer }) => {
+      const ctx = currentRoomAndPlayer();
+      if (!ctx || ctx.room.phase !== "playing") return;
+      const { room, player } = ctx;
+
+      if (!room.pendingQuestion || !room.pendingAskerId) return;
+      if (room.pendingAskerId === player.id) {
         socket.emit("error", { message: "You can't answer your own question." });
         return;
       }
-      if (!room.pendingQuestion) return;
       if (answer !== "yes" && answer !== "no") return;
 
-      const entry: QAEntry = {
+      const entry: LogEntry = {
+        type: "qna",
         question: room.pendingQuestion,
         answer,
-        askerSocketId: room.pendingAskerSocketId!,
+        askerId: room.pendingAskerId,
       };
-      room.qaLog.push(entry);
+      room.log.push(entry);
       room.pendingQuestion = null;
-      room.pendingAskerSocketId = null;
+      room.pendingAskerId = null;
+      // The answerer plays next.
+      room.currentTurnPlayerId = player.id;
 
-      // Switch turns
-      const nextPlayer = room.players.find(
-        (p) => p.socketId !== room.currentTurnSocketId,
-      );
-      room.currentTurnSocketId = nextPlayer?.socketId ?? room.currentTurnSocketId;
-
-      io.to(code).emit("question_answered", {
+      io.to(room.code).emit("question_answered", {
         question: entry.question,
         answer: entry.answer,
-        askerSocketId: entry.askerSocketId,
-        currentTurnSocketId: room.currentTurnSocketId,
+        askerId: entry.askerId,
+        currentTurnPlayerId: room.currentTurnPlayerId,
       });
     });
 
     // ── Make a guess ─────────────────────────────────────────────────────────
-    socket.on("make_guess", ({ characterId }: { characterId: string }) => {
-      const code = socketToRoom.get(socket.id);
-      if (!code) return;
-      const room = rooms.get(code);
-      if (!room || room.phase !== "playing") return;
-      if (room.currentTurnSocketId !== socket.id) {
+    on("make_guess", ({ characterId }) => {
+      const ctx = currentRoomAndPlayer();
+      if (!ctx || ctx.room.phase !== "playing") return;
+      const { room, player } = ctx;
+
+      if (room.currentTurnPlayerId !== player.id) {
         socket.emit("error", { message: "It's not your turn." });
         return;
       }
-
-      const opponent = room.players.find((p) => p.socketId !== socket.id);
-      if (!opponent) return;
-
-      const correct = opponent.selectedCharacterId === characterId;
-      const guesser = room.players.find((p) => p.socketId === socket.id)!;
-
-      if (correct) {
-        room.phase = "ended";
-        room.winnerId = socket.id;
-
-        io.to(code).emit("game_over", {
-          winnerId: socket.id,
-          loserOpponentCharacterId: opponent.selectedCharacterId,
-          guesserCharacterId: guesser.selectedCharacterId,
-          reason: "correct_guess",
-        });
-      } else {
-        guesser.lives -= 1;
-
-        if (guesser.lives <= 0) {
-          room.phase = "ended";
-          room.winnerId = opponent.socketId;
-
-          io.to(code).emit("game_over", {
-            winnerId: opponent.socketId,
-            loserOpponentCharacterId: opponent.selectedCharacterId,
-            guesserCharacterId: guesser.selectedCharacterId,
-            reason: "out_of_lives",
-          });
-        } else {
-          // Wrong guess — switch turns
-          room.currentTurnSocketId = opponent.socketId;
-
-          io.to(code).emit("wrong_guess", {
-            guesserSocketId: socket.id,
-            guessedCharacterId: characterId,
-            lives: guesser.lives,
-            currentTurnSocketId: room.currentTurnSocketId,
-          });
-        }
+      if (room.pendingQuestion) {
+        socket.emit("error", { message: "Wait for the answer to your question first." });
+        return;
       }
+
+      const id = readCharacterId(characterId);
+      const opponent = opponentOf(room, player);
+      if (!id || !opponent) return;
+
+      if (opponent.selectedCharacterId === id) {
+        endGame(room, player.id, "correct_guess");
+        return;
+      }
+
+      player.lives -= 1;
+      room.log.push({ type: "guess", guesserId: player.id, guessedCharacterId: id });
+
+      if (player.lives <= 0) {
+        endGame(room, opponent.id, "out_of_lives");
+        return;
+      }
+
+      room.currentTurnPlayerId = opponent.id;
+      io.to(room.code).emit("wrong_guess", {
+        guesserId: player.id,
+        guessedCharacterId: id,
+        lives: player.lives,
+        currentTurnPlayerId: room.currentTurnPlayerId,
+      });
     });
 
-    // ── Sync eliminated characters (client-side state, broadcast for UI) ────
-    socket.on("sync_eliminations", ({ eliminatedIds }: { eliminatedIds: string[] }) => {
-      const code = socketToRoom.get(socket.id);
-      if (!code) return;
-      const room = rooms.get(code);
-      if (!room) return;
-
-      const player = room.players.find((p) => p.socketId === socket.id);
-      if (player) {
-        player.eliminatedIds = eliminatedIds;
-      }
+    // ── Remember eliminated characters so they survive a reconnect ──────────
+    on("sync_eliminations", ({ eliminatedIds }) => {
+      const ctx = currentRoomAndPlayer();
+      if (!ctx || !Array.isArray(eliminatedIds)) return;
+      ctx.player.eliminatedIds = [
+        ...new Set(eliminatedIds.filter((id): id is string => readCharacterId(id) !== null)),
+      ];
     });
 
     // ── Rematch ──────────────────────────────────────────────────────────────
-    socket.on("request_rematch", () => {
-      const code = socketToRoom.get(socket.id);
-      if (!code) return;
-      const room = rooms.get(code);
-      if (!room || room.phase !== "ended") return;
+    on("request_rematch", () => {
+      const ctx = currentRoomAndPlayer();
+      if (!ctx || ctx.room.phase !== "ended" || ctx.room.players.length < 2) return;
 
-      socket.to(code).emit("rematch_requested", { bySocketId: socket.id });
+      ctx.room.rematchRequestedBy = ctx.player.id;
+      io.to(ctx.room.code).emit("rematch_requested", { byPlayerId: ctx.player.id });
     });
 
-    socket.on("accept_rematch", () => {
-      const code = socketToRoom.get(socket.id);
-      if (!code) return;
-      const room = rooms.get(code);
-      if (!room || room.phase !== "ended") return;
+    on("accept_rematch", () => {
+      const ctx = currentRoomAndPlayer();
+      if (!ctx) return;
+      const { room, player } = ctx;
+      if (room.phase !== "ended" || room.players.length < 2) return;
+      // Only the player who did *not* ask can accept.
+      if (!room.rematchRequestedBy || room.rematchRequestedBy === player.id) return;
 
-      // Reset room for a new game
       room.phase = "selection";
-      room.qaLog = [];
+      room.log = [];
       room.pendingQuestion = null;
-      room.pendingAskerSocketId = null;
+      room.pendingAskerId = null;
       room.winnerId = null;
-      room.currentTurnSocketId = null;
+      room.gameOverReason = null;
+      room.rematchRequestedBy = null;
+      room.currentTurnPlayerId = null;
       for (const p of room.players) {
         p.selectedCharacterId = null;
         p.eliminatedIds = [];
-        p.lives = 3;
+        p.lives = MAX_LIVES;
         p.isReady = false;
       }
 
-      io.to(code).emit("rematch_started", {
-        code,
+      io.to(room.code).emit("rematch_started", {
+        code: room.code,
         phase: room.phase,
-        players: room.players.map((p) => ({
-          socketId: p.socketId,
-          name: p.name,
-          lives: p.lives,
-        })),
+        players: publicPlayers(room),
         characters: getCharacters(),
       });
     });
 
     // ── Disconnect ───────────────────────────────────────────────────────────
     socket.on("disconnect", () => {
-      // Remove from matchmaking queue
-      const qIdx = matchmakingQueue.indexOf(socket.id);
-      if (qIdx !== -1) matchmakingQueue.splice(qIdx, 1);
+      try {
+        // A newer tab took over this session: nothing to clean up.
+        if (session.socketId !== socket.id) return;
+        session.socketId = null;
+        removeFromQueue(session.token);
 
-      // Notify room
-      const code = socketToRoom.get(socket.id);
-      if (code) {
-        const room = rooms.get(code);
-        if (room && room.phase !== "ended") {
-          room.phase = "ended";
-          socket.to(code).emit("opponent_left", { socketId: socket.id });
+        const room = roomOf(session);
+        if (!room) {
+          sessions.delete(session.token);
+          return;
         }
-        socketToRoom.delete(socket.id);
 
-        // Clean up room after a delay if both players are gone
-        setTimeout(() => {
-          const r = rooms.get(code);
-          if (!r) return;
-          const activePlayers = r.players.filter((p) =>
-            io.sockets.sockets.has(p.socketId),
-          );
-          if (activePlayers.length === 0) {
-            rooms.delete(code);
+        // Keep the seat for a while so a reload or a network blip isn't a forfeit.
+        socket.to(room.code).emit("opponent_disconnected", {
+          graceSeconds: RECONNECT_GRACE_MS / 1000,
+        });
+        session.disconnectTimer = setTimeout(() => {
+          session.disconnectTimer = null;
+          if (session.socketId) return;
+          try {
+            endSession(session);
+          } catch (err) {
+            logger.error({ err }, "Failed to end session");
           }
-        }, 30_000);
+        }, RECONNECT_GRACE_MS);
+      } catch (err) {
+        logger.error({ err }, "Disconnect handler failed");
       }
     });
   });
