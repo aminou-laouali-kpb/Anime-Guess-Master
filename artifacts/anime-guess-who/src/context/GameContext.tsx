@@ -122,6 +122,8 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Socket listeners are registered once; they read the live phase from here.
   const phaseRef = useRef(phase);
   phaseRef.current = phase;
+  const charactersRef = useRef(characters);
+  charactersRef.current = characters;
   const myNameRef = useRef(myName);
   myNameRef.current = myName;
   const myPlayerIdRef = useRef(myPlayerId);
@@ -270,7 +272,8 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     socket.on("character_assigned", ({ characterId }) => {
       setMyCharacterId(characterId);
-      toast.info("Temps écoulé ! Un personnage a été choisi au hasard pour toi.");
+      const name = charactersRef.current.find(c => c.id === characterId)?.name;
+      toast.info(`Temps écoulé ! Ton personnage, choisi au hasard : ${name ?? "?"}.`, { duration: 6000 });
     });
 
     socket.on("turn_timeout", ({ playerId, lives, currentTurnPlayerId, while: during }) => {
