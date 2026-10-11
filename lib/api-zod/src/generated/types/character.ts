@@ -18,4 +18,9 @@ export interface Character {
   powers: string[];
   alignment: string;
   role: string;
+  /**
+     * Portrait URL, or null when no image is available yet
+     * @nullable
+     */
+  imageUrl: string | null;
 }

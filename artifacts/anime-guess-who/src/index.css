@@ -139,7 +139,7 @@
 }
 
 .eliminated-card {
-  @apply grayscale opacity-50 relative pointer-events-none scale-95 transition-all duration-300;
+  @apply grayscale opacity-50 relative scale-95 transition-all duration-300;
 }
 .eliminated-card::after {
   content: '';

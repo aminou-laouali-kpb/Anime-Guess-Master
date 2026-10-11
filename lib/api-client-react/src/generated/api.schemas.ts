@@ -21,18 +21,11 @@ export interface Character {
   powers: string[];
   alignment: string;
   role: string;
-}
-
-export interface RoomInput {
-  hostName?: string;
-}
-
-export interface Room {
-  code: string;
-  phase: string;
-  playerCount: number;
-  /** @nullable */
-  hostName?: string | null;
+  /**
+     * Portrait URL, or null when no image is available yet
+     * @nullable
+     */
+  imageUrl: string | null;
 }
 
 export interface ErrorResponse {

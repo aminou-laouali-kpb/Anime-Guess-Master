@@ -2,8 +2,8 @@ import React from "react";
 import { useGame } from "@/context/GameContext";
 import { Button } from "@/components/ui/button";
 import { CharacterCard } from "@/components/CharacterCard";
+import { LogEntryView } from "@/components/LogEntryView";
 import { Home, RotateCcw, Trophy, Skull } from "lucide-react";
-import { socket } from "@/lib/socket";
 
 export const Ended: React.FC = () => {
   const { 
@@ -12,15 +12,23 @@ export const Ended: React.FC = () => {
     revealedOpponentCharacterId, 
     characters,
     rematchRequestedBy,
+    myPlayerId,
+    opponentLeft,
+    gameLog,
+    players,
     requestRematch,
     acceptRematch,
     leaveGame
   } = useGame();
 
-  const isWinner = winnerId === socket.id;
+  const isWinner = winnerId === myPlayerId;
   const isDisconnect = gameOverReason === "opponent_left";
 
   const opponentCharacter = characters.find(c => c.id === revealedOpponentCharacterId);
+  const opponentName = players.find(p => p.id !== myPlayerId)?.name;
+  const hasFreeAnswersFromOpponent = gameLog.some(
+    log => log.type === "qna" && !log.verified && log.askerId === myPlayerId
+  );
 
   return (
     <div className="min-h-[100dvh] w-full flex flex-col items-center justify-center p-6 bg-background relative overflow-hidden">
@@ -36,13 +44,13 @@ export const Ended: React.FC = () => {
             {isWinner ? <Trophy className="w-16 h-16" /> : <Skull className="w-16 h-16" />}
           </div>
           <h1 className={`text-6xl md:text-8xl font-display font-black uppercase tracking-tighter transform ${isWinner ? '-skew-x-6 text-green-500 drop-shadow-[0_0_15px_rgba(34,197,94,0.5)]' : 'text-red-500'}`}>
-            {isDisconnect ? "Opponent Fled" : (isWinner ? "Victory!" : "Defeat")}
+            {isDisconnect ? "Abandon" : (isWinner ? "Victoire !" : "Défaite")}
           </h1>
           <p className="text-xl font-bold uppercase tracking-widest text-muted-foreground">
-            {gameOverReason === "out_of_lives" && !isWinner && "You ran out of lives!"}
-            {gameOverReason === "out_of_lives" && isWinner && "Opponent ran out of lives!"}
-            {gameOverReason === "correct_guess" && isWinner && "You guessed correctly!"}
-            {gameOverReason === "correct_guess" && !isWinner && "Opponent guessed your character!"}
+            {gameOverReason === "out_of_lives" && !isWinner && "Tu n’as plus de vies !"}
+            {gameOverReason === "out_of_lives" && isWinner && "L’adversaire n’a plus de vies !"}
+            {gameOverReason === "correct_guess" && isWinner && "Bien deviné !"}
+            {gameOverReason === "correct_guess" && !isWinner && "L’adversaire a deviné ton personnage !"}
           </p>
         </div>
 
@@ -50,7 +58,7 @@ export const Ended: React.FC = () => {
         {!isDisconnect && opponentCharacter && (
           <div className="flex flex-col items-center gap-4 w-full">
             <span className="text-sm font-bold uppercase tracking-widest text-muted-foreground">
-              They were hiding:
+              Son personnage secret :
             </span>
             <div className="w-full max-w-[250px] transform hover:scale-105 transition-transform duration-500">
               <CharacterCard character={opponentCharacter} />
@@ -60,28 +68,58 @@ export const Ended: React.FC = () => {
 
         {/* Actions */}
         <div className="flex flex-col w-full gap-3 mt-4">
-          {!isDisconnect && (
+          {opponentLeft && !isDisconnect && (
+            <p className="text-sm font-bold uppercase tracking-widest text-muted-foreground">
+              Ton adversaire a quitté la partie.
+            </p>
+          )}
+          {!isDisconnect && !opponentLeft && (
             <>
-              {rematchRequestedBy === socket.id ? (
+              {rematchRequestedBy === myPlayerId ? (
                 <Button size="lg" disabled className="w-full h-14 text-lg bg-secondary/50 font-bold">
-                  Waiting for opponent...
+                  En attente de l’adversaire…
                 </Button>
               ) : rematchRequestedBy ? (
                 <Button size="lg" className="w-full h-14 text-lg bg-secondary hover:bg-secondary/80 font-bold animate-pulse" onClick={acceptRematch}>
-                  <RotateCcw className="w-5 h-5 mr-2" /> Accept Rematch
+                  <RotateCcw className="w-5 h-5 mr-2" /> Accepter la revanche
                 </Button>
               ) : (
                 <Button size="lg" className="w-full h-14 text-lg bg-primary hover:bg-primary/90 font-bold" onClick={requestRematch}>
-                  <RotateCcw className="w-5 h-5 mr-2" /> Rematch
+                  <RotateCcw className="w-5 h-5 mr-2" /> Revanche
                 </Button>
               )}
             </>
           )}
           
           <Button variant="outline" size="lg" className="w-full h-14 text-lg font-bold border-2" onClick={leaveGame}>
-            <Home className="w-5 h-5 mr-2" /> Back to Lobby
+            <Home className="w-5 h-5 mr-2" /> Retour à l’accueil
           </Button>
         </div>
+
+        {/* Recap: with the secret character revealed, every free answer can be checked */}
+        {gameLog.length > 0 && (
+          <section className="w-full text-left space-y-3">
+            <h2 className="text-sm font-bold uppercase tracking-widest text-muted-foreground text-center">
+              Récapitulatif de la partie
+            </h2>
+            {hasFreeAnswersFromOpponent && opponentCharacter && (
+              <p className="text-xs text-muted-foreground text-center">
+                Compare les réponses « non vérifiées » de ton adversaire avec la fiche de {opponentCharacter.name} ci-dessus.
+              </p>
+            )}
+            <div className="space-y-2">
+              {gameLog.map(log => (
+                <LogEntryView
+                  key={log.id}
+                  log={log}
+                  myPlayerId={myPlayerId}
+                  opponentName={opponentName}
+                  characters={characters}
+                />
+              ))}
+            </div>
+          </section>
+        )}
 
       </div>
     </div>

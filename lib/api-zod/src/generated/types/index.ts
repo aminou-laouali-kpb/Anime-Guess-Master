@@ -9,5 +9,3 @@
 export * from './character';
 export * from './errorResponse';
 export * from './healthStatus';
-export * from './room';
-export * from './roomInput';

@@ -32,40 +32,9 @@ export const ListCharactersResponseItem = zod.object({
   "species": zod.string(),
   "powers": zod.array(zod.string()),
   "alignment": zod.string(),
-  "role": zod.string()
+  "role": zod.string(),
+  "imageUrl": zod.string().nullable().describe('Portrait URL, or null when no image is available yet')
 })
 export const ListCharactersResponse = zod.array(ListCharactersResponseItem)
-
-
-/**
- * Creates a new private game room and returns a join code
- * @summary Create a game room
- */
-export const CreateRoomBody = zod.object({
-  "hostName": zod.string().optional()
-})
-
-export const CreateRoomResponse = zod.object({
-  "code": zod.string(),
-  "phase": zod.string(),
-  "playerCount": zod.number(),
-  "hostName": zod.string().nullish()
-})
-
-
-/**
- * Returns current state of a game room by its join code
- * @summary Get room info
- */
-export const GetRoomParams = zod.object({
-  "code": zod.coerce.string()
-})
-
-export const GetRoomResponse = zod.object({
-  "code": zod.string(),
-  "phase": zod.string(),
-  "playerCount": zod.number(),
-  "hostName": zod.string().nullish()
-})
 
 

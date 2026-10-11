@@ -48,18 +48,18 @@ export const Home: React.FC = () => {
             Anime<br />Who
           </h1>
           <p className="text-muted-foreground font-bold tracking-widest uppercase text-sm">
-            Guess Who? Anime Edition
+            Qui est-ce ? Édition anime
           </p>
         </div>
 
         {myName && (
           <div className="bg-card/50 backdrop-blur-md border border-card-border p-3 rounded-xl flex items-center justify-between">
             <div className="flex flex-col">
-              <span className="text-xs text-muted-foreground font-bold uppercase tracking-wider">Player Name</span>
+              <span className="text-xs text-muted-foreground font-bold uppercase tracking-wider">Pseudo</span>
               <span className="font-display font-bold text-lg">{myName}</span>
             </div>
             <Button variant="ghost" size="sm" onClick={() => setShowNameModal(true)}>
-              Edit
+              Modifier
             </Button>
           </div>
         )}
@@ -70,7 +70,7 @@ export const Home: React.FC = () => {
             className="w-full h-16 text-lg font-display font-bold hover:scale-[1.02] transition-transform" 
             onClick={() => handleAction(joinQueue)}
           >
-            <Gamepad2 className="mr-2 w-6 h-6" /> Quick Play
+            <Gamepad2 className="mr-2 w-6 h-6" /> Partie rapide
           </Button>
 
           <Button 
@@ -80,7 +80,7 @@ export const Home: React.FC = () => {
             onClick={handleCreateRoom}
           >
             <Users className="mr-2 w-5 h-5" />
-            Create Private Game
+            Créer une partie privée
           </Button>
 
           <Button 
@@ -89,7 +89,7 @@ export const Home: React.FC = () => {
             className="w-full h-14 font-bold border-2 hover:scale-[1.02] transition-transform" 
             onClick={() => handleAction(() => setShowJoin(true))}
           >
-            <UsersRound className="mr-2 w-5 h-5" /> Join via Code
+            <UsersRound className="mr-2 w-5 h-5" /> Rejoindre avec un code
           </Button>
 
           <Button 
@@ -98,7 +98,7 @@ export const Home: React.FC = () => {
             className="w-full mt-4 text-muted-foreground hover:text-foreground"
             onClick={() => setShowHowToPlay(true)}
           >
-            <HelpCircle className="mr-2 w-5 h-5" /> How to Play
+            <HelpCircle className="mr-2 w-5 h-5" /> Comment jouer
           </Button>
         </div>
       </div>
@@ -110,25 +110,25 @@ export const Home: React.FC = () => {
       }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="font-display text-2xl">Enter your Ninja Way</DialogTitle>
+            <DialogTitle className="font-display text-2xl">Choisis ta voie du ninja</DialogTitle>
             <DialogDescription>
-              What should we call you in the arena?
+              Quel nom veux-tu porter dans l’arène ?
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSaveName} className="space-y-4 pt-4">
             <div className="space-y-2">
-              <Label htmlFor="name">Player Name</Label>
+              <Label htmlFor="name">Pseudo</Label>
               <Input 
                 id="name" 
                 autoFocus
-                placeholder="e.g. Uzumaki Naruto" 
+                placeholder="ex. Uzumaki Naruto" 
                 value={localName} 
                 onChange={(e) => setLocalName(e.target.value)}
                 maxLength={20}
               />
             </div>
             <DialogFooter>
-              <Button type="submit" disabled={!localName.trim()}>Save & Continue</Button>
+              <Button type="submit" disabled={!localName.trim()}>Enregistrer et continuer</Button>
             </DialogFooter>
           </form>
         </DialogContent>
@@ -137,9 +137,9 @@ export const Home: React.FC = () => {
       <Dialog open={showJoin} onOpenChange={setShowJoin}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="font-display text-2xl">Join Private Game</DialogTitle>
+            <DialogTitle className="font-display text-2xl">Rejoindre une partie privée</DialogTitle>
             <DialogDescription>
-              Enter the 6-character room code from your opponent.
+              Saisis le code à 6 caractères donné par ton adversaire.
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={(e) => {
@@ -147,7 +147,7 @@ export const Home: React.FC = () => {
             if (joinCode.trim()) joinRoom(joinCode.trim().toUpperCase());
           }} className="space-y-4 pt-4">
             <div className="space-y-2">
-              <Label htmlFor="code">Room Code</Label>
+              <Label htmlFor="code">Code de la partie</Label>
               <Input 
                 id="code" 
                 autoFocus
@@ -160,7 +160,7 @@ export const Home: React.FC = () => {
             </div>
             <DialogFooter>
               <Button type="submit" disabled={joinCode.trim().length === 0} className="w-full">
-                Join Arena <ArrowRight className="ml-2 w-4 h-4" />
+                Entrer dans l’arène <ArrowRight className="ml-2 w-4 h-4" />
               </Button>
             </DialogFooter>
           </form>
@@ -170,16 +170,16 @@ export const Home: React.FC = () => {
       <Dialog open={showHowToPlay} onOpenChange={setShowHowToPlay}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle className="font-display text-2xl">How to Play</DialogTitle>
+            <DialogTitle className="font-display text-2xl">Comment jouer</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 text-sm leading-relaxed">
-            <p><strong>1. Selection:</strong> Both players secretly pick one anime character from the grid.</p>
-            <p><strong>2. Deduction:</strong> Take turns asking yes/no questions about your opponent's secret character (e.g. "Does your character have spiky hair?").</p>
-            <p><strong>3. Elimination:</strong> Based on their answer, tap characters on your grid to eliminate them from your suspects.</p>
-            <p><strong>4. Victory:</strong> If you think you know who it is, use your turn to Make a Guess! But be careful—a wrong guess costs you a life, and 3 wrong guesses means you lose.</p>
+            <p><strong>1. Choix :</strong> chaque joueur choisit en secret un personnage parmi les 24 de la grille.</p>
+            <p><strong>2. Déduction :</strong> à tour de rôle, posez des questions fermées (oui / non) sur le personnage secret de l’adversaire (ex. « Ton personnage a-t-il les cheveux en pétard ? »).</p>
+            <p><strong>3. Élimination :</strong> selon la réponse, touche les personnages de ta grille pour les écarter. Touche-les à nouveau pour les remettre.</p>
+            <p><strong>4. Victoire :</strong> quand tu penses avoir trouvé, utilise ton tour pour deviner ! Attention : une mauvaise réponse coûte une vie, et à 3 vies perdues tu as perdu. Chaque tour est chronométré : si le temps est écoulé, tu perds aussi une vie.</p>
           </div>
           <DialogFooter>
-            <Button onClick={() => setShowHowToPlay(false)}>Got it</Button>
+            <Button onClick={() => setShowHowToPlay(false)}>Compris</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -2,20 +2,10 @@ import React, { useState } from "react";
 import { useGame } from "@/context/GameContext";
 import { Button } from "@/components/ui/button";
 import { Loader2, ArrowLeft, Copy, CheckCircle2 } from "lucide-react";
-import { useGetRoom, getGetRoomQueryKey } from "@workspace/api-client-react";
 
 export const QueueLobby: React.FC = () => {
   const { phase, queuePosition, roomCode, leaveGame } = useGame();
   const [copied, setCopied] = useState(false);
-
-  // Poll room state via REST API as requested
-  useGetRoom(roomCode || "", {
-    query: {
-      enabled: phase === "lobby" && !!roomCode,
-      queryKey: getGetRoomQueryKey(roomCode || ""),
-      refetchInterval: 2000,
-    }
-  });
 
   const copyCode = () => {
     if (roomCode) {
@@ -28,7 +18,7 @@ export const QueueLobby: React.FC = () => {
   return (
     <div className="min-h-[100dvh] w-full flex flex-col items-center justify-center p-6 bg-background relative">
       <div className="absolute top-4 left-4">
-        <Button variant="ghost" size="icon" onClick={leaveGame} className="rounded-full">
+        <Button variant="ghost" size="icon" onClick={leaveGame} className="rounded-full" aria-label="Retour">
           <ArrowLeft className="w-5 h-5" />
         </Button>
       </div>
@@ -41,12 +31,12 @@ export const QueueLobby: React.FC = () => {
 
         <div className="space-y-2">
           <h2 className="text-3xl font-display font-black uppercase tracking-tight">
-            {phase === "queue" ? "Searching for Opponent" : "Awaiting Challenger"}
+            {phase === "queue" ? "Recherche d’un adversaire" : "En attente d’un adversaire"}
           </h2>
           <p className="text-muted-foreground font-medium">
             {phase === "queue" 
-              ? `Queue position: ${queuePosition || '...'}`
-              : "Tell your friend to join using the code below."}
+              ? `Position dans la file : ${queuePosition || '…'}`
+              : "Envoie ce code à la personne avec qui tu veux jouer."}
           </p>
         </div>
 
@@ -56,12 +46,12 @@ export const QueueLobby: React.FC = () => {
               <span className="font-mono text-3xl tracking-[0.3em] font-bold w-full text-center pl-4">
                 {roomCode}
               </span>
-              <Button size="icon" variant="ghost" onClick={copyCode} className="shrink-0">
+              <Button size="icon" variant="ghost" onClick={copyCode} className="shrink-0" aria-label="Copier le code">
                 {copied ? <CheckCircle2 className="w-5 h-5 text-green-500" /> : <Copy className="w-5 h-5" />}
               </Button>
             </div>
             <p className="text-xs text-muted-foreground uppercase tracking-widest font-bold">
-              Room Code
+              Code de la partie
             </p>
           </div>
         )}
