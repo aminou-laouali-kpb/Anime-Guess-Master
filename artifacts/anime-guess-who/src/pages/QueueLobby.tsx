@@ -2,20 +2,10 @@ import React, { useState } from "react";
 import { useGame } from "@/context/GameContext";
 import { Button } from "@/components/ui/button";
 import { Loader2, ArrowLeft, Copy, CheckCircle2 } from "lucide-react";
-import { useGetRoom, getGetRoomQueryKey } from "@workspace/api-client-react";
 
 export const QueueLobby: React.FC = () => {
   const { phase, queuePosition, roomCode, leaveGame } = useGame();
   const [copied, setCopied] = useState(false);
-
-  // Poll room state via REST API as requested
-  useGetRoom(roomCode || "", {
-    query: {
-      enabled: phase === "lobby" && !!roomCode,
-      queryKey: getGetRoomQueryKey(roomCode || ""),
-      refetchInterval: 2000,
-    }
-  });
 
   const copyCode = () => {
     if (roomCode) {

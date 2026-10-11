@@ -12,8 +12,6 @@ tags:
     description: Health operations
   - name: characters
     description: Anime character operations
-  - name: rooms
-    description: Game room operations
 paths:
   /healthz:
     get:
@@ -44,52 +42,6 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/Character"
-
-  /rooms:
-    post:
-      operationId: createRoom
-      tags: [rooms]
-      summary: Create a game room
-      description: Creates a new private game room and returns a join code
-      requestBody:
-        required: false
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/RoomInput"
-      responses:
-        "201":
-          description: Room created
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Room"
-
-  /rooms/{code}:
-    get:
-      operationId: getRoom
-      tags: [rooms]
-      summary: Get room info
-      description: Returns current state of a game room by its join code
-      parameters:
-        - name: code
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Room info
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Room"
-        "404":
-          description: Room not found
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
 
 components:
   schemas:
@@ -140,28 +92,6 @@ components:
           type: string
         role:
           type: string
-
-    RoomInput:
-      type: object
-      properties:
-        hostName:
-          type: string
-
-    Room:
-      type: object
-      required:
-        - code
-        - phase
-        - playerCount
-      properties:
-        code:
-          type: string
-        phase:
-          type: string
-        playerCount:
-          type: number
-        hostName:
-          type: ["string", "null"]
 
     ErrorResponse:
       type: object

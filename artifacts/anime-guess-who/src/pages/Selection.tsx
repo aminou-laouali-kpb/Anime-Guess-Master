@@ -4,9 +4,11 @@ import { CharacterCard } from "@/components/CharacterCard";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
+import { useSecondsLeft } from "@/hooks/use-seconds-left";
 
 export const Selection: React.FC = () => {
-  const { characters, selectCharacter, myCharacterId, opponentReady, myName } = useGame();
+  const { characters, selectCharacter, myCharacterId, opponentReady, myName, timer } = useGame();
+  const secondsLeft = useSecondsLeft(timer?.deadline);
   
   // Local state to hold choice before confirming
   const [localSelection, setLocalSelection] = useState<string | null>(null);
@@ -35,6 +37,11 @@ export const Selection: React.FC = () => {
             Opponent {opponentReady ? "✓" : "..."}
           </span>
         </div>
+        {!isLockedIn && secondsLeft !== null && (
+          <p className={`mt-1 text-xs font-bold uppercase tracking-widest tabular-nums ${secondsLeft <= 10 ? "text-red-500 animate-pulse" : "text-muted-foreground"}`}>
+            {secondsLeft}s left — then we pick for you
+          </p>
+        )}
       </div>
 
       {/* Grid */}

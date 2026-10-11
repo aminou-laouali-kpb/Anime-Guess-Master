@@ -3,8 +3,19 @@ import cors from "cors";
 import pinoHttp from "pino-http";
 import router from "./routes";
 import { logger } from "./lib/logger";
+import { httpRateLimit } from "./lib/rate-limit";
+
+// The web app and the API share one origin behind Replit's proxy, so no
+// cross-origin access is needed. Extra origins can be allowed explicitly with
+// ALLOWED_ORIGINS="https://a.example,https://b.example".
+export const allowedOrigins = (process.env["ALLOWED_ORIGINS"] ?? "")
+  .split(",")
+  .map((o) => o.trim())
+  .filter(Boolean);
 
 const app: Express = express();
+
+app.disable("x-powered-by");
 
 app.use(
   pinoHttp({
@@ -25,9 +36,16 @@ app.use(
     },
   }),
 );
-app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use((_req, res, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("Referrer-Policy", "no-referrer");
+  next();
+});
+app.use(cors({ origin: allowedOrigins.length > 0 ? allowedOrigins : false }));
+app.use(httpRateLimit(120));
+app.use(express.json({ limit: "10kb" }));
+app.use(express.urlencoded({ extended: true, limit: "10kb" }));
 
 app.use("/api", router);
 

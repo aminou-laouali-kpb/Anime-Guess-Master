@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
+import { useSecondsLeft } from "@/hooks/use-seconds-left";
 
 export const Playing: React.FC = () => {
   const {
@@ -22,8 +23,12 @@ export const Playing: React.FC = () => {
     syncEliminations,
     myPlayerId,
     myEliminatedIds,
-    opponentConnected
+    opponentConnected,
+    timer
   } = useGame();
+
+  const secondsLeft = useSecondsLeft(timer?.deadline);
+  const urgent = secondsLeft !== null && secondsLeft <= 10;
 
   const [eliminatedIds, setEliminatedIds] = useState<Set<string>>(() => new Set(myEliminatedIds));
   
@@ -74,30 +79,35 @@ export const Playing: React.FC = () => {
   return (
     <div className="min-h-[100dvh] w-full flex flex-col bg-background relative pb-28 md:pb-32">
       
-      {/* Top HUD (Opponent) */}
-      <div className="sticky top-0 z-40 bg-card border-b-4 border-card-border p-3 flex justify-between items-center shadow-sm">
-        <div className="flex flex-col">
-          <span className="text-xs uppercase font-bold text-muted-foreground tracking-wider">Opponent</span>
-          <span className="font-display font-black text-lg text-secondary truncate max-w-[150px]">
-            {opponent?.name || "Player 2"}
-          </span>
+      {/* Top HUD (Opponent) + turn banner stay visible while scrolling the board */}
+      <div className="sticky top-0 z-40">
+        <div className="bg-card border-b-4 border-card-border p-3 flex justify-between items-center shadow-sm">
+          <div className="flex flex-col">
+            <span className="text-xs uppercase font-bold text-muted-foreground tracking-wider">Opponent</span>
+            <span className="font-display font-black text-lg text-secondary truncate max-w-[150px]">
+              {opponent?.name || "Player 2"}
+            </span>
+          </div>
+          <div className="flex gap-1">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <Heart 
+                key={i} 
+                className={cn("w-5 h-5", i < (opponent?.lives || 0) ? "fill-secondary text-secondary" : "fill-muted text-muted-foreground opacity-30")} 
+              />
+            ))}
+          </div>
         </div>
-        <div className="flex gap-1">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <Heart 
-              key={i} 
-              className={cn("w-5 h-5", i < (opponent?.lives || 0) ? "fill-secondary text-secondary" : "fill-muted text-muted-foreground opacity-30")} 
-            />
-          ))}
-        </div>
-      </div>
 
-      {/* Turn Indicator Banner */}
-      <div className={cn(
-        "py-1.5 px-4 text-center font-bold uppercase tracking-widest text-xs transition-colors shadow-sm z-30 relative",
-        isMyTurn ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
-      )}>
-        {!opponentConnected ? "Opponent disconnected — waiting for them…" : isMyTurn ? "Your Turn" : "Opponent's Turn"}
+        {/* Turn Indicator Banner */}
+        <div className={cn(
+          "py-1.5 px-4 text-center font-bold uppercase tracking-widest text-xs transition-colors shadow-sm z-30 relative",
+          isMyTurn ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+        )}>
+          {!opponentConnected ? "Opponent disconnected — waiting for them…" : isMyTurn ? "Your Turn" : "Opponent's Turn"}
+          {opponentConnected && secondsLeft !== null && !pendingQuestion && !awaitingAnswerFor && (
+            <span className={cn("ml-2 tabular-nums", urgent && "text-red-500 animate-pulse")}>· {secondsLeft}s</span>
+          )}
+        </div>
       </div>
 
       {/* Game Board (Grid) */}
@@ -168,6 +178,11 @@ export const Playing: React.FC = () => {
             <DialogDescription className="text-lg font-bold text-foreground mt-4">
               "{pendingQuestion}"
             </DialogDescription>
+            {secondsLeft !== null && (
+              <p className={cn("text-sm font-bold mt-2 tabular-nums", urgent ? "text-red-500" : "text-muted-foreground")}>
+                Answer within {secondsLeft}s or lose a life
+              </p>
+            )}
           </DialogHeader>
           <div className="flex gap-4 mt-6 pointer-events-auto">
             <Button className="flex-1 h-14 bg-green-600 hover:bg-green-700 text-xl font-bold" onClick={() => answerQuestion("yes")}>
@@ -186,6 +201,11 @@ export const Playing: React.FC = () => {
           <div className="bg-card border-2 border-primary p-6 rounded-2xl max-w-md w-full text-center space-y-4 shadow-2xl">
             <h3 className="font-display text-xl font-bold text-primary uppercase">Awaiting Answer...</h3>
             <p className="text-lg font-medium">"{awaitingAnswerFor}"</p>
+            {secondsLeft !== null && (
+              <p className="text-sm text-muted-foreground font-bold tabular-nums">
+                Opponent has {secondsLeft}s to answer
+              </p>
+            )}
             <div className="flex justify-center mt-4">
               <span className="flex h-3 w-3 relative">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
@@ -302,6 +322,13 @@ export const Playing: React.FC = () => {
                       <div className="font-bold text-red-500 mb-1">{guesserName} guessed:</div>
                       <p className="font-bold">{guessedChar?.name}</p>
                       <div className="text-red-600 font-black uppercase mt-1">INCORRECT! Lost a life.</div>
+                    </div>
+                  );
+                } else if (log.type === "timeout") {
+                  const name = log.playerId === myPlayerId ? "You" : opponent?.name;
+                  return (
+                    <div key={log.id} className="bg-amber-500/10 p-3 rounded-lg text-sm border border-amber-500/30">
+                      <div className="font-bold text-amber-600">{name} ran out of time — lost a life.</div>
                     </div>
                   );
                 }

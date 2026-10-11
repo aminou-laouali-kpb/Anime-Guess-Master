@@ -23,18 +23,6 @@ export interface Character {
   role: string;
 }
 
-export interface RoomInput {
-  hostName?: string;
-}
-
-export interface Room {
-  code: string;
-  phase: string;
-  playerCount: number;
-  /** @nullable */
-  hostName?: string | null;
-}
-
 export interface ErrorResponse {
   error: string;
 }

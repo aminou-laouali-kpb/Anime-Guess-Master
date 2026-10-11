@@ -6,29 +6,22 @@
  * OpenAPI spec version: 0.1.0
  */
 import {
-  useMutation,
   useQuery
 } from '@tanstack/react-query';
 import type {
-  MutationFunction,
   QueryFunction,
   QueryKey,
-  UseMutationOptions,
-  UseMutationResult,
   UseQueryOptions,
   UseQueryResult
 } from '@tanstack/react-query';
 
 import type {
   Character,
-  ErrorResponse,
-  HealthStatus,
-  Room,
-  RoomInput
+  HealthStatus
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
-import type { ErrorType , BodyType } from '../custom-fetch';
+import type { ErrorType } from '../custom-fetch';
 
 type AwaitedInput<T> = PromiseLike<T> | T;
 
@@ -198,156 +191,6 @@ export function useListCharacters<TData = Awaited<ReturnType<typeof listCharacte
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getListCharactersQueryOptions(options)
-
-  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
-
-  return withQueryKey(query, queryOptions.queryKey);
-}
-
-
-
-
-
-
-
-export const getCreateRoomUrl = () => {
-
-
-
-
-  return `/api/rooms`
-}
-
-/**
- * Creates a new private game room and returns a join code
- * @summary Create a game room
- */
-export const createRoom = async (roomInput?: RoomInput, options?: Parameters<typeof customFetch>[1]): Promise<Room> => {
-
-  return customFetch<Room>(getCreateRoomUrl(),
-  {
-    ...options,
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
-    body: JSON.stringify(roomInput)
-  }
-);}
-
-
-
-
-
-export const getCreateRoomMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createRoom>>, TError,{data?: BodyType<RoomInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof createRoom>>, TError,{data?: BodyType<RoomInput>}, TContext> => {
-
-const mutationKey = ['createRoom'];
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createRoom>>, {data?: BodyType<RoomInput>}> = (props) => {
-          const {data} = props ?? {};
-
-          return  createRoom(data,requestOptions)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type CreateRoomMutationResult = NonNullable<Awaited<ReturnType<typeof createRoom>>>
-    export type CreateRoomMutationBody = BodyType<RoomInput> | undefined
-    export type CreateRoomMutationError = ErrorType<unknown>
-
-    /**
- * @summary Create a game room
- */
-export const useCreateRoom = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createRoom>>, TError,{data?: BodyType<RoomInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
- ): UseMutationResult<
-        Awaited<ReturnType<typeof createRoom>>,
-        TError,
-        {data?: BodyType<RoomInput>},
-        TContext
-      > => {
-      return useMutation(getCreateRoomMutationOptions(options));
-    }
-
-export const getGetRoomUrl = (code: string,) => {
-
-
-
-
-  return `/api/rooms/${code}`
-}
-
-/**
- * Returns current state of a game room by its join code
- * @summary Get room info
- */
-export const getRoom = async (code: string, options?: Parameters<typeof customFetch>[1]): Promise<Room> => {
-
-  return customFetch<Room>(getGetRoomUrl(code),
-  {
-    ...options,
-    method: 'GET'
-
-
-  }
-);}
-
-
-
-
-
-export const getGetRoomQueryKey = (code: string,) => {
-    return [
-    `/api/rooms/${code}`
-    ] as const;
-    }
-
-
-export const getGetRoomQueryOptions = <TData = Awaited<ReturnType<typeof getRoom>>, TError = ErrorType<ErrorResponse>>(code: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRoom>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  queryOptions?.queryKey ?? getGetRoomQueryKey(code);
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getRoom>>> = ({ signal }) => getRoom(code, { signal, ...requestOptions });
-
-
-
-
-
-   return  { queryKey, queryFn, enabled: code !== null && code !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getRoom>>, TError, TData> & { queryKey: QueryKey }
-}
-
-export type GetRoomQueryResult = NonNullable<Awaited<ReturnType<typeof getRoom>>>
-export type GetRoomQueryError = ErrorType<ErrorResponse>
-
-
-/**
- * @summary Get room info
- */
-
-export function useGetRoom<TData = Awaited<ReturnType<typeof getRoom>>, TError = ErrorType<ErrorResponse>>(
- code: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRoom>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
-
- ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-
-  const queryOptions = getGetRoomQueryOptions(code,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

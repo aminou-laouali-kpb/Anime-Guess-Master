@@ -11,7 +11,8 @@ export interface PlayerState {
 
 export interface GameLogEntry {
   id: string;
-  type: "qna" | "guess";
+  type: "qna" | "guess" | "timeout";
+  playerId?: string;
   askerId?: string;
   question?: string;
   answer?: "yes" | "no";
@@ -23,7 +24,14 @@ export type GameOverReason = "correct_guess" | "out_of_lives" | "opponent_left";
 
 type ServerLogEntry =
   | { type: "qna"; question: string; answer: "yes" | "no"; askerId: string }
-  | { type: "guess"; guesserId: string; guessedCharacterId: string };
+  | { type: "guess"; guesserId: string; guessedCharacterId: string }
+  | { type: "timeout"; playerId: string };
+
+// actingPlayerId: who must act before the deadline (null = both players).
+export interface TimerPayload {
+  actingPlayerId: string | null;
+  msLeft: number | null;
+}
 
 export interface RoomSnapshot {
   code: string;
@@ -42,6 +50,7 @@ export interface RoomSnapshot {
   gameOverReason: GameOverReason | null;
   opponentCharacterId: string | null;
   rematchRequestedBy: string | null;
+  timer: TimerPayload;
 }
 
 export interface ClientToServerEvents {
@@ -94,6 +103,14 @@ export interface ServerToClientEvents {
     opponentCharacterId: string | null;
   }) => void;
   opponent_left: () => void;
+  timer: (payload: TimerPayload) => void;
+  character_assigned: (payload: { characterId: string }) => void;
+  turn_timeout: (payload: {
+    playerId: string;
+    lives: number;
+    currentTurnPlayerId: string;
+    while: "answering" | "playing";
+  }) => void;
   opponent_disconnected: (payload: { graceSeconds: number }) => void;
   opponent_reconnected: () => void;
   rematch_requested: (payload: { byPlayerId: string }) => void;

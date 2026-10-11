@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from "react";
-import { socket, saveSessionToken, GamePhase, GameOverReason, PlayerState, GameLogEntry, RoomSnapshot } from "../lib/socket";
+import { socket, saveSessionToken, GamePhase, GameOverReason, PlayerState, GameLogEntry, RoomSnapshot, TimerPayload } from "../lib/socket";
 import { Character, useListCharacters } from "@workspace/api-client-react";
 import { toast } from "sonner";
 
@@ -23,8 +23,19 @@ interface GameState {
   gameOverReason: GameOverReason | null;
   revealedOpponentCharacterId: string | null;
   rematchRequestedBy: string | null;
+  timer: TurnTimer | null;
   isConnected: boolean;
   myName: string;
+}
+
+// Deadline converted to the local clock so client/server clock skew doesn't matter.
+export interface TurnTimer {
+  actingPlayerId: string | null;
+  deadline: number;
+}
+
+function toTurnTimer({ actingPlayerId, msLeft }: TimerPayload): TurnTimer | null {
+  return msLeft === null ? null : { actingPlayerId, deadline: Date.now() + msLeft };
 }
 
 interface GameContextType extends GameState {
@@ -76,6 +87,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [gameOverReason, setGameOverReason] = useState<GameOverReason | null>(null);
   const [revealedOpponentCharacterId, setRevealedOpponentCharacterId] = useState<string | null>(null);
   const [rematchRequestedBy, setRematchRequestedBy] = useState<string | null>(null);
+  const [timer, setTimer] = useState<TurnTimer | null>(null);
 
   // Socket listeners are registered once; they read the live phase from here.
   const phaseRef = useRef(phase);
@@ -103,6 +115,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setGameOverReason(null);
     setRevealedOpponentCharacterId(null);
     setRematchRequestedBy(null);
+    setTimer(null);
   };
 
   const startNewRound = (players: PlayerState[], characters: Character[]) => {
@@ -143,6 +156,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setGameOverReason(room.gameOverReason);
     setRevealedOpponentCharacterId(room.opponentCharacterId);
     setRematchRequestedBy(room.rematchRequestedBy);
+    setTimer(toTurnTimer(room.timer));
   };
 
   const setMyName = (name: string) => {
@@ -193,6 +207,38 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     socket.on("opponent_ready", () => {
       setOpponentReady(true);
+    });
+
+    socket.on("timer", (payload) => {
+      setTimer(toTurnTimer(payload));
+    });
+
+    socket.on("character_assigned", ({ characterId }) => {
+      setMyCharacterId(characterId);
+      toast.info("Time's up! A random character was picked for you.");
+    });
+
+    socket.on("turn_timeout", ({ playerId, lives, currentTurnPlayerId, while: during }) => {
+      setPendingQuestion(null);
+      setAwaitingAnswerFor(null);
+      setGameLog(prev => [...prev, { id: Math.random().toString(), type: "timeout", playerId }]);
+      setPlayers(prev => prev.map(p => p.id === playerId ? { ...p, lives } : p));
+      setCurrentTurnId(currentTurnPlayerId);
+      if (playerId === myPlayerIdRef.current) {
+        toast.error(during === "answering"
+          ? "Too slow to answer! You lost a life."
+          : "Time's up! You lost a life and your turn.");
+      } else {
+        toast.success("Your opponent ran out of time and lost a life.");
+      }
+    });
+
+    socket.on("connect_error", (err) => {
+      if (err.message === "too_many_connections") {
+        toast.error("Too many connections from your network. Close some tabs and try again.");
+      } else if (err.message === "server_full") {
+        toast.error("The server is full right now. Please try again in a moment.");
+      }
     });
 
     socket.on("game_start", ({ currentTurnPlayerId, players }) => {
@@ -307,6 +353,10 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       socket.off("room_created");
       socket.off("room_joined");
       socket.off("opponent_ready");
+      socket.off("timer");
+      socket.off("character_assigned");
+      socket.off("turn_timeout");
+      socket.off("connect_error");
       socket.off("game_start");
       socket.off("question_asked");
       socket.off("awaiting_answer");
@@ -399,6 +449,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
         gameOverReason,
         revealedOpponentCharacterId,
         rematchRequestedBy,
+        timer,
         isConnected,
         myName,
         setMyName,

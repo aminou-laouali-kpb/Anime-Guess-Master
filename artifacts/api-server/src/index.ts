@@ -1,6 +1,6 @@
 import { createServer } from "http";
 import { Server as SocketIOServer } from "socket.io";
-import app from "./app";
+import app, { allowedOrigins } from "./app";
 import { logger } from "./lib/logger";
 import { setupGameEngine } from "./lib/game-engine";
 
@@ -21,10 +21,10 @@ if (Number.isNaN(port) || port <= 0) {
 const httpServer = createServer(app);
 
 const io = new SocketIOServer(httpServer, {
-  cors: {
-    origin: "*",
-    methods: ["GET", "POST"],
-  },
+  // Same-origin only unless ALLOWED_ORIGINS lists more (see app.ts).
+  ...(allowedOrigins.length > 0
+    ? { cors: { origin: allowedOrigins, methods: ["GET", "POST"] } }
+    : {}),
   // Mount under /api so the shared proxy (which already routes /api → this server)
   // forwards socket.io handshakes and WebSocket upgrades without extra path config.
   path: "/api/socket.io",
