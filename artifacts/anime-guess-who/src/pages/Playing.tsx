@@ -9,6 +9,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { useSecondsLeft } from "@/hooks/use-seconds-left";
 import { LogEntryView } from "@/components/LogEntryView";
+import { ReactionPicker } from "@/components/Reactions";
 import { ATTRIBUTES, VerifiableAttribute, hasTrait, questionText, valueLabel, valuesOnBoard } from "@/lib/questions";
 import { toast } from "sonner";
 
@@ -178,7 +179,8 @@ export const Playing: React.FC = () => {
               {me?.name || "Joueur 1"}
             </span>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <ReactionPicker />
             <Button variant="ghost" size="sm" onClick={() => setShowLog(!showLog)} className="font-bold relative">
               <MessageSquare className="w-4 h-4 mr-2" /> Historique
               {gameLog.length > 0 && (

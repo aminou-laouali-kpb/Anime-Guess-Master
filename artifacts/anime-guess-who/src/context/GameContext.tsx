@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from "react";
-import { socket, saveSessionToken, saveProfileToken, MyStatsPayload, RatingUpdate, RoomMode, BotLevel, GamePhase, GameOverReason, PlayerState, GameLogEntry, RoomSnapshot, TimerPayload } from "../lib/socket";
+import { socket, saveSessionToken, saveProfileToken, MyStatsPayload, RatingUpdate, RoomMode, BotLevel, Reaction, GamePhase, GameOverReason, PlayerState, GameLogEntry, RoomSnapshot, TimerPayload } from "../lib/socket";
 import { Character, useListCharacters } from "@workspace/api-client-react";
 import type { VerifiableAttribute } from "../lib/questions";
 import { toast } from "sonner";
@@ -26,6 +26,8 @@ interface GameState {
   revealedOpponentCharacterId: string | null;
   rematchRequestedBy: string | null;
   timer: TurnTimer | null;
+  reactions: LiveReaction[]; // currently floating on screen
+  reactionsMuted: boolean; // hide the opponent's reactions
   myStats: MyStatsPayload | null;
   ratingUpdate: RatingUpdate | null; // result of the game that just ended
   isConnected: boolean;
@@ -41,6 +43,15 @@ export interface TurnTimer {
 function toTurnTimer({ actingPlayerId, msLeft }: TimerPayload): TurnTimer | null {
   return msLeft === null ? null : { actingPlayerId, deadline: Date.now() + msLeft };
 }
+
+export interface LiveReaction {
+  id: number;
+  playerId: string;
+  emoji: Reaction;
+}
+
+const MUTE_KEY = "anime_who_mute_reactions";
+const REACTION_LIFETIME_MS = 2600;
 
 interface GameContextType extends GameState {
   setMyName: (name: string) => void;
@@ -58,6 +69,8 @@ interface GameContextType extends GameState {
   acceptRematch: () => void;
   leaveGame: () => void;
   refreshMyStats: () => void;
+  sendReaction: (emoji: Reaction) => void;
+  setReactionsMuted: (muted: boolean) => void;
 }
 
 const GameContext = createContext<GameContextType | null>(null);
@@ -96,6 +109,13 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [revealedOpponentCharacterId, setRevealedOpponentCharacterId] = useState<string | null>(null);
   const [rematchRequestedBy, setRematchRequestedBy] = useState<string | null>(null);
   const [timer, setTimer] = useState<TurnTimer | null>(null);
+  const [reactions, setReactions] = useState<LiveReaction[]>([]);
+  const [reactionsMuted, setReactionsMutedState] = useState(() => {
+    try { return localStorage.getItem(MUTE_KEY) === "1"; } catch { return false; }
+  });
+  const reactionsMutedRef = useRef(reactionsMuted);
+  reactionsMutedRef.current = reactionsMuted;
+  const reactionIdRef = useRef(0);
   const [myStats, setMyStats] = useState<MyStatsPayload | null>(null);
   const [ratingUpdate, setRatingUpdate] = useState<RatingUpdate | null>(null);
 
@@ -234,6 +254,14 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     socket.on("opponent_ready", () => {
       setOpponentReady(true);
+    });
+
+    socket.on("reaction", ({ playerId, emoji }) => {
+      if (playerId !== myPlayerIdRef.current && reactionsMutedRef.current) return;
+      const id = ++reactionIdRef.current;
+      // Keep only the last few on screen so spam can't flood it.
+      setReactions(prev => [...prev.slice(-5), { id, playerId, emoji }]);
+      setTimeout(() => setReactions(prev => prev.filter(r => r.id !== id)), REACTION_LIFETIME_MS);
     });
 
     socket.on("timer", (payload) => {
@@ -379,6 +407,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       socket.off("room_joined");
       socket.off("opponent_ready");
       socket.off("timer");
+      socket.off("reaction");
       socket.off("character_assigned");
       socket.off("turn_timeout");
       socket.off("connect_error");
@@ -456,6 +485,16 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     socket.emit("accept_rematch");
   }, []);
 
+  const sendReaction = useCallback((emoji: Reaction) => {
+    socket.emit("react", { emoji });
+  }, []);
+
+  const setReactionsMuted = useCallback((muted: boolean) => {
+    try { localStorage.setItem(MUTE_KEY, muted ? "1" : "0"); } catch { /* storage blocked */ }
+    setReactionsMutedState(muted);
+    if (muted) setReactions(prev => prev.filter(r => r.playerId === myPlayerIdRef.current));
+  }, []);
+
   const refreshMyStats = useCallback(() => {
     socket.emit("get_my_stats");
   }, []);
@@ -490,6 +529,8 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
         revealedOpponentCharacterId,
         rematchRequestedBy,
         timer,
+        reactions,
+        reactionsMuted,
         myStats,
         ratingUpdate,
         isConnected,
@@ -509,6 +550,8 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
         acceptRematch,
         leaveGame,
         refreshMyStats,
+        sendReaction,
+        setReactionsMuted,
       }}
     >
       {children}
