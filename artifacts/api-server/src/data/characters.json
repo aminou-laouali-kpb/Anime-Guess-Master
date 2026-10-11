@@ -91,6 +91,19 @@
     "role": "secondary"
   },
   {
+    "id": "tsunade",
+    "name": "Tsunade",
+    "anime": "Naruto",
+    "gender": "female",
+    "hairColor": "blonde",
+    "eyeColor": "brown",
+    "ageRange": "adult",
+    "species": "human",
+    "powers": ["superhuman strength", "medical ninjutsu", "creation rebirth", "slug summoning"],
+    "alignment": "hero",
+    "role": "secondary"
+  },
+  {
     "id": "goku",
     "name": "Goku",
     "anime": "Dragon Ball Z",
@@ -156,6 +169,45 @@
     "role": "secondary"
   },
   {
+    "id": "bulma",
+    "name": "Bulma",
+    "anime": "Dragon Ball Z",
+    "gender": "female",
+    "hairColor": "blue",
+    "eyeColor": "blue",
+    "ageRange": "adult",
+    "species": "human",
+    "powers": ["genius inventor", "capsule technology", "dragon radar"],
+    "alignment": "hero",
+    "role": "secondary"
+  },
+  {
+    "id": "android-18",
+    "name": "Android 18",
+    "anime": "Dragon Ball Z",
+    "gender": "female",
+    "hairColor": "blonde",
+    "eyeColor": "blue",
+    "ageRange": "adult",
+    "species": "android",
+    "powers": ["infinite energy", "ki blasts", "flight", "destructo disc"],
+    "alignment": "antihero",
+    "role": "secondary"
+  },
+  {
+    "id": "videl",
+    "name": "Videl",
+    "anime": "Dragon Ball Z",
+    "gender": "female",
+    "hairColor": "black",
+    "eyeColor": "blue",
+    "ageRange": "teen",
+    "species": "human",
+    "powers": ["martial arts", "flight", "ki control"],
+    "alignment": "hero",
+    "role": "secondary"
+  },
+  {
     "id": "eren-yeager",
     "name": "Eren Yeager",
     "anime": "Attack on Titan",
@@ -205,6 +257,19 @@
     "species": "human",
     "powers": ["ackerman strength", "ODM mastery", "fastest soldier alive"],
     "alignment": "hero",
+    "role": "secondary"
+  },
+  {
+    "id": "annie-leonhart",
+    "name": "Annie Leonhart",
+    "anime": "Attack on Titan",
+    "gender": "female",
+    "hairColor": "blonde",
+    "eyeColor": "blue",
+    "ageRange": "teen",
+    "species": "titan shifter",
+    "powers": ["female titan", "crystal hardening", "martial arts"],
+    "alignment": "villain",
     "role": "secondary"
   },
   {
@@ -273,6 +338,19 @@
     "role": "secondary"
   },
   {
+    "id": "boa-hancock",
+    "name": "Boa Hancock",
+    "anime": "One Piece",
+    "gender": "female",
+    "hairColor": "black",
+    "eyeColor": "blue",
+    "ageRange": "adult",
+    "species": "human",
+    "powers": ["love-love fruit", "petrification", "haki"],
+    "alignment": "antihero",
+    "role": "secondary"
+  },
+  {
     "id": "tanjiro-kamado",
     "name": "Tanjiro Kamado",
     "anime": "Demon Slayer",
@@ -335,6 +413,32 @@
     "species": "demon",
     "powers": ["demon blood art", "shapeshifting", "cellular destruction", "immortality"],
     "alignment": "villain",
+    "role": "secondary"
+  },
+  {
+    "id": "shinobu-kocho",
+    "name": "Shinobu Kocho",
+    "anime": "Demon Slayer",
+    "gender": "female",
+    "hairColor": "black",
+    "eyeColor": "violet",
+    "ageRange": "teen",
+    "species": "human",
+    "powers": ["insect breathing", "wisteria poison", "speed"],
+    "alignment": "hero",
+    "role": "secondary"
+  },
+  {
+    "id": "mitsuri-kanroji",
+    "name": "Mitsuri Kanroji",
+    "anime": "Demon Slayer",
+    "gender": "female",
+    "hairColor": "pink",
+    "eyeColor": "green",
+    "ageRange": "teen",
+    "species": "human",
+    "powers": ["love breathing", "whip sword", "superhuman strength", "flexibility"],
+    "alignment": "hero",
     "role": "secondary"
   },
   {
@@ -403,6 +507,45 @@
     "role": "secondary"
   },
   {
+    "id": "ochaco-uraraka",
+    "name": "Ochaco Uraraka",
+    "anime": "My Hero Academia",
+    "gender": "female",
+    "hairColor": "brown",
+    "eyeColor": "brown",
+    "ageRange": "teen",
+    "species": "human",
+    "powers": ["zero gravity", "martial arts"],
+    "alignment": "hero",
+    "role": "main"
+  },
+  {
+    "id": "momo-yaoyorozu",
+    "name": "Momo Yaoyorozu",
+    "anime": "My Hero Academia",
+    "gender": "female",
+    "hairColor": "black",
+    "eyeColor": "black",
+    "ageRange": "teen",
+    "species": "human",
+    "powers": ["creation", "strategy"],
+    "alignment": "hero",
+    "role": "secondary"
+  },
+  {
+    "id": "himiko-toga",
+    "name": "Himiko Toga",
+    "anime": "My Hero Academia",
+    "gender": "female",
+    "hairColor": "blonde",
+    "eyeColor": "yellow",
+    "ageRange": "teen",
+    "species": "human",
+    "powers": ["transform", "blood drain", "knife fighting"],
+    "alignment": "villain",
+    "role": "secondary"
+  },
+  {
     "id": "ichigo-kurosaki",
     "name": "Ichigo Kurosaki",
     "anime": "Bleach",
@@ -452,6 +595,32 @@
     "species": "shinigami",
     "powers": ["kyoka suigetsu", "hogyoku", "complete hypnosis", "godlike power"],
     "alignment": "villain",
+    "role": "secondary"
+  },
+  {
+    "id": "orihime-inoue",
+    "name": "Orihime Inoue",
+    "anime": "Bleach",
+    "gender": "female",
+    "hairColor": "orange",
+    "eyeColor": "gray",
+    "ageRange": "teen",
+    "species": "human",
+    "powers": ["shun shun rikka", "healing", "shields"],
+    "alignment": "hero",
+    "role": "main"
+  },
+  {
+    "id": "yoruichi-shihoin",
+    "name": "Yoruichi Shihoin",
+    "anime": "Bleach",
+    "gender": "female",
+    "hairColor": "purple",
+    "eyeColor": "gold",
+    "ageRange": "adult",
+    "species": "shinigami",
+    "powers": ["flash step", "shunko", "cat transformation", "hakuda"],
+    "alignment": "hero",
     "role": "secondary"
   },
   {
@@ -559,6 +728,19 @@
     "role": "secondary"
   },
   {
+    "id": "biscuit-krueger",
+    "name": "Biscuit Krueger",
+    "anime": "Hunter x Hunter",
+    "gender": "female",
+    "hairColor": "blonde",
+    "eyeColor": "blue",
+    "ageRange": "adult",
+    "species": "human",
+    "powers": ["nen", "magical esthetician", "enhancement", "transformation"],
+    "alignment": "hero",
+    "role": "secondary"
+  },
+  {
     "id": "edward-elric",
     "name": "Edward Elric",
     "anime": "Fullmetal Alchemist",
@@ -611,6 +793,32 @@
     "role": "secondary"
   },
   {
+    "id": "winry-rockbell",
+    "name": "Winry Rockbell",
+    "anime": "Fullmetal Alchemist",
+    "gender": "female",
+    "hairColor": "blonde",
+    "eyeColor": "blue",
+    "ageRange": "teen",
+    "species": "human",
+    "powers": ["automail engineering", "wrench throwing"],
+    "alignment": "hero",
+    "role": "secondary"
+  },
+  {
+    "id": "riza-hawkeye",
+    "name": "Riza Hawkeye",
+    "anime": "Fullmetal Alchemist",
+    "gender": "female",
+    "hairColor": "blonde",
+    "eyeColor": "brown",
+    "ageRange": "adult",
+    "species": "human",
+    "powers": ["sharpshooting", "marksmanship", "military tactics"],
+    "alignment": "hero",
+    "role": "secondary"
+  },
+  {
     "id": "lelouch",
     "name": "Lelouch Lamperouge",
     "anime": "Code Geass",
@@ -624,6 +832,32 @@
     "role": "main"
   },
   {
+    "id": "cc",
+    "name": "C.C.",
+    "anime": "Code Geass",
+    "gender": "female",
+    "hairColor": "green",
+    "eyeColor": "gold",
+    "ageRange": "adult",
+    "species": "immortal",
+    "powers": ["immortality", "geass contract", "shock images"],
+    "alignment": "antihero",
+    "role": "main"
+  },
+  {
+    "id": "kallen-kozuki",
+    "name": "Kallen Kozuki",
+    "anime": "Code Geass",
+    "gender": "female",
+    "hairColor": "red",
+    "eyeColor": "blue",
+    "ageRange": "teen",
+    "species": "human",
+    "powers": ["guren piloting", "combat skills"],
+    "alignment": "hero",
+    "role": "secondary"
+  },
+  {
     "id": "spike-spiegel",
     "name": "Spike Spiegel",
     "anime": "Cowboy Bebop",
@@ -634,6 +868,19 @@
     "species": "human",
     "powers": ["jeet kune do", "expert marksmanship", "spaceship piloting"],
     "alignment": "hero",
+    "role": "main"
+  },
+  {
+    "id": "faye-valentine",
+    "name": "Faye Valentine",
+    "anime": "Cowboy Bebop",
+    "gender": "female",
+    "hairColor": "purple",
+    "eyeColor": "green",
+    "ageRange": "adult",
+    "species": "human",
+    "powers": ["gunslinging", "piloting", "gambling"],
+    "alignment": "antihero",
     "role": "main"
   },
   {
@@ -661,6 +908,32 @@
     "powers": ["return by death", "willpower", "tactical mind"],
     "alignment": "hero",
     "role": "main"
+  },
+  {
+    "id": "emilia",
+    "name": "Emilia",
+    "anime": "Re:Zero",
+    "gender": "female",
+    "hairColor": "silver",
+    "eyeColor": "violet",
+    "ageRange": "teen",
+    "species": "half-elf",
+    "powers": ["spirit magic", "ice magic", "contract with puck"],
+    "alignment": "hero",
+    "role": "main"
+  },
+  {
+    "id": "ram",
+    "name": "Ram",
+    "anime": "Re:Zero",
+    "gender": "female",
+    "hairColor": "pink",
+    "eyeColor": "pink",
+    "ageRange": "adult",
+    "species": "demon",
+    "powers": ["wind magic", "clairvoyance", "demon horn"],
+    "alignment": "hero",
+    "role": "secondary"
   },
   {
     "id": "senku-ishigami",

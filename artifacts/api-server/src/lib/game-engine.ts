@@ -209,13 +209,32 @@ export function getCharacters(): CharacterWithImage[] {
   return allCharacters.map(({ image: _image, ...c }) => ({ ...c, imageUrl: imageUrlFor(c.id) }));
 }
 
-function dealBoard(): string[] {
-  const ids = allCharacters.map((c) => c.id);
-  for (let i = ids.length - 1; i > 0; i--) {
+function shuffle<T>(items: T[]): T[] {
+  const out = [...items];
+  for (let i = out.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
-    [ids[i], ids[j]] = [ids[j]!, ids[i]!];
+    [out[i], out[j]] = [out[j]!, out[i]!];
   }
-  return ids.slice(0, BOARD_SIZE);
+  return out;
+}
+
+// Each gender gets its fair share of the board (proportional to the whole
+// roster), so a random draw can't produce an all-male board.
+function dealBoard(): string[] {
+  const byGender = new Map<string, string[]>();
+  for (const c of shuffle(allCharacters)) {
+    byGender.set(c.gender, [...(byGender.get(c.gender) ?? []), c.id]);
+  }
+
+  const board: string[] = [];
+  for (const ids of byGender.values()) {
+    const share = Math.floor((ids.length / allCharacters.length) * BOARD_SIZE);
+    board.push(...ids.splice(0, share));
+  }
+  // Rounding leaves a few seats: fill them from whatever is left.
+  const rest = shuffle([...byGender.values()].flat());
+  board.push(...rest.slice(0, BOARD_SIZE - board.length));
+  return shuffle(board);
 }
 
 function boardOf(room: Room): CharacterWithImage[] {

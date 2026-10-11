@@ -6,7 +6,7 @@ const HAIR: Record<string, string> = {
   green: "verts", orange: "orange", pink: "roses", silver: "argentés",
   "dark blue": "bleu foncé", yellow: "jaunes", "white and red": "blancs et rouges",
   "pale white": "blanc pâle", white: "blancs", "dark green": "vert foncé",
-  blue: "bleus", "light green": "vert clair",
+  blue: "bleus", "light green": "vert clair", purple: "violets",
 };
 
 const EYES: Record<string, string> = {
@@ -20,7 +20,8 @@ const EYES: Record<string, string> = {
 const SPECIES: Record<string, string> = {
   human: "humain", shinigami: "shinigami", saiyan: "saiyan", demon: "démon",
   "titan shifter": "titan métamorphe", namekian: "namek", alien: "extraterrestre",
-  "chimera ant": "fourmi-chimère",
+  "chimera ant": "fourmi-chimère", android: "androïde",
+  immortal: "immortel", "half-elf": "demi-elfe",
 };
 
 const GENDER: Record<string, string> = { male: "homme", female: "femme" };
