@@ -1,12 +1,8 @@
-import { createServer } from "http";
-import { Server as SocketIOServer } from "socket.io";
-import app, { allowedOrigins } from "./app";
 import { logger } from "./lib/logger";
-import { makeOriginCheck } from "./lib/origin";
-import { setupGameEngine } from "./lib/game-engine";
+import { createGameServer } from "./server";
 import { loadCharacterImages } from "./lib/character-images";
 import { initStats } from "./lib/stats";
-import characters from "./data/characters.json" assert { type: "json" };
+import characters from "./data/characters.json" with { type: "json" };
 
 const rawPort = process.env["PORT"];
 
@@ -22,34 +18,33 @@ if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
 }
 
-const httpServer = createServer(app);
+const { httpServer } = createGameServer();
 
-const io = new SocketIOServer(httpServer, {
-  // Same-origin only unless ALLOWED_ORIGINS lists more (see app.ts).
-  ...(allowedOrigins.length > 0
-    ? { cors: { origin: allowedOrigins, methods: ["GET", "POST"] } }
-    : {}),
-  // Mount under /api so the shared proxy (which already routes /api → this server)
-  // forwards socket.io handshakes and WebSocket upgrades without extra path config.
-  path: "/api/socket.io",
-  // Game messages are tiny; refuse anything big instead of buffering 1 MB.
-  maxHttpBufferSize: 16 * 1024,
-  // Browsers on other websites can't open game connections.
-  allowRequest: makeOriginCheck(allowedOrigins),
-});
+// Once the server is up, games live in memory: a crash would end every match
+// in progress, so unexpected errors are logged and the process keeps running.
+// Before that point (startup), any error must fail loudly with a non-zero
+// exit code so Replit's supervisor sees it.
+let listening = false;
 
-// Games live in memory, so a crash ends every match in progress. Socket
-// handlers already catch their own errors; this is the last line of defense.
+function fatal(err: unknown, message: string): never {
+  logger.fatal({ err }, message);
+  process.exit(1);
+}
+
 process.on("uncaughtException", (err) => {
+  if (!listening) fatal(err, "Uncaught exception during startup");
   logger.error({ err }, "Uncaught exception");
 });
 process.on("unhandledRejection", (reason) => {
+  if (!listening) fatal(reason, "Unhandled rejection during startup");
   logger.error({ err: reason }, "Unhandled promise rejection");
 });
 
-setupGameEngine(io);
+// e.g. EADDRINUSE: the port is taken, there is nothing useful to keep alive.
+httpServer.on("error", (err) => fatal(err, "HTTP server error"));
 
 httpServer.listen(port, () => {
+  listening = true;
   logger.info({ port }, "Server listening");
   // In the background: the game is playable right away, cards just show
   // initials until the portraits are found.

@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from "react";
 import { socket, saveSessionToken, saveProfileToken, MyStatsPayload, RatingUpdate, RoomMode, BotLevel, Reaction, GamePhase, GameOverReason, PlayerState, GameLogEntry, RoomSnapshot, TimerPayload } from "../lib/socket";
-import { Character, useListCharacters } from "@workspace/api-client-react";
+import type { Character } from "@workspace/api-client-react";
 import type { VerifiableAttribute } from "../lib/questions";
 import { toast } from "sonner";
 
@@ -31,6 +31,8 @@ interface GameState {
   myStats: MyStatsPayload | null;
   ratingUpdate: RatingUpdate | null; // result of the game that just ended
   isConnected: boolean;
+  hasConnectedOnce: boolean;
+  connectionReplaced: boolean; // the server closed our connection: a reload is needed
   myName: string;
 }
 
@@ -75,6 +77,16 @@ interface GameContextType extends GameState {
 
 const GameContext = createContext<GameContextType | null>(null);
 
+const NAME_KEY = "anime_who_name";
+
+function readStoredName(): string {
+  try {
+    return localStorage.getItem(NAME_KEY) || "";
+  } catch {
+    return "";
+  }
+}
+
 const SNAPSHOT_PHASES: Record<RoomSnapshot["phase"], GamePhase> = {
   waiting: "lobby",
   selection: "selection",
@@ -83,11 +95,10 @@ const SNAPSHOT_PHASES: Record<RoomSnapshot["phase"], GamePhase> = {
 };
 
 export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Pre-fetch characters to satisfy requirements and prime cache
-  useListCharacters();
-
-  const [myName, setMyNameState] = useState(() => localStorage.getItem("anime_who_name") || "");
+  const [myName, setMyNameState] = useState(readStoredName);
   const [isConnected, setIsConnected] = useState(false);
+  const [hasConnectedOnce, setHasConnectedOnce] = useState(false);
+  const [connectionReplaced, setConnectionReplaced] = useState(false);
   const [phase, setPhase] = useState<GamePhase>("home");
   const [roomCode, setRoomCode] = useState<string | null>(null);
   const [roomMode, setRoomMode] = useState<RoomMode | null>(null);
@@ -196,13 +207,26 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const setMyName = (name: string) => {
-    localStorage.setItem("anime_who_name", name);
+    try {
+      localStorage.setItem(NAME_KEY, name);
+    } catch {
+      // Storage blocked (private mode…): the name just won't be remembered.
+    }
     setMyNameState(name);
   };
 
   useEffect(() => {
-    socket.on("connect", () => setIsConnected(true));
-    socket.on("disconnect", () => setIsConnected(false));
+    socket.on("connect", () => {
+      setIsConnected(true);
+      setHasConnectedOnce(true);
+      setConnectionReplaced(false);
+    });
+    socket.on("disconnect", (reason) => {
+      setIsConnected(false);
+      // "io server disconnect": the server hung up (e.g. the game was opened
+      // in another tab). socket.io won't retry that one by itself.
+      if (reason === "io server disconnect") setConnectionReplaced(true);
+    });
 
     socket.on("session", ({ token, playerId }) => {
       saveSessionToken(token);
@@ -395,6 +419,11 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     });
 
+    // After the error boundary's "Réessayer" this provider is mounted again
+    // while the socket is still connected, but with all its state reset: drop
+    // the connection and reconnect, so the server sends the game state again
+    // (the session token in localStorage gives us our seat back).
+    if (socket.connected) socket.disconnect();
     socket.connect();
 
     return () => {
@@ -537,6 +566,8 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
         myStats,
         ratingUpdate,
         isConnected,
+        hasConnectedOnce,
+        connectionReplaced,
         myName,
         setMyName,
         joinQueue,

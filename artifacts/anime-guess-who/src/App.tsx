@@ -1,19 +1,18 @@
-import { type ReactNode } from 'react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { Suspense, lazy } from 'react';
 import { ErrorBoundary } from '@/components/error-boundary';
-import { Toaster } from '@/components/ui/sonner'; // Using sonner instead of toast since I used sonner in GameContext
-import { TooltipProvider } from '@/components/ui/tooltip';
+import { Toaster } from '@/components/ui/sonner';
 import { GameProvider, useGame } from '@/context/GameContext';
 import { FloatingReactions } from '@/components/Reactions';
+import { ConnectionStatus } from '@/components/ConnectionStatus';
 
 // Pages
 import { Home } from '@/pages/Home';
 import { QueueLobby } from '@/pages/QueueLobby';
 import { Selection } from '@/pages/Selection';
 import { Playing } from '@/pages/Playing';
-import { Ended } from '@/pages/Ended';
 
-const queryClient = new QueryClient();
+// Only needed once a game ends: loaded on demand to keep the first load small.
+const Ended = lazy(() => import('@/pages/Ended').then((m) => ({ default: m.Ended })));
 
 function MainGame() {
   const { phase } = useGame();
@@ -29,7 +28,11 @@ function MainGame() {
     case "playing":
       return <Playing />;
     case "ended":
-      return <Ended />;
+      return (
+        <Suspense fallback={null}>
+          <Ended />
+        </Suspense>
+      );
     default:
       return <Home />;
   }
@@ -37,17 +40,14 @@ function MainGame() {
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <ErrorBoundary>
-          <GameProvider>
-            <MainGame />
-            <FloatingReactions />
-          </GameProvider>
-        </ErrorBoundary>
-        <Toaster position="top-center" theme="system" richColors />
-      </TooltipProvider>
-    </QueryClientProvider>
+    <ErrorBoundary>
+      <GameProvider>
+        <MainGame />
+        <FloatingReactions />
+        <ConnectionStatus />
+      </GameProvider>
+      <Toaster position="top-center" theme="light" richColors />
+    </ErrorBoundary>
   );
 }
 

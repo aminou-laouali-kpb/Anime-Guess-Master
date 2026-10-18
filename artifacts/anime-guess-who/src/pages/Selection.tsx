@@ -1,16 +1,14 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { useGame } from "@/context/GameContext";
 import { CharacterCard } from "@/components/CharacterCard";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
-import { motion } from "framer-motion";
-import { useSecondsLeft } from "@/hooks/use-seconds-left";
+import { Countdown } from "@/components/Countdown";
 import { LeaveGameButton } from "@/components/LeaveGameButton";
 
 export const Selection: React.FC = () => {
   const { characters, selectCharacter, myCharacterId, opponentReady, myName, timer, players, myPlayerId } = useGame();
   const opponentName = players.find(p => p.id !== myPlayerId)?.name ?? "Adversaire";
-  const secondsLeft = useSecondsLeft(timer?.deadline);
   
   // Local state to hold choice before confirming
   const [localSelection, setLocalSelection] = useState<string | null>(null);
@@ -22,6 +20,12 @@ export const Selection: React.FC = () => {
   };
 
   const isLockedIn = myCharacterId !== null;
+  const pickCharacter = useCallback(
+    (id: string) => {
+      if (!isLockedIn) setLocalSelection(id);
+    },
+    [isLockedIn],
+  );
 
   // If the clock ran out and a character was picked for me, forget the one I
   // had tapped without confirming, so only the real choice is highlighted.
@@ -46,33 +50,28 @@ export const Selection: React.FC = () => {
             {opponentName} {opponentReady ? "✓" : "…"}
           </span>
         </div>
-        {!isLockedIn && secondsLeft !== null && (
-          <p className={`mt-1 text-xs font-bold uppercase tracking-widest tabular-nums ${secondsLeft <= 10 ? "text-red-500 animate-pulse" : "text-muted-foreground"}`}>
-            encore {secondsLeft} s — sinon on choisit pour toi
-          </p>
+        {!isLockedIn && (
+          <Countdown deadline={timer?.deadline}>
+            {(seconds, urgent) => (
+              <p className={`mt-1 text-xs font-bold uppercase tracking-widest tabular-nums ${urgent ? "text-red-600 animate-pulse" : "text-muted-foreground"}`}>
+                encore {seconds} s — sinon on choisit pour toi
+              </p>
+            )}
+          </Countdown>
         )}
       </div>
 
       {/* Grid */}
       <div className="p-3 grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-8 gap-2 max-w-6xl mx-auto w-full">
         {characters.map((char, index) => (
-          <motion.div
-            key={char.id}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.03, duration: 0.3 }}
-          >
+          <div key={char.id} className="card-in" style={{ animationDelay: `${index * 30}ms` }}>
             <CharacterCard
               character={char}
               size="sm"
               selected={(myCharacterId ?? localSelection) === char.id}
-              onClick={() => {
-                if (!isLockedIn) {
-                  setLocalSelection(char.id);
-                }
-              }}
+              onPick={pickCharacter}
             />
-          </motion.div>
+          </div>
         ))}
       </div>
 

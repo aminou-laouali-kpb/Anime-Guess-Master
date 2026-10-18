@@ -43,8 +43,7 @@ function DefaultFallback({ error, resetError }: ErrorFallbackProps) {
           Une erreur est survenue
         </h1>
         <p className="mt-2 text-sm text-gray-600">
-          Cette partie de l’application a rencontré un problème. Le reste
-          fonctionne toujours.
+          Un problème est survenu. Réessaie ; si cela continue, recharge la page.
         </p>
         {/* Dev only: messages can carry API responses and other internals. */}
         {import.meta.env.DEV ? (

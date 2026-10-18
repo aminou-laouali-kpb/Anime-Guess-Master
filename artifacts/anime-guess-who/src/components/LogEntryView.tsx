@@ -11,7 +11,9 @@ interface LogEntryViewProps {
   characters: Character[];
 }
 
-export const LogEntryView: React.FC<LogEntryViewProps> = ({ log, myPlayerId, opponentName, characters }) => {
+export const LogEntryView: React.FC<LogEntryViewProps> = ({ log, myPlayerId, opponentName: opponentNameProp, characters }) => {
+  // The opponent's name isn't known yet right after a page reload.
+  const opponentName = opponentNameProp ?? "Adversaire";
   if (log.type === "qna") {
     const askerName = log.askerId === myPlayerId ? "Toi" : opponentName;
     const text = log.verified && log.attribute && log.value
@@ -22,11 +24,11 @@ export const LogEntryView: React.FC<LogEntryViewProps> = ({ log, myPlayerId, opp
         <div className="flex items-center justify-between gap-2 mb-1">
           <span className="font-bold text-primary">{askerName} :</span>
           {log.verified ? (
-            <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase text-green-600">
+            <span className="inline-flex items-center gap-1 text-[11px] font-bold uppercase text-green-700">
               <ShieldCheck className="w-3 h-3" /> Vérifiée
             </span>
           ) : (
-            <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase text-muted-foreground">
+            <span className="inline-flex items-center gap-1 text-[11px] font-bold uppercase text-muted-foreground">
               <MessageCircleQuestion className="w-3 h-3" /> Non vérifiée
             </span>
           )}
@@ -34,7 +36,7 @@ export const LogEntryView: React.FC<LogEntryViewProps> = ({ log, myPlayerId, opp
         <p className="italic mb-2">« {text} »</p>
         <div className="flex items-center gap-2 font-black uppercase">
           Réponse :
-          <span className={log.answer === "yes" ? "text-green-500" : "text-red-500"}>
+          <span className={log.answer === "yes" ? "text-green-700" : "text-red-600"}>
             {log.answer === "yes" ? "oui" : "non"}
           </span>
         </div>
@@ -47,7 +49,7 @@ export const LogEntryView: React.FC<LogEntryViewProps> = ({ log, myPlayerId, opp
     const guessedChar = characters.find(c => c.id === log.guessedCharacterId);
     return (
       <div className="bg-red-500/10 p-3 rounded-lg text-sm border border-red-500/30">
-        <div className="font-bold text-red-500 mb-1">{guesserName} a tenté :</div>
+        <div className="font-bold text-red-600 mb-1">{guesserName} a tenté :</div>
         <p className="font-bold">{guessedChar?.name}</p>
         <div className="text-red-600 font-black uppercase mt-1">Raté ! Une vie en moins.</div>
       </div>
@@ -57,7 +59,7 @@ export const LogEntryView: React.FC<LogEntryViewProps> = ({ log, myPlayerId, opp
   const name = log.playerId === myPlayerId ? "Toi" : opponentName;
   return (
     <div className="bg-amber-500/10 p-3 rounded-lg text-sm border border-amber-500/30">
-      <div className="font-bold text-amber-600">{name} : temps écoulé — une vie en moins.</div>
+      <div className="font-bold text-amber-700">{name} : temps écoulé — une vie en moins.</div>
     </div>
   );
 };

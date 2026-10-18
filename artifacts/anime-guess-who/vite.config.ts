@@ -27,9 +27,10 @@ if (!basePath) {
   );
 }
 
-// Link previews (Facebook, LinkedIn, X…) need absolute image URLs. The site's
-// public address comes from SITE_URL, or from Replit's deployment domain;
-// without either, the relative path is kept (fine for WhatsApp, Discord…).
+// Link previews (Facebook, LinkedIn, X…) need absolute image URLs, and search
+// engines want a canonical address. The site's public address comes from
+// SITE_URL, or from Replit's deployment domain; without either, the relative
+// image path is kept (fine for WhatsApp, Discord…) and no canonical is added.
 function absoluteShareImage(): Plugin {
   const domain = process.env.REPLIT_DOMAINS?.split(',')[0]?.trim();
   const siteUrl = (process.env.SITE_URL ?? (domain ? `https://${domain}` : ''))
@@ -39,10 +40,15 @@ function absoluteShareImage(): Plugin {
     transformIndexHtml(html) {
       if (!siteUrl) return html;
       const prefix = siteUrl + basePath.replace(/\/+$/, '');
-      return html.replace(
-        /(<meta (?:property|name)="(?:og:image|twitter:image)" content=")\//g,
-        `$1${prefix}/`,
-      );
+      return html
+        .replace(
+          /(<meta (?:property|name)="(?:og:image|twitter:image)" content=")\//g,
+          `$1${prefix}/`,
+        )
+        .replace(
+          '</head>',
+          `    <link rel="canonical" href="${prefix}/" />\n    <meta property="og:url" content="${prefix}/" />\n  </head>`,
+        );
     },
   };
 }
