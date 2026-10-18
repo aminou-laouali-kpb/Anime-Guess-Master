@@ -75,7 +75,7 @@ const LeaderboardDialogContent: React.FC<LeaderboardDialogProps> = ({ open, onOp
               )}
               {!stats.rank && (
                 <p className="text-xs text-muted-foreground">
-                  Encore {Math.max(0, minGames - stats.rankedGames)} partie(s) rapide(s) pour apparaître au classement.
+                  Encore {Math.max(0, minGames - stats.rankedGames)} {minGames - stats.rankedGames > 1 ? "parties rapides" : "partie rapide"} pour apparaître au classement.
                 </p>
               )}
             </>
@@ -106,7 +106,7 @@ const LeaderboardDialogContent: React.FC<LeaderboardDialogProps> = ({ open, onOp
                       {MEDALS[entry.rank - 1] ?? entry.rank}
                     </span>
                     <span className="flex-1 truncate">{entry.name}{isMe && " (toi)"}</span>
-                    <span className="text-xs text-muted-foreground tabular-nums">{entry.rankedGames} parties</span>
+                    <span className="text-xs text-muted-foreground tabular-nums">{entry.rankedGames} {entry.rankedGames > 1 ? "parties" : "partie"}</span>
                     <span className="w-12 text-right font-display font-black tabular-nums">{entry.rating}</span>
                   </li>
                 );

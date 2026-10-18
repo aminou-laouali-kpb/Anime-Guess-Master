@@ -21,7 +21,7 @@ const SPECIES: Record<string, string> = {
   human: "humain", shinigami: "shinigami", saiyan: "saiyan", demon: "démon",
   "titan shifter": "titan métamorphe", namekian: "namek", alien: "extraterrestre",
   "chimera ant": "fourmi-chimère", android: "androïde",
-  immortal: "immortel", "half-elf": "demi-elfe", devil: "diable",
+  immortal: "immortel", "half-elf": "demi-elfe", devil: "diable", "soul in armor": "âme dans une armure",
 };
 
 const GENDER: Record<string, string> = { male: "homme", female: "femme" };

@@ -47,13 +47,13 @@ export const Ended: React.FC = () => {
             {isWinner ? <Trophy className="w-16 h-16" /> : <Skull className="w-16 h-16" />}
           </div>
           <h1 className={`${isDisconnect ? 'text-4xl md:text-6xl' : 'text-6xl md:text-8xl'} font-display font-black uppercase tracking-tighter transform ${isWinner ? '-skew-x-6 text-green-600 drop-shadow-[0_0_15px_rgba(34,197,94,0.5)]' : 'text-red-600'}`}>
-            {isDisconnect ? "Victoire par abandon" : (isWinner ? "Victoire !" : "Défaite")}
+            {isDisconnect ? "Victoire par abandon" : (isWinner ? "Victoire !" : "Défaite")}
           </h1>
           <p className="text-xl font-bold uppercase tracking-widest text-muted-foreground">
-            {gameOverReason === "out_of_lives" && !isWinner && "Tu n’as plus de vies !"}
-            {gameOverReason === "out_of_lives" && isWinner && "L’adversaire n’a plus de vies !"}
-            {gameOverReason === "correct_guess" && isWinner && "Bien deviné !"}
-            {gameOverReason === "correct_guess" && !isWinner && "L’adversaire a deviné ton personnage !"}
+            {gameOverReason === "out_of_lives" && !isWinner && "Tu n’as plus de vies !"}
+            {gameOverReason === "out_of_lives" && isWinner && "L’adversaire n’a plus de vies !"}
+            {gameOverReason === "correct_guess" && isWinner && "Bien deviné !"}
+            {gameOverReason === "correct_guess" && !isWinner && "L’adversaire a deviné ton personnage !"}
             {isDisconnect && "Ton adversaire a quitté la partie."}
           </p>
         </div>

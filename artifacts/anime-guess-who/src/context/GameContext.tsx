@@ -358,7 +358,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (guesserId === myPlayerIdRef.current) {
         toast.error("Raté ! Tu perds une vie.");
       } else {
-        toast.success("L’adversaire s’est trompé !");
+        toast.success("L’adversaire s’est trompé !");
       }
     });
 
@@ -382,7 +382,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     socket.on("opponent_reconnected", () => {
       setOpponentConnected(true);
       if (phaseRef.current !== "ended") {
-        toast.success("Ton adversaire est de retour !");
+        toast.success("Ton adversaire est de retour !");
       }
     });
 
@@ -403,7 +403,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     socket.on("rematch_requested", ({ byPlayerId }) => {
       setRematchRequestedBy(byPlayerId);
       if (byPlayerId !== myPlayerIdRef.current) {
-        toast.info("Ton adversaire veut une revanche !");
+        toast.info("Ton adversaire veut une revanche !");
       }
     });
 

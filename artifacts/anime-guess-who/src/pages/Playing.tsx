@@ -102,7 +102,9 @@ export const Playing: React.FC = () => {
       firstSync.current = false; // the initial value came from the server
       return;
     }
-    syncEliminations(Array.from(eliminatedIds));
+    // Debounced: a burst of taps must not trip the server's flood limiter.
+    const timer = setTimeout(() => syncEliminations(Array.from(eliminatedIds)), 400);
+    return () => clearTimeout(timer);
   }, [eliminatedIds, syncEliminations]);
 
   const handleAsk = (e: React.FormEvent) => {
@@ -290,7 +292,7 @@ export const Playing: React.FC = () => {
       <Dialog open={!!pendingQuestion} onOpenChange={() => {}}>
         <DialogContent className="sm:max-w-md [&>button]:hidden pointer-events-none">
           <DialogHeader className="text-center">
-            <DialogTitle className="font-display text-2xl uppercase text-secondary">Question reçue !</DialogTitle>
+            <DialogTitle className="font-display text-2xl uppercase text-secondary">Question reçue !</DialogTitle>
             <DialogDescription className="text-lg font-bold text-foreground mt-4">
               « {pendingQuestion} »
             </DialogDescription>
@@ -412,7 +414,7 @@ export const Playing: React.FC = () => {
             ) : (
               <Input
                 autoFocus
-                placeholder="ex. Ton personnage se bat-il avec une épée ?"
+                placeholder="ex. Ton personnage se bat-il avec une épée ?"
                 value={freeQuestion}
                 onChange={e => setFreeQuestion(e.target.value)}
                 maxLength={200}

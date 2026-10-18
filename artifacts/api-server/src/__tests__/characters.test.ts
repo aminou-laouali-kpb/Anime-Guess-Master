@@ -20,7 +20,7 @@ const VERIFIABLE = ["hairColor", "eyeColor", "gender", "ageRange", "species", "a
 
 // Characters that can't be told apart by any verified question. This list must
 // only shrink: adding a new look-alike pair makes the game unwinnable for them.
-const KNOWN_INDISTINGUISHABLE = [["alphonse-elric", "edward-elric"]];
+const KNOWN_INDISTINGUISHABLE: string[][] = [];
 
 describe("characters.json", () => {
   it("has the expected shape", () => {
