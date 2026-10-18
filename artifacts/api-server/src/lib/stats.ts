@@ -252,7 +252,8 @@ export async function getLeaderboard(): Promise<LeaderboardEntry[]> {
     .select()
     .from(playersTable)
     .where(gte(playersTable.rankedGames, MIN_RANKED_GAMES))
-    .orderBy(desc(playersTable.rating), desc(playersTable.wins), asc(playersTable.createdAt))
+    // Ties: whoever reached the rating first (wins also count unranked games, so not used).
+    .orderBy(desc(playersTable.rating), asc(playersTable.createdAt))
     .limit(LEADERBOARD_SIZE);
 
   // Players with the same rating share a rank (1, 2, 2, 4…).

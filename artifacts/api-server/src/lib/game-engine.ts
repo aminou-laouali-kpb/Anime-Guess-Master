@@ -1,6 +1,6 @@
 import { randomBytes } from "crypto";
 import type { Server as SocketIOServer, Socket } from "socket.io";
-import characters from "../data/characters.json" assert { type: "json" };
+import characters from "../data/characters.json" with { type: "json" };
 import { imageUrlFor } from "./character-images";
 import { logger } from "./logger";
 import { TokenBucket, clientIp } from "./rate-limit";
@@ -135,12 +135,14 @@ const REACTION_COOLDOWN_MS = 1_000;
 const MAX_QUESTIONS_PER_GAME = 60;
 // Like the original board game: a smaller board keeps games short and readable.
 const BOARD_SIZE = 24;
-export const RECONNECT_GRACE_MS = 45_000;
+// Test hook: GAME_TIME_SCALE=0.05 makes every clock 20x faster. Always 1 in production.
+const TIME_SCALE = Number(process.env["GAME_TIME_SCALE"]) > 0 ? Number(process.env["GAME_TIME_SCALE"]) : 1;
+export const RECONNECT_GRACE_MS = 45_000 * TIME_SCALE;
 
 // Nobody can stall a game forever: each step has a deadline.
-const SELECTION_TIME_MS = 90_000;
-const TURN_TIME_MS = 60_000;
-const ANSWER_TIME_MS = 45_000;
+const SELECTION_TIME_MS = 90_000 * TIME_SCALE;
+const TURN_TIME_MS = 60_000 * TIME_SCALE;
+const ANSWER_TIME_MS = 45_000 * TIME_SCALE;
 
 // Abuse limits. Rooms only exist while a session holds them, so capping
 // sessions caps rooms and the matchmaking queue too.
@@ -186,8 +188,18 @@ function readString(raw: unknown, maxLength: number): string | null {
   return value || null;
 }
 
+// Player names are shown to everyone (and on the leaderboard): drop control
+// characters, invisible/bidirectional-override characters and extra spaces.
+const UNSAFE_NAME_CHARS = /[\p{C}\p{Zl}\p{Zp}\u200B-\u200F\u202A-\u202E\u2060-\u2069\uFEFF]/gu;
+
+export function cleanName(raw: unknown): string {
+  if (typeof raw !== "string") return "Joueur";
+  const name = raw.normalize("NFC").replace(/\s+/g, " ").replace(UNSAFE_NAME_CHARS, "").trim().slice(0, 24).trim();
+  return name || "Joueur";
+}
+
 function readName(raw: unknown): string {
-  return readString(raw, 24) ?? "Joueur";
+  return cleanName(raw);
 }
 
 function readCharacterId(room: Room, raw: unknown): string | null {
@@ -669,7 +681,7 @@ export function setupGameEngine(io: SocketIOServer): void {
     if (!bot || Math.random() > chance) return;
     setTimeout(() => {
       if (rooms.has(room.code)) io.to(room.code).emit("reaction", { playerId: bot.id, emoji });
-    }, 700 + Math.random() * 800);
+    }, (700 + Math.random() * 800) * TIME_SCALE);
   }
 
   function cancelBot(room: Room): void {
@@ -693,13 +705,14 @@ export function setupGameEngine(io: SocketIOServer): void {
     let delay = 0;
     let act: (() => void) | null = null;
     if (room.phase === "selection" && !bot.isReady) {
-      delay = 1200;
+      delay = 1200 * TIME_SCALE;
       act = () => selectCharacter(room, bot, pickRandomCharacterId(room));
     } else if (room.phase === "playing" && room.currentTurnPlayerId === bot.id && !room.pendingQuestion) {
-      delay = 1800 + Math.random() * 1500;
+      // The pause scales with the clocks, so it can never outlast the turn clock.
+      delay = (1800 + Math.random() * 1500) * TIME_SCALE;
       act = () => playBotTurn(room, bot);
     } else if (room.phase === "ended" && room.rematchRequestedBy === human.id) {
-      delay = 900;
+      delay = 900 * TIME_SCALE;
       act = () => startRematch(room);
     }
 
@@ -820,20 +833,27 @@ export function setupGameEngine(io: SocketIOServer): void {
     // Wraps every handler so a malformed payload or a bug can never crash
     // the process (which would kill every game in progress), and drops
     // events from clients that flood the server.
+    // Flood limit on EVERY incoming packet, including event names we don't
+    // handle (those used to skip the limit entirely).
+    socket.use((_packet, next) => {
+      if (bucket.take()) {
+        droppedEvents = 0;
+        next();
+        return;
+      }
+      droppedEvents += 1;
+      if (droppedEvents === 1) {
+        socket.emit("error", { message: "Doucement ! Trop d’actions d’un coup." });
+      }
+      if (droppedEvents > MAX_DROPPED_EVENTS) {
+        logger.warn({ ip: socket.data.ip }, "Disconnecting flooding client");
+        socket.disconnect(true);
+      }
+      // Not calling next(): the packet is dropped.
+    });
+
     function on(event: string, handler: (payload: Record<string, unknown>) => void) {
       socket.on(event, (raw: unknown) => {
-        if (!bucket.take()) {
-          droppedEvents += 1;
-          if (droppedEvents === 1) {
-            socket.emit("error", { message: "Doucement ! Trop d’actions d’un coup." });
-          }
-          if (droppedEvents > MAX_DROPPED_EVENTS) {
-            logger.warn({ ip: socket.data.ip }, "Disconnecting flooding client");
-            socket.disconnect(true);
-          }
-          return;
-        }
-        droppedEvents = 0;
         try {
           handler(payloadOf(raw));
         } catch (err) {
@@ -858,11 +878,14 @@ export function setupGameEngine(io: SocketIOServer): void {
         socket.join(restored.room.code);
         const opponent = opponentOf(restored.room, restored.player);
         if (opponent) emitToPlayer(opponent, "opponent_reconnected");
+        // Resume the paused clock BEFORE taking the snapshot, so the state we
+        // send already carries the time left (instead of "no clock" followed
+        // by a separate timer event).
+        updateTimer(restored.room);
       }
       socket.emit("state_sync", {
         room: restored ? snapshotFor(restored.room, restored.player) : null,
       });
-      if (restored) updateTimer(restored.room);
     } catch (err) {
       logger.error({ err }, "Failed to restore session");
     }
@@ -981,7 +1004,11 @@ export function setupGameEngine(io: SocketIOServer): void {
         .then((stats) =>
           socket.emit("my_stats", { enabled: true, minRankedGames: MIN_RANKED_GAMES, stats }),
         )
-        .catch((err) => logger.error({ err }, "Failed to load player stats"));
+        .catch((err) => {
+          logger.error({ err }, "Failed to load player stats");
+          // Database trouble: hide the stats UI until the next successful call.
+          socket.emit("my_stats", { enabled: false, minRankedGames: MIN_RANKED_GAMES, stats: null });
+        });
     });
 
     // ── Leave the current room or queue on purpose ───────────────────────────
