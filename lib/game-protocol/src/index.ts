@@ -23,7 +23,9 @@ export type BotLevel = (typeof BOT_LEVELS)[number];
 
 export type RoomMode = "quick" | "private" | "bot";
 export type RoomPhase = "waiting" | "selection" | "playing" | "ended";
-export type GameOverReason = "correct_guess" | "out_of_lives" | "opponent_left";
+// "draw": the player who moved first found the character, and the second
+// player then found theirs with their last-chance guess too.
+export type GameOverReason = "correct_guess" | "out_of_lives" | "opponent_left" | "draw";
 
 export interface PlayerState {
   id: string;
@@ -88,6 +90,9 @@ export interface RoomSnapshot {
   gameOverReason: GameOverReason | null;
   opponentCharacterId: string | null;
   rematchRequestedBy: string | null;
+  // Set after the first player found the character: this player gets one
+  // final guess to even things out (and ask nothing more).
+  lastChanceFor: string | null;
   timer: TimerPayload;
 }
 
@@ -164,10 +169,12 @@ export interface ServerToClientEvents {
     currentTurnPlayerId: string;
   }) => void;
   game_over: (payload: {
-    winnerId: string;
+    winnerId: string | null; // null on a draw
     reason: GameOverReason;
     opponentCharacterId: string | null;
   }) => void;
+  // The first player guessed right; this player gets one final guess.
+  last_chance: (payload: { playerId: string }) => void;
   opponent_left: () => void;
   timer: (payload: TimerPayload) => void;
   reaction: (payload: { playerId: string; emoji: Reaction }) => void;

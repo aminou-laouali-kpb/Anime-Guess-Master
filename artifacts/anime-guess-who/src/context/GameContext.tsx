@@ -23,6 +23,7 @@ interface GameState {
   gameLog: GameLogEntry[];
   winnerId: string | null;
   gameOverReason: GameOverReason | null;
+  lastChanceFor: string | null;
   revealedOpponentCharacterId: string | null;
   rematchRequestedBy: string | null;
   timer: TurnTimer | null;
@@ -117,6 +118,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [gameLog, setGameLog] = useState<GameLogEntry[]>([]);
   const [winnerId, setWinnerId] = useState<string | null>(null);
   const [gameOverReason, setGameOverReason] = useState<GameOverReason | null>(null);
+  const [lastChanceFor, setLastChanceFor] = useState<string | null>(null);
   const [revealedOpponentCharacterId, setRevealedOpponentCharacterId] = useState<string | null>(null);
   const [rematchRequestedBy, setRematchRequestedBy] = useState<string | null>(null);
   const [timer, setTimer] = useState<TurnTimer | null>(null);
@@ -157,6 +159,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setGameLog([]);
     setWinnerId(null);
     setGameOverReason(null);
+    setLastChanceFor(null);
     setRevealedOpponentCharacterId(null);
     setRematchRequestedBy(null);
     setTimer(null);
@@ -179,6 +182,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setGameLog([]);
     setWinnerId(null);
     setGameOverReason(null);
+    setLastChanceFor(null);
     setRevealedOpponentCharacterId(null);
     setRematchRequestedBy(null);
   };
@@ -201,6 +205,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setGameLog(room.log.map((entry, i) => ({ ...entry, id: `restored-${i}` })));
     setWinnerId(room.winnerId);
     setGameOverReason(room.gameOverReason);
+    setLastChanceFor(room.lastChanceFor);
     setRevealedOpponentCharacterId(room.opponentCharacterId);
     setRematchRequestedBy(room.rematchRequestedBy);
     setTimer(toTurnTimer(room.timer));
@@ -362,8 +367,19 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     });
 
+    socket.on("last_chance", ({ playerId }) => {
+      setLastChanceFor(playerId);
+      setCurrentTurnId(playerId);
+      if (playerId === myPlayerIdRef.current) {
+        toast.info("L’adversaire a trouvé ton personnage ! Dernière chance : devine le sien.", { duration: 6000 });
+      } else {
+        toast.success("Tu as trouvé ! L’adversaire a une dernière chance de deviner.", { duration: 6000 });
+      }
+    });
+
     socket.on("game_over", ({ winnerId, opponentCharacterId, reason }) => {
       setPhase("ended");
+      setLastChanceFor(null);
       setWinnerId(winnerId);
       setRevealedOpponentCharacterId(opponentCharacterId);
       setGameOverReason(reason);
@@ -448,6 +464,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       socket.off("awaiting_answer");
       socket.off("question_answered");
       socket.off("wrong_guess");
+      socket.off("last_chance");
       socket.off("game_over");
       socket.off("opponent_disconnected");
       socket.off("opponent_reconnected");
@@ -558,6 +575,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
         gameLog,
         winnerId,
         gameOverReason,
+        lastChanceFor,
         revealedOpponentCharacterId,
         rematchRequestedBy,
         timer,

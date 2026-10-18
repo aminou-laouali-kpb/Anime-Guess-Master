@@ -3,7 +3,9 @@ import {
   type Game,
   type TestServer,
   connectClient,
+  playToFirstPlayerWin,
   startPrivateGame,
+  winAsFirstPlayer,
   startServer,
   wait,
   whoseTurn,
@@ -150,8 +152,7 @@ describe("a full game", () => {
     const moverTarget = mover === g.a ? g.bChar : g.aChar;
     const otherTarget = mover === g.a ? g.aChar : g.bChar;
 
-    mover.emit("make_guess", { characterId: moverTarget });
-    await mover.until(() => mover.has("game_over") && other.has("game_over"));
+    await winAsFirstPlayer(mover, other, moverTarget, g.board.map((c) => c["id"] as string).find((id) => id !== otherTarget)!);
     expect(mover.last("game_over")).toMatchObject({ winnerId: mover.playerId, reason: "correct_guess", opponentCharacterId: moverTarget });
     expect(other.last("game_over")).toMatchObject({ winnerId: mover.playerId, opponentCharacterId: otherTarget });
   });
@@ -192,6 +193,91 @@ describe("a full game", () => {
   });
 });
 
+describe("last chance (the first player's edge)", () => {
+  // Whoever moves first finds the character one turn earlier, so their correct
+  // guess doesn't end the game: the other player gets one final guess.
+  it("gives the second player one final guess, and nothing else, after the first player is right", async () => {
+    const g = trackGame(await startPrivateGame(server));
+    const { mover, other } = whoseTurn(g);
+    const moverTarget = mover === g.a ? g.bChar : g.aChar;
+
+    mover.emit("make_guess", { characterId: moverTarget });
+    expect(await other.next("last_chance")).toEqual({ playerId: other.playerId });
+    await mover.until(() => mover.has("last_chance"));
+    expect(mover.has("game_over")).toBe(false);
+
+    other.emit("ask_question", { attribute: "role", value: "main" });
+    expect((await other.next("error"))["message"]).toMatch(/Dernière chance/);
+
+    const snapshot = (await (async () => {
+      other.socket.disconnect();
+      const back = track(await connectClient(server, { token: other.token, profile: other.profile }));
+      return back.last("state_sync")!["room"];
+    })()) as Record<string, unknown>;
+    expect(snapshot["lastChanceFor"]).toBe(other.playerId);
+  });
+
+  it("keeps the first player's win when the final guess misses", async () => {
+    const g = trackGame(await startPrivateGame(server));
+    const { mover, other } = await playToFirstPlayerWin(g);
+    expect(mover.last("game_over")).toMatchObject({ winnerId: mover.playerId, reason: "correct_guess" });
+    expect(other.last("game_over")).toMatchObject({ winnerId: mover.playerId, reason: "correct_guess" });
+  });
+
+  it("ends in a draw when the second player finds the character too", async () => {
+    const g = trackGame(await startPrivateGame(server));
+    const { mover, other } = whoseTurn(g);
+    const moverTarget = mover === g.a ? g.bChar : g.aChar;
+    const otherTarget = mover === g.a ? g.aChar : g.bChar;
+
+    mover.emit("make_guess", { characterId: moverTarget });
+    await other.next("last_chance");
+    other.emit("make_guess", { characterId: otherTarget });
+    await mover.until(() => mover.has("game_over") && other.has("game_over"));
+    expect(mover.last("game_over")).toMatchObject({ winnerId: null, reason: "draw", opponentCharacterId: moverTarget });
+    expect(other.last("game_over")).toMatchObject({ winnerId: null, reason: "draw", opponentCharacterId: otherTarget });
+  });
+
+  it("ends the game at once when the second player is right first", async () => {
+    const g = trackGame(await startPrivateGame(server));
+    const { mover, other } = whoseTurn(g);
+    const otherTarget = mover === g.a ? g.aChar : g.bChar;
+    const moverChar = otherTarget;
+
+    mover.emit("ask_question", { attribute: "role", value: "main" }); // pass the turn
+    await other.next("question_answered");
+    other.emit("make_guess", { characterId: moverChar });
+    await mover.until(() => mover.has("game_over") && other.has("game_over"));
+    expect(other.last("game_over")).toMatchObject({ winnerId: other.playerId, reason: "correct_guess" });
+    expect(other.has("last_chance")).toBe(false);
+    expect(mover.has("last_chance")).toBe(false);
+  });
+
+  it("lets the first player's win stand when the last-chance clock runs out", async () => {
+    const g = trackGame(await startPrivateGame(server));
+    const { mover, other } = whoseTurn(g);
+    mover.emit("make_guess", { characterId: mover === g.a ? g.bChar : g.aChar });
+    await other.next("last_chance");
+    await mover.until(() => mover.has("game_over"), 8000, "game_over after the clock");
+    expect(mover.last("game_over")).toMatchObject({ winnerId: mover.playerId, reason: "correct_guess" });
+  });
+
+  it("resets for a rematch", async () => {
+    const g = trackGame(await startPrivateGame(server));
+    const { mover, other } = await playToFirstPlayerWin(g);
+    mover.emit("request_rematch");
+    await other.next("rematch_requested");
+    other.emit("accept_rematch");
+    await other.next("rematch_started");
+    const snap = (await (async () => {
+      other.socket.disconnect();
+      const back = track(await connectClient(server, { token: other.token, profile: other.profile }));
+      return back.last("state_sync")!["room"];
+    })()) as Record<string, unknown>;
+    expect(snap["lastChanceFor"]).toBeNull();
+  });
+});
+
 describe("reconnection", () => {
   it("restores the game, including a pending question, with the session token", async () => {
     const g = trackGame(await startPrivateGame(server));
@@ -224,9 +310,7 @@ describe("reconnection", () => {
 
   it("tells the opponent when a player leaves, even after the game ended", async () => {
     const g = trackGame(await startPrivateGame(server));
-    const { mover, other } = whoseTurn(g);
-    mover.emit("make_guess", { characterId: mover === g.a ? g.bChar : g.aChar });
-    await other.until(() => other.has("game_over"));
+    const { mover, other } = await playToFirstPlayerWin(g);
     mover.emit("leave_room");
     await other.next("opponent_left");
   });
@@ -235,9 +319,7 @@ describe("reconnection", () => {
 describe("rematch", () => {
   it("can't be forced, and deals a new board when accepted", async () => {
     const g = trackGame(await startPrivateGame(server));
-    const { mover, other } = whoseTurn(g);
-    mover.emit("make_guess", { characterId: mover === g.a ? g.bChar : g.aChar });
-    await other.until(() => other.has("game_over"));
+    const { mover, other } = await playToFirstPlayerWin(g);
 
     other.emit("accept_rematch"); // nobody asked
     await wait(200);

@@ -16,7 +16,7 @@ import characters from "../data/characters.json" with { type: "json" };
 import { imageUrlFor } from "./character-images";
 import { logger } from "./logger";
 import { TokenBucket, clientIp } from "./rate-limit";
-import { BOT_LEVELS, BOT_NAMES, type BotLevel, type BotMemory, chooseBotMove } from "./bot";
+import { BOT_LEVELS, BOT_NAMES, type BotLevel, type BotMemory, chooseBotMove, remainingCandidates } from "./bot";
 import {
   MIN_RANKED_GAMES,
   getPlayerStats,
@@ -85,6 +85,12 @@ export interface Room {
   winnerId: string | null;
   gameOverReason: GameOverReason | null;
   rematchRequestedBy: string | null;
+  // The player who got the first turn. Moving first is an edge (they find the
+  // character one turn earlier), so their correct guess doesn't end the game
+  // outright: see lastChanceFor.
+  firstPlayerId: string | null;
+  // The second player's one final guess after the first player guessed right.
+  lastChanceFor: string | null;
   timer: NodeJS.Timeout | null;
   timerKey: string | null;
   timerDeadline: number | null;
@@ -220,6 +226,8 @@ function createRoom(code: string, mode: Room["mode"]): Room {
     pendingQuestion: null,
     pendingAskerId: null,
     winnerId: null,
+    firstPlayerId: null,
+    lastChanceFor: null,
     gameOverReason: null,
     rematchRequestedBy: null,
     timer: null,
@@ -304,6 +312,7 @@ function snapshotFor(room: Room, player: Player) {
     opponentCharacterId:
       room.phase === "ended" ? (opponent?.selectedCharacterId ?? null) : null,
     rematchRequestedBy: room.rematchRequestedBy,
+    lastChanceFor: room.lastChanceFor,
     timer: timerPayload(room),
   };
 }
@@ -438,6 +447,8 @@ export function setupGameEngine(io: GameServer): void {
     room.phase = "playing";
     const firstIdx = Math.floor(Math.random() * 2);
     room.currentTurnPlayerId = room.players[firstIdx]!.id;
+    room.firstPlayerId = room.currentTurnPlayerId;
+    room.lastChanceFor = null;
 
     io.to(room.code).emit("game_start", {
       currentTurnPlayerId: room.currentTurnPlayerId,
@@ -464,6 +475,12 @@ export function setupGameEngine(io: GameServer): void {
     }
 
     if (room.phase !== "playing") return;
+
+    // Out of time on the last-chance guess: the first player's win stands.
+    if (room.lastChanceFor && room.firstPlayerId) {
+      endGame(room, room.firstPlayerId, "correct_guess");
+      return;
+    }
 
     // Stalling costs a life, like a wrong guess.
     const answering = room.pendingQuestion !== null;
@@ -496,7 +513,7 @@ export function setupGameEngine(io: GameServer): void {
   // Each player gets their own game_over so "opponentCharacterId" is always
   // the *other* player's character.
   // Saves the result for stats and tells each player how their rating moved.
-  function reportResult(room: Room, winner: Player, loser: Player, reason: string): void {
+  function reportResult(room: Room, winner: Player, loser: Player, reason: string, draw = false): void {
     if (!statsEnabled || room.mode === "bot") return;
     // Two players on the same network could be one person farming wins, and
     // endless rematches between two accounts would farm Elo too.
@@ -507,6 +524,7 @@ export function setupGameEngine(io: GameServer): void {
       ranked,
       mode: room.mode,
       reason,
+      draw,
     })
       .then((result) => {
         if (!result) return;
@@ -516,8 +534,9 @@ export function setupGameEngine(io: GameServer): void {
       .catch((err) => logger.error({ err }, "Failed to record game result"));
   }
 
-  function endGame(room: Room, winnerId: string, reason: GameOverReason): void {
+  function endGame(room: Room, winnerId: string | null, reason: GameOverReason): void {
     room.phase = "ended";
+    room.lastChanceFor = null;
     room.winnerId = winnerId;
     room.gameOverReason = reason;
     room.pendingQuestion = null;
@@ -533,6 +552,12 @@ export function setupGameEngine(io: GameServer): void {
       });
     }
 
+    if (winnerId === null) {
+      const [a, b] = room.players;
+      if (a && b) reportResult(room, a, b, reason, true);
+      botReact(room, "😮", 0.9);
+      return;
+    }
     const winner = room.players.find((p) => p.id === winnerId);
     const loser = winner && opponentOf(room, winner);
     if (winner && loser) reportResult(room, winner, loser, reason);
@@ -587,6 +612,7 @@ export function setupGameEngine(io: GameServer): void {
   }
 
   function askVerified(room: Room, player: Player, attribute: VerifiableAttribute, value: string): void {
+    if (room.lastChanceFor) return; // the final guess can only be a guess
     const opponent = opponentOf(room, player);
     const secret = allCharacters.find((c) => c.id === opponent?.selectedCharacterId);
     if (!opponent || !secret) return;
@@ -609,11 +635,35 @@ export function setupGameEngine(io: GameServer): void {
     updateTimer(room);
   }
 
+  function startLastChance(room: Room, guesser: Player): void {
+    room.lastChanceFor = guesser.id;
+    room.currentTurnPlayerId = guesser.id;
+    room.pendingQuestion = null;
+    room.pendingAskerId = null;
+    io.to(room.code).emit("last_chance", { playerId: guesser.id });
+    updateTimer(room);
+  }
+
   function makeGuess(room: Room, player: Player, characterId: string): void {
     const opponent = opponentOf(room, player);
     if (!opponent) return;
 
-    if (opponent.selectedCharacterId === characterId) {
+    const correct = opponent.selectedCharacterId === characterId;
+
+    // The second player's final guess settles it: a draw if they find the
+    // character too, otherwise the first player's win stands.
+    if (room.lastChanceFor === player.id) {
+      endGame(room, correct ? null : opponent.id, correct ? "draw" : "correct_guess");
+      return;
+    }
+
+    if (correct) {
+      // The first player moved first, so they got there a turn earlier: give
+      // the other player one last guess before declaring the win.
+      if (player.id === room.firstPlayerId) {
+        startLastChance(room, opponent);
+        return;
+      }
       endGame(room, player.id, "correct_guess");
       return;
     }
@@ -646,6 +696,8 @@ export function setupGameEngine(io: GameServer): void {
     room.pendingAskerId = null;
     room.winnerId = null;
     room.gameOverReason = null;
+    room.firstPlayerId = null;
+    room.lastChanceFor = null;
     room.rematchRequestedBy = null;
     room.currentTurnPlayerId = null;
     for (const p of room.players) {
@@ -741,7 +793,13 @@ export function setupGameEngine(io: GameServer): void {
       .map((id) => allCharacters.find((c) => c.id === id))
       .filter((c): c is Character => Boolean(c));
 
-    const move = chooseBotMove(board, memory, room.botLevel ?? "normal");
+    let move = chooseBotMove(board, memory, room.botLevel ?? "normal");
+    if (room.lastChanceFor === bot.id && move.type === "ask") {
+      // Last chance: no more questions, so take the best remaining guess.
+      const candidates = remainingCandidates(board, memory);
+      const pool = candidates.length ? candidates : board;
+      move = { type: "guess", characterId: pool[Math.floor(Math.random() * pool.length)]!.id };
+    }
     if (move.type === "ask") askVerified(room, bot, move.attribute, move.value);
     else makeGuess(room, bot, move.characterId);
   }
@@ -1034,6 +1092,10 @@ export function setupGameEngine(io: GameServer): void {
       }
       if (room.pendingQuestion) {
         socket.emit("error", { message: "Une question est déjà en attente." });
+        return;
+      }
+      if (room.lastChanceFor) {
+        socket.emit("error", { message: "Dernière chance : il ne reste qu’à deviner." });
         return;
       }
 

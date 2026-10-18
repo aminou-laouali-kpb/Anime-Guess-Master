@@ -20,7 +20,7 @@ async function myStats(client: TestClient) {
 }
 
 /** Quick-match `winner` against `loser`; `winner` guesses right. Resolves with `winner`'s rating update. */
-async function playQuickGame(winner: TestClient, loser: TestClient) {
+async function playQuickGame(winner: TestClient, loser: TestClient, outcome: "win" | "draw" = "win") {
   // Count arrivals rather than checking presence: the same two players may
   // have played before, so an older room_joined is already in their history.
   const joinedBefore = [winner.count("room_joined"), loser.count("room_joined")] as const;
@@ -32,19 +32,41 @@ async function playQuickGame(winner: TestClient, loser: TestClient) {
     5000,
     "both players to be matched",
   );
-  return finishGame(winner, loser);
+  return finishGame(winner, loser, outcome);
 }
 
-async function finishGame(winner: TestClient, loser: TestClient) {
+async function finishGame(winner: TestClient, loser: TestClient, outcome: "win" | "draw" = "win") {
   const board = winner.last("room_joined")!["characters"] as { id: string }[];
   winner.emit("select_character", { characterId: board[0]!.id });
   loser.emit("select_character", { characterId: board[1]!.id });
   const start = await winner.next("game_start");
-  if (start["currentTurnPlayerId"] !== winner.playerId) {
+  if (outcome === "draw") {
+    // The first player finds the character, then the other one does too.
+    const winnerFirst = start["currentTurnPlayerId"] === winner.playerId;
+    const [first, second] = winnerFirst ? [winner, loser] : [loser, winner];
+    const [firstTarget, secondTarget] = winnerFirst ? [board[1]!.id, board[0]!.id] : [board[0]!.id, board[1]!.id];
+    first.emit("make_guess", { characterId: firstTarget });
+    await second.next("last_chance");
+    second.emit("make_guess", { characterId: secondTarget });
+    return winner.next("rating_update");
+  }
+  return guessToWin(winner, loser, start["currentTurnPlayerId"] === winner.playerId, board);
+}
+
+/**
+ * `winner` finds the loser's character (board[1]). If the winner moved first, the loser
+ * gets a last-chance guess, which they miss; otherwise the guess ends the game outright.
+ */
+async function guessToWin(winner: TestClient, loser: TestClient, winnerMovesFirst: boolean, board: { id: string }[]) {
+  if (!winnerMovesFirst) {
     loser.emit("ask_question", { attribute: "gender", value: "male" }); // pass the turn
     await winner.next("question_answered");
   }
   winner.emit("make_guess", { characterId: board[1]!.id });
+  if (winnerMovesFirst) {
+    await loser.next("last_chance");
+    loser.emit("make_guess", { characterId: board[2]!.id }); // a miss (not the winner's board[0])
+  }
   return winner.next("rating_update");
 }
 
@@ -85,6 +107,19 @@ describe.skipIf(!hasDatabase)("player stats and leaderboard (Postgres)", () => {
     expect(b.last("rating_update")).toMatchObject({ ranked: true, delta: -16, rating: 984 });
   });
 
+  it("settles a draw with a small Elo transfer and no win or loss", async () => {
+    const [a, b] = [await newPlayer(), await newPlayer()];
+    await playQuickGame(a, b); // a: 1016, b: 984
+    await leave(a, b);
+    const drawUpdate = await playQuickGame(a, b, "draw");
+    await b.until(() => b.count("rating_update") >= 2, 3000, "the second rating update");
+    // The higher-rated player gives up a point to the lower-rated one.
+    expect(drawUpdate).toMatchObject({ ranked: true, delta: -1, rating: 1015 });
+    expect(b.last("rating_update")).toMatchObject({ ranked: true, delta: 1, rating: 985 });
+    expect(await myStats(a)).toMatchObject({ gamesPlayed: 2, wins: 1, losses: 0, currentStreak: 0 });
+    expect(await myStats(b)).toMatchObject({ gamesPlayed: 2, wins: 0, losses: 1, currentStreak: 0 });
+  });
+
   it("counts private games in the stats but not in the rating", async () => {
     const [a, b] = [await newPlayer(), await newPlayer()];
     a.emit("create_room", { name: "A" });
@@ -119,12 +154,8 @@ describe.skipIf(!hasDatabase)("player stats and leaderboard (Postgres)", () => {
     a.emit("select_character", { characterId: board[0]!.id });
     b.emit("select_character", { characterId: board[1]!.id });
     const start = await a.next("game_start");
-    if (start["currentTurnPlayerId"] !== a.playerId) {
-      b.emit("ask_question", { attribute: "gender", value: "male" });
-      await a.next("question_answered");
-    }
-    a.emit("make_guess", { characterId: board[1]!.id });
-    expect(await a.next("rating_update")).toMatchObject({ ranked: false, delta: 0 });
+    const update = await guessToWin(a, b, start["currentTurnPlayerId"] === a.playerId, board);
+    expect(update).toMatchObject({ ranked: false, delta: 0 });
   });
 
   it("ranks at most 2 games per pair of players per day", async () => {

@@ -94,12 +94,21 @@ export function eloDelta(winnerRating: number, loserRating: number): number {
   return Math.max(1, Math.round(K_FACTOR * (1 - expected)));
 }
 
+// A draw is worth half a win: the higher-rated player gives up a few points,
+// the lower-rated one gains them. Positive = points gained by `a`.
+export function eloDrawDelta(ratingA: number, ratingB: number): number {
+  const expected = 1 / (1 + 10 ** ((ratingB - ratingA) / 400));
+  return Math.round(K_FACTOR * (0.5 - expected));
+}
+
+// For a draw, `winner` and `loser` are simply the two players (either order).
 export async function recordGame(params: {
   winner: Participant;
   loser: Participant;
   ranked: boolean;
   mode: "quick" | "private";
   reason: string;
+  draw?: boolean;
 }): Promise<{ winner: RatingUpdate; loser: RatingUpdate } | null> {
   if (!statsEnabled) return null;
   const { db, playersTable, gamesTable } = await loadDb();
@@ -151,19 +160,25 @@ export async function recordGame(params: {
         );
       if (Number(value) >= MAX_RANKED_PER_PAIR_PER_DAY) ranked = false;
     }
-    const delta = ranked ? eloDelta(winner.rating, loser.rating) : 0;
+    const draw = params.draw === true;
+    const delta = !ranked ? 0 : draw ? eloDrawDelta(winner.rating, loser.rating) : eloDelta(winner.rating, loser.rating);
+    const winnerRating = draw ? Math.max(MIN_RATING, winner.rating + delta) : winner.rating + delta;
     const loserRating = Math.max(MIN_RATING, loser.rating - delta);
     const rankedInc = ranked ? 1 : 0;
 
     await tx
       .update(playersTable)
       .set({
-        rating: winner.rating + delta,
+        rating: winnerRating,
         gamesPlayed: sql`${playersTable.gamesPlayed} + 1`,
         rankedGames: sql`${playersTable.rankedGames} + ${rankedInc}`,
-        wins: sql`${playersTable.wins} + 1`,
-        currentStreak: sql`${playersTable.currentStreak} + 1`,
-        bestStreak: sql`greatest(${playersTable.bestStreak}, ${playersTable.currentStreak} + 1)`,
+        ...(draw
+          ? { currentStreak: 0 }
+          : {
+              wins: sql`${playersTable.wins} + 1`,
+              currentStreak: sql`${playersTable.currentStreak} + 1`,
+              bestStreak: sql`greatest(${playersTable.bestStreak}, ${playersTable.currentStreak} + 1)`,
+            }),
         updatedAt: sql`now()`,
       })
       .where(eq(playersTable.id, winner.id));
@@ -175,7 +190,7 @@ export async function recordGame(params: {
           rating: loserRating,
           gamesPlayed: sql`${playersTable.gamesPlayed} + 1`,
           rankedGames: sql`${playersTable.rankedGames} + ${rankedInc}`,
-          losses: sql`${playersTable.losses} + 1`,
+          ...(draw ? {} : { losses: sql`${playersTable.losses} + 1` }),
           currentStreak: 0,
           updatedAt: sql`now()`,
         })
@@ -193,8 +208,8 @@ export async function recordGame(params: {
 
     leaderboardCache = null;
     return {
-      winner: { ranked, rating: winner.rating + delta, delta },
-      loser: { ranked, rating: loserRating, delta: -(loser.rating - loserRating) },
+      winner: { ranked, rating: winnerRating, delta: winnerRating - winner.rating },
+      loser: { ranked, rating: loserRating, delta: loserRating - loser.rating },
     };
   });
 }

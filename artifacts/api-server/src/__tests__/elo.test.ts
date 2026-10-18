@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { eloDelta } from "../lib/stats";
+import { eloDelta, eloDrawDelta } from "../lib/stats";
 
 describe("eloDelta", () => {
   it("is 16 points between equal players", () => {
@@ -17,5 +17,24 @@ describe("eloDelta", () => {
       expect(delta).toBeGreaterThanOrEqual(1);
       expect(delta).toBeLessThanOrEqual(32);
     }
+  });
+});
+
+describe("eloDrawDelta", () => {
+  it("moves nothing between equal players", () => {
+    expect(eloDrawDelta(1000, 1000)).toBe(0);
+  });
+
+  it("takes points from the higher-rated player and gives them to the lower-rated one", () => {
+    expect(eloDrawDelta(1200, 1000)).toBeLessThan(0);
+    expect(eloDrawDelta(1000, 1200)).toBeGreaterThan(0);
+  });
+
+  it("is mirrored: what one side gains, the other loses", () => {
+    expect(eloDrawDelta(1300, 900)).toBe(-eloDrawDelta(900, 1300));
+  });
+
+  it("is worth less than a win for the underdog", () => {
+    expect(eloDrawDelta(900, 1100)).toBeLessThan(eloDelta(900, 1100));
   });
 });

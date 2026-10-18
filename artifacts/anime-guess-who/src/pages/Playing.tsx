@@ -33,7 +33,8 @@ export const Playing: React.FC = () => {
     opponentConnected,
     timer,
     roomMode,
-    myCharacterId
+    myCharacterId,
+    lastChanceFor
   } = useGame();
   const myCharacter = characters.find(c => c.id === myCharacterId);
   // The computer only understands verified questions.
@@ -73,6 +74,8 @@ export const Playing: React.FC = () => {
 
   const isMyTurn = currentTurnId === myPlayerId;
   const canAct = isMyTurn && !awaitingAnswerFor;
+  // Last chance: the only move left is a guess.
+  const canAsk = canAct && !lastChanceFor;
 
   // If my turn ends while a dialog is open (time out), close it: acting now
   // would only get "Ce n'est pas ton tour."
@@ -196,7 +199,7 @@ export const Playing: React.FC = () => {
           "py-1.5 px-4 text-center font-bold uppercase tracking-widest text-xs transition-colors shadow-sm z-30 relative",
           isMyTurn ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
         )}>
-          {!opponentConnected ? "Adversaire déconnecté — on l’attend…" : isMyTurn ? "À toi de jouer" : "Tour de l’adversaire"}
+          {!opponentConnected ? "Adversaire déconnecté — on l’attend…" : lastChanceFor ? (isMyTurn ? "Dernière chance : devine !" : "Dernière chance de l’adversaire") : isMyTurn ? "À toi de jouer" : "Tour de l’adversaire"}
           {opponentConnected && !pendingQuestion && !awaitingAnswerFor && (
             <Countdown deadline={timer?.deadline}>
               {(seconds, urgent) => (
@@ -269,7 +272,7 @@ export const Playing: React.FC = () => {
         <div className="p-3 flex gap-2 sm:gap-3 max-w-2xl mx-auto">
           <Button
             className="flex-1 min-w-0 h-12 font-bold text-sm sm:text-base bg-blue-600 hover:bg-blue-700"
-            disabled={!canAct}
+            disabled={!canAsk}
             onClick={() => setShowAskModal(true)}
           >
             <Search className="w-5 h-5 mr-1.5 shrink-0" />
