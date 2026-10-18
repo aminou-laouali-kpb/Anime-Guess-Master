@@ -1,7 +1,5 @@
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800;900&family=Bricolage+Grotesque:opsz,wght@12..96,400..800&display=swap');
 @import 'tailwindcss';
 @import 'tw-animate-css';
-@plugin "@tailwindcss/typography";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -65,7 +63,8 @@
   --primary-foreground: 0 0% 100%;
   
   /* Secondary: Hot Pink */
-  --secondary: 326 100% 55%;
+  /* 42% lightness: white text on it reaches a 5:1 contrast (55% gave 3.6:1) */
+  --secondary: 326 100% 42%;
   --secondary-foreground: 0 0% 100%;
   
   /* Accent: Deep Purple */
@@ -162,4 +161,41 @@
 }
 ::-webkit-scrollbar-thumb:hover {
   @apply bg-muted-foreground/50;
+}
+
+
+/* ── Animations (CSS only: no animation library needed) ───────────────────── */
+
+/* Cards slide in one after the other; the delay is set inline per card. */
+@keyframes card-in {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: none; }
+}
+.card-in { animation: card-in 0.3s ease-out both; }
+
+/* Emoji reactions: --rx is the horizontal drift, --dir is -1 (rises) or 1 (falls). */
+@keyframes reaction-float {
+  0% { opacity: 0; transform: translate(var(--rx, 0px), 0) scale(0.4); }
+  15% { opacity: 1; transform: translate(var(--rx, 0px), calc(var(--dir, -1) * 20px)) scale(1.25); }
+  25% { transform: translate(var(--rx, 0px), calc(var(--dir, -1) * 35px)) scale(1); }
+  75% { opacity: 1; }
+  100% { opacity: 0; transform: translate(var(--rx, 0px), calc(var(--dir, -1) * 140px)) scale(1); }
+}
+@keyframes reaction-fade {
+  0% { opacity: 0; }
+  15%, 75% { opacity: 1; }
+  100% { opacity: 0; }
+}
+.reaction-float { animation: reaction-float 2.4s ease-out both; }
+
+/* People who ask their system for less motion: no spinning, pulsing, sliding
+   or drifting. Reactions still appear, as a plain fade. */
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .reaction-float { animation: reaction-fade 2.4s linear both !important; }
 }

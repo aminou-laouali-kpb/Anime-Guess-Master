@@ -1,4 +1,4 @@
-import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useGame } from "@/context/GameContext";
 import { CharacterCard } from "@/components/CharacterCard";
 import { Button } from "@/components/ui/button";
@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
-import { useSecondsLeft } from "@/hooks/use-seconds-left";
+import { Countdown } from "@/components/Countdown";
 import { LogEntryView } from "@/components/LogEntryView";
 import { ReactionPicker } from "@/components/Reactions";
 import { LeaveGameButton } from "@/components/LeaveGameButton";
@@ -38,9 +38,6 @@ export const Playing: React.FC = () => {
   const myCharacter = characters.find(c => c.id === myCharacterId);
   // The computer only understands verified questions.
   const vsBot = roomMode === "bot";
-
-  const secondsLeft = useSecondsLeft(timer?.deadline);
-  const urgent = secondsLeft !== null && secondsLeft <= 10;
 
   const [eliminatedIds, setEliminatedIds] = useState<Set<string>>(() => new Set(myEliminatedIds));
   
@@ -87,19 +84,26 @@ export const Playing: React.FC = () => {
     }
   }, [canAct]);
 
-  const toggleElimination = (id: string) => {
+  // One stable function for all 24 cards, so they don't all redraw on each toggle.
+  const toggleElimination = useCallback((id: string) => {
     setEliminatedIds(prev => {
       const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      // Sync in background
-      syncEliminations(Array.from(next));
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       return next;
     });
-  };
+  }, []);
+
+  // Tell the server (so eliminations survive a reconnect) after the state has
+  // changed, not from inside the state updater.
+  const firstSync = useRef(true);
+  useEffect(() => {
+    if (firstSync.current) {
+      firstSync.current = false; // the initial value came from the server
+      return;
+    }
+    syncEliminations(Array.from(eliminatedIds));
+  }, [eliminatedIds, syncEliminations]);
 
   const handleAsk = (e: React.FormEvent) => {
     e.preventDefault();
@@ -120,6 +124,8 @@ export const Playing: React.FC = () => {
   const lastLog = gameLog[gameLog.length - 1];
   useEffect(() => {
     if (!lastLog || lastLog.type !== "qna" || !lastLog.verified) return;
+    // Entries rebuilt after a reload are old news: don't offer to cross out again.
+    if (lastLog.id.startsWith("restored-")) return;
     if (lastLog.askerId !== myPlayerId || !lastLog.attribute || !lastLog.value) return;
     const { attribute, value } = lastLog;
     const keep = lastLog.answer === "yes";
@@ -135,7 +141,6 @@ export const Playing: React.FC = () => {
           setEliminatedIds(prev => {
             const next = new Set(prev);
             ruledOut.forEach(id => next.add(id));
-            syncEliminations(Array.from(next));
             return next;
           });
         },
@@ -190,8 +195,15 @@ export const Playing: React.FC = () => {
           isMyTurn ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
         )}>
           {!opponentConnected ? "Adversaire déconnecté — on l’attend…" : isMyTurn ? "À toi de jouer" : "Tour de l’adversaire"}
-          {opponentConnected && secondsLeft !== null && !pendingQuestion && !awaitingAnswerFor && (
-            <span className={cn("ml-2 tabular-nums", urgent && "text-red-500 animate-pulse")}>· {secondsLeft} s</span>
+          {opponentConnected && !pendingQuestion && !awaitingAnswerFor && (
+            <Countdown deadline={timer?.deadline}>
+              {(seconds, urgent) => (
+                // Red on the blue "your turn" banner would be unreadable.
+                <span className={cn("ml-2 tabular-nums", urgent && (isMyTurn ? "text-yellow-200 font-black animate-pulse" : "text-red-600 animate-pulse"))}>
+                  · {seconds} s
+                </span>
+              )}
+            </Countdown>
           )}
         </div>
       </div>
@@ -204,7 +216,7 @@ export const Playing: React.FC = () => {
             character={char}
             size="sm"
             eliminated={eliminatedIds.has(char.id)}
-            onClick={() => toggleElimination(char.id)}
+            onPick={toggleElimination}
           />
         ))}
       </div>
@@ -282,11 +294,13 @@ export const Playing: React.FC = () => {
             <DialogDescription className="text-lg font-bold text-foreground mt-4">
               « {pendingQuestion} »
             </DialogDescription>
-            {secondsLeft !== null && (
-              <p className={cn("text-sm font-bold mt-2 tabular-nums", urgent ? "text-red-500" : "text-muted-foreground")}>
-                Réponds dans les {secondsLeft} s ou tu perds une vie
-              </p>
-            )}
+            <Countdown deadline={timer?.deadline}>
+              {(seconds, urgent) => (
+                <p className={cn("text-sm font-bold mt-2 tabular-nums", urgent ? "text-red-600" : "text-muted-foreground")}>
+                  Réponds dans les {seconds} s ou tu perds une vie
+                </p>
+              )}
+            </Countdown>
             {myCharacter && (
               <p className="text-sm font-bold mt-2">
                 Ton personnage : <span className="text-primary">{myCharacter.name}</span>
@@ -314,11 +328,13 @@ export const Playing: React.FC = () => {
           <div className="bg-card border-2 border-primary p-6 rounded-2xl max-w-md w-full text-center space-y-4 shadow-2xl">
             <h3 className="font-display text-xl font-bold text-primary uppercase">En attente de la réponse…</h3>
             <p className="text-lg font-medium">« {awaitingAnswerFor} »</p>
-            {secondsLeft !== null && (
-              <p className="text-sm text-muted-foreground font-bold tabular-nums">
-                L’adversaire a {secondsLeft} s pour répondre
-              </p>
-            )}
+            <Countdown deadline={timer?.deadline}>
+              {(seconds) => (
+                <p className="text-sm text-muted-foreground font-bold tabular-nums">
+                  L’adversaire a {seconds} s pour répondre
+                </p>
+              )}
+            </Countdown>
             <div className="flex justify-center mt-4">
               <span className="flex h-3 w-3 relative">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
@@ -424,7 +440,7 @@ export const Playing: React.FC = () => {
           onOpenAutoFocus={(e) => e.preventDefault()}
         >
           <div className="p-4 border-b bg-card">
-            <DialogTitle className="font-display text-2xl text-red-500 flex items-center">
+            <DialogTitle className="font-display text-2xl text-red-600 flex items-center">
               <Crosshair className="w-6 h-6 mr-2" /> Qui est-ce ?
             </DialogTitle>
             <DialogDescription className="text-sm text-muted-foreground mt-1 font-bold">
@@ -447,7 +463,7 @@ export const Playing: React.FC = () => {
                   size="sm"
                   selected={guessCandidate === char.id}
                   className="cursor-pointer hover:border-red-500 hover:ring-2 ring-red-500/50"
-                  onClick={() => setGuessCandidate(char.id)}
+                  onPick={setGuessCandidate}
                 />
               ))}
               {guessable.length === 0 ? (

@@ -24,8 +24,8 @@ export const ATTRIBUTES: { key: VerifiableAttribute; label: string }[] = [
   { key: "anime", label: "Anime" },
 ];
 
-const AGE: Record<string, string> = { child: "un enfant", teen: "un ado", adult: "un adulte" };
-const ALIGNMENT: Record<string, string> = {
+export const AGE_PHRASES: Record<string, string> = { child: "un enfant", teen: "un ado", adult: "un adulte" };
+export const ALIGNMENT_PHRASES: Record<string, string> = {
   hero: "un héros", villain: "un méchant", antihero: "un anti-héros", neutral: "neutre",
 };
 
@@ -35,7 +35,7 @@ export function valueLabel(attribute: VerifiableAttribute, value: string): strin
     case "hairColor": return value === "none" ? "chauve" : fr.hair(value);
     case "eyeColor": return fr.eyes(value);
     case "gender": return fr.gender(value);
-    case "ageRange": return AGE[value]?.replace(/^un /, "") ?? value;
+    case "ageRange": return AGE_PHRASES[value]?.replace(/^un /, "") ?? value;
     case "species": return fr.species(value);
     case "alignment": return fr.alignment(value);
     case "role": return fr.role(value);
@@ -51,9 +51,9 @@ export function questionText(attribute: VerifiableAttribute, value: string): str
         : `Ton personnage a-t-il les cheveux ${fr.hair(value)} ?`;
     case "eyeColor": return `Ton personnage a-t-il les yeux ${fr.eyes(value)} ?`;
     case "gender": return value === "female" ? "Ton personnage est-il une femme ?" : "Ton personnage est-il un homme ?";
-    case "ageRange": return `Ton personnage est-il ${AGE[value] ?? value} ?`;
+    case "ageRange": return `Ton personnage est-il ${AGE_PHRASES[value] ?? value} ?`;
     case "species": return `Ton personnage est-il de l’espèce « ${fr.species(value)} » ?`;
-    case "alignment": return `Ton personnage est-il ${ALIGNMENT[value] ?? value} ?`;
+    case "alignment": return `Ton personnage est-il ${ALIGNMENT_PHRASES[value] ?? value} ?`;
     case "role": return `Ton personnage est-il un personnage ${fr.role(value)} ?`;
     case "anime": return `Ton personnage vient-il de « ${value} » ?`;
   }

@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
 import { SmilePlus, Volume2, VolumeX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -28,26 +27,21 @@ export const FloatingReactions: React.FC = () => {
 
   return (
     <div className="pointer-events-none fixed inset-0 z-[70] overflow-hidden" aria-live="polite">
-      <AnimatePresence>
-        {reactions.map(r => {
-          const mine = r.playerId === myPlayerId;
-          const who = mine ? "Toi" : players.find(p => p.id === r.playerId)?.name ?? "Adversaire";
-          return (
-            <motion.div
-              key={r.id}
-              role="img"
-              aria-label={`${who} : ${LABELS[r.emoji]}`}
-              className={cn("absolute left-1/2 text-5xl drop-shadow-lg select-none", mine ? "bottom-40" : "top-24")}
-              initial={{ opacity: 0, scale: 0.4, x: offsetFor(r.id), y: 0 }}
-              animate={{ opacity: [0, 1, 1, 0], scale: [0.4, 1.25, 1, 1], y: mine ? -140 : 140 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 2.4, times: [0, 0.15, 0.75, 1], ease: "easeOut" }}
-            >
-              {r.emoji}
-            </motion.div>
-          );
-        })}
-      </AnimatePresence>
+      {reactions.map(r => {
+        const mine = r.playerId === myPlayerId;
+        const who = mine ? "Toi" : players.find(p => p.id === r.playerId)?.name ?? "Adversaire";
+        return (
+          <div
+            key={r.id}
+            role="img"
+            aria-label={`${who} : ${LABELS[r.emoji]}`}
+            className={cn("reaction-float absolute left-1/2 text-5xl drop-shadow-lg select-none", mine ? "bottom-40" : "top-24")}
+            style={{ "--rx": `${offsetFor(r.id)}px`, "--dir": mine ? -1 : 1 } as React.CSSProperties}
+          >
+            {r.emoji}
+          </div>
+        );
+      })}
     </div>
   );
 };

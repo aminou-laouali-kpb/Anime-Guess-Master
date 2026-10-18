@@ -1,17 +1,22 @@
-import React, { useState } from "react";
+import React, { Suspense, lazy, useState } from "react";
 import { useGame } from "@/context/GameContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Gamepad2, Users, UsersRound, HelpCircle, ArrowRight, Trophy, Bot } from "lucide-react";
 import type { BotLevel } from "@/lib/socket";
-import { LeaderboardDialog } from "@/components/LeaderboardDialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+
+// The leaderboard (and the data library it needs) loads when first opened.
+const LeaderboardDialog = lazy(() =>
+  import("@/components/LeaderboardDialog").then((m) => ({ default: m.LeaderboardDialog })),
+);
 
 export const Home: React.FC = () => {
   const { myName, setMyName, joinQueue, joinRoom, createPrivateRoom, playVsBot, myStats } = useGame();
   const [showBot, setShowBot] = useState(false);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
+  const [leaderboardLoaded, setLeaderboardLoaded] = useState(false);
 
   const [showJoin, setShowJoin] = useState(false);
   const [joinCode, setJoinCode] = useState("");
@@ -28,16 +33,14 @@ export const Home: React.FC = () => {
     }
   };
 
+  // The name dialog opens by itself while there is no name and can't be
+  // closed, so in practice the name is always set by the time a button is used.
   const handleAction = (action: () => void) => {
     if (!myName) {
       setShowNameModal(true);
     } else {
       action();
     }
-  };
-
-  const handleCreateRoom = () => {
-    handleAction(createPrivateRoom);
   };
 
   return (
@@ -81,7 +84,7 @@ export const Home: React.FC = () => {
             variant="secondary"
             size="lg" 
             className="w-full h-14 font-bold border-2 hover:scale-[1.02] transition-transform" 
-            onClick={handleCreateRoom}
+            onClick={() => handleAction(createPrivateRoom)}
           >
             <Users className="mr-2 w-5 h-5" />
             Créer une partie privée
@@ -111,7 +114,7 @@ export const Home: React.FC = () => {
                 variant="ghost"
                 size="lg"
                 className="w-full text-muted-foreground hover:text-foreground"
-                onClick={() => setShowLeaderboard(true)}
+                onClick={() => { setLeaderboardLoaded(true); setShowLeaderboard(true); }}
               >
                 <Trophy className="mr-2 w-5 h-5" /> Classement
               </Button>
@@ -192,7 +195,11 @@ export const Home: React.FC = () => {
         </DialogContent>
       </Dialog>
 
-      <LeaderboardDialog open={showLeaderboard} onOpenChange={setShowLeaderboard} />
+      {leaderboardLoaded && (
+        <Suspense fallback={null}>
+          <LeaderboardDialog open={showLeaderboard} onOpenChange={setShowLeaderboard} />
+        </Suspense>
+      )}
 
       <Dialog open={showBot} onOpenChange={setShowBot}>
         <DialogContent className="sm:max-w-md">

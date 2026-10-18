@@ -32,6 +32,16 @@ const ALIGNMENT: Record<string, string> = {
 
 const ROLE: Record<string, string> = { main: "principal", secondary: "secondaire" };
 
+// Exposed so the tests can check every value in characters.json has a label.
+export const FR_LABELS = {
+  hair: HAIR,
+  eyes: EYES,
+  species: SPECIES,
+  gender: GENDER,
+  alignment: ALIGNMENT,
+  role: ROLE,
+};
+
 const lookup = (table: Record<string, string>) => (value: string) =>
   table[value?.toLowerCase()] ?? value;
 

@@ -9,6 +9,9 @@ interface CharacterCardProps {
   selected?: boolean;
   eliminated?: boolean;
   onClick?: () => void;
+  // Same as onClick but receives the character's id, so the parent can pass
+  // ONE stable function to all 24 cards (and the memoized cards don't redraw).
+  onPick?: (id: string) => void;
   className?: string;
   size?: "sm" | "md" | "lg";
 }
@@ -70,14 +73,20 @@ export const Portrait: React.FC<{ character: Character; size: "sm" | "md" | "lg"
   );
 };
 
-export const CharacterCard: React.FC<CharacterCardProps> = ({
+const CharacterCardView: React.FC<CharacterCardProps> = ({
   character,
   selected = false,
   eliminated = false,
   onClick,
+  onPick,
   className,
   size = "md"
 }) => {
+  const interactive = Boolean(onClick || onPick);
+  const handleClick = () => {
+    onClick?.();
+    onPick?.(character.id);
+  };
   const alignmentClass = alignmentColors[character.alignment?.toLowerCase()] || alignmentColors.neutral;
   const compact = size === "sm";
 
@@ -90,7 +99,7 @@ export const CharacterCard: React.FC<CharacterCardProps> = ({
           <h3 className={cn("font-display font-bold leading-tight text-white drop-shadow", compact ? "text-xs" : "text-base")}>
             {character.name}
           </h3>
-          <p className={cn("text-white/75 font-semibold uppercase tracking-wider truncate", compact ? "text-[9px]" : "text-[10px]")}>
+          <p className={cn("text-white/75 font-semibold uppercase tracking-wider truncate", compact ? "text-[10px]" : "text-[11px]")}>
             {character.anime}
           </p>
         </div>
@@ -105,11 +114,11 @@ export const CharacterCard: React.FC<CharacterCardProps> = ({
         <div className="p-2 flex flex-col gap-1.5 text-left">
           <div className="grid grid-cols-2 gap-1">
             <div className="flex flex-col bg-muted/30 rounded p-1">
-              <span className="text-[10px] uppercase text-muted-foreground font-bold">Cheveux</span>
+              <span className="text-[11px] uppercase text-muted-foreground font-bold">Cheveux</span>
               <span className="font-semibold text-xs capitalize truncate">{fr.hair(character.hairColor)}</span>
             </div>
             <div className="flex flex-col bg-muted/30 rounded p-1">
-              <span className="text-[10px] uppercase text-muted-foreground font-bold">Yeux</span>
+              <span className="text-[11px] uppercase text-muted-foreground font-bold">Yeux</span>
               <span className="font-semibold text-xs capitalize truncate">{fr.eyes(character.eyeColor)}</span>
             </div>
           </div>
@@ -127,19 +136,19 @@ export const CharacterCard: React.FC<CharacterCardProps> = ({
 
   const classes = cn(
     "relative block w-full rounded-xl border-2 overflow-hidden bg-card text-card-foreground select-none",
-    onClick && "cursor-pointer anime-card-hover focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/50",
+    interactive && "cursor-pointer anime-card-hover focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/50",
     selected && "border-primary ring-4 ring-primary/20",
     !selected && "border-card-border",
     eliminated && "eliminated-card",
     className
   );
 
-  if (!onClick) return <div className={classes}>{content}</div>;
+  if (!interactive) return <div className={classes}>{content}</div>;
 
   return (
     <button
       type="button"
-      onClick={onClick}
+      onClick={handleClick}
       className={classes}
       aria-label={`${character.name} (${character.anime})${eliminated ? ", éliminé" : ""}`}
       aria-pressed={selected || eliminated}
@@ -148,3 +157,6 @@ export const CharacterCard: React.FC<CharacterCardProps> = ({
     </button>
   );
 };
+
+// Redraw a card only when its own data changes.
+export const CharacterCard = React.memo(CharacterCardView);

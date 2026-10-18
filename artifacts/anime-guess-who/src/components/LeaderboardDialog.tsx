@@ -1,4 +1,5 @@
 import React, { useEffect } from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useGetLeaderboard, getGetLeaderboardQueryKey } from "@workspace/api-client-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Trophy, Flame, Loader2 } from "lucide-react";
@@ -7,14 +8,23 @@ import { cn } from "@/lib/utils";
 
 const MEDALS = ["🥇", "🥈", "🥉"];
 
+// This dialog is the only place that fetches with react-query, so it brings
+// its own client and the app loads the library only when it is first opened.
+const queryClient = new QueryClient();
+
 const Stat: React.FC<{ label: string; value: React.ReactNode }> = ({ label, value }) => (
   <div className="flex flex-col items-center bg-muted/40 rounded-lg py-2">
     <span className="font-display font-black text-xl tabular-nums">{value}</span>
-    <span className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground">{label}</span>
+    <span className="text-[11px] uppercase font-bold tracking-wider text-muted-foreground">{label}</span>
   </div>
 );
 
-export const LeaderboardDialog: React.FC<{ open: boolean; onOpenChange: (open: boolean) => void }> = ({ open, onOpenChange }) => {
+interface LeaderboardDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}
+
+const LeaderboardDialogContent: React.FC<LeaderboardDialogProps> = ({ open, onOpenChange }) => {
   const { myStats, refreshMyStats } = useGame();
   const leaderboard = useGetLeaderboard({
     query: { queryKey: getGetLeaderboardQueryKey(), enabled: open, staleTime: 15_000 },
@@ -53,13 +63,13 @@ export const LeaderboardDialog: React.FC<{ open: boolean; onOpenChange: (open: b
               <div className="grid grid-cols-3 gap-2">
                 <Stat label="Score" value={stats.rating} />
                 <Stat label="Rang" value={stats.rank ? `#${stats.rank}` : "—"} />
-                <Stat label="Victoires" value={`${winRate} %`} />
+                <Stat label="Taux de victoire" value={`${winRate} %`} />
                 <Stat label="Parties" value={stats.gamesPlayed} />
                 <Stat label="Gagnées" value={stats.wins} />
                 <Stat label="Meilleure série" value={stats.bestStreak} />
               </div>
               {stats.currentStreak >= 2 && (
-                <p className="text-sm font-bold text-orange-500 flex items-center gap-1">
+                <p className="text-sm font-bold text-orange-700 flex items-center gap-1">
                   <Flame className="w-4 h-4" /> {stats.currentStreak} victoires d’affilée !
                 </p>
               )}
@@ -96,7 +106,7 @@ export const LeaderboardDialog: React.FC<{ open: boolean; onOpenChange: (open: b
                       {MEDALS[entry.rank - 1] ?? entry.rank}
                     </span>
                     <span className="flex-1 truncate">{entry.name}{isMe && " (toi)"}</span>
-                    <span className="text-xs text-muted-foreground tabular-nums">{entry.wins} V · {entry.losses} D</span>
+                    <span className="text-xs text-muted-foreground tabular-nums">{entry.rankedGames} parties</span>
                     <span className="w-12 text-right font-display font-black tabular-nums">{entry.rating}</span>
                   </li>
                 );
@@ -108,3 +118,9 @@ export const LeaderboardDialog: React.FC<{ open: boolean; onOpenChange: (open: b
     </Dialog>
   );
 };
+
+export const LeaderboardDialog: React.FC<LeaderboardDialogProps> = (props) => (
+  <QueryClientProvider client={queryClient}>
+    <LeaderboardDialogContent {...props} />
+  </QueryClientProvider>
+);
