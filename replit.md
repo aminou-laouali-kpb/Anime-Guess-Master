@@ -1,48 +1,83 @@
-# [Project name]
+# AnimeWho — Qui est-ce ? version anime
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+Jeu en ligne à deux joueurs, en français : chacun choisit en secret un personnage d'anime parmi 24 tirés au hasard, puis on se pose des questions à tour de rôle pour deviner le personnage de l'adversaire. Parties rapides (appariement automatique), parties privées (code à 6 caractères) et parties contre l'ordinateur (3 niveaux).
 
-## Run & Operate
+## Lancer et exploiter
 
-- `pnpm --filter @workspace/api-server run dev` — run the API server (port 5000)
-- `pnpm run typecheck` — full typecheck across all packages
-- `pnpm run build` — typecheck + build all packages
-- `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
-- `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
-- Optional env: `DATABASE_URL` — Postgres connection string. Enables player stats and the leaderboard (tables are created on startup); without it the game runs and those features are hidden.
-- Optional env: `SITE_URL` — public address of the site (e.g. `https://anime-guess-master.replit.app`), used to make the link-preview image URL absolute at build time.
-- Optional env: `ALLOWED_ORIGINS` — comma-separated extra origins allowed by CORS (same-origin only by default).
-- Optional env: `TRUSTED_PROXY_HOPS` — number of proxies in front of the API that append to `X-Forwarded-For` (default 1, Replit's proxy). The client IP is read from the right of that header, never the left (forgeable). On startup the server logs `Client IP taken from X-Forwarded-For` with the entry count, to check this setting.
+- `pnpm --filter @workspace/api-server run dev` — serveur API + temps réel (port 8080, fixé par Replit)
+- `pnpm --filter @workspace/anime-guess-who run dev` — interface web (port 20021, fixé par Replit)
+- `pnpm run typecheck` — vérification des types de tout le dépôt
+- `pnpm run test` — tous les tests (voir « Tests »)
+- `pnpm run build` — types + construction de tous les paquets (hors `mockup-sandbox`)
+- `pnpm --filter @workspace/api-spec run codegen` — régénère les clients et schémas Zod depuis `lib/api-spec/openapi.yaml`
+- `pnpm --filter @workspace/db run push` — applique un changement de schéma à la base (à la main, voir « Pièges »)
 
-## Stack
+### Variables d'environnement (toutes optionnelles)
+
+| Variable | Rôle |
+|---|---|
+| `DATABASE_URL` | Connexion Postgres. Active les statistiques et le classement (les tables sont créées au démarrage). Sans elle, le jeu fonctionne et ces fonctions sont masquées. |
+| `SITE_URL` | Adresse publique du site (ex. `https://anime-guess-master.replit.app`). Sert, à la **construction**, à rendre absolue l'URL de l'image d'aperçu et à ajouter l'adresse canonique. |
+| `ALLOWED_ORIGINS` | Origines supplémentaires autorisées (CORS et WebSocket), séparées par des virgules. Par défaut : même site uniquement. |
+| `TRUSTED_PROXY_HOPS` | Nombre de proxys devant l'API qui complètent `X-Forwarded-For` (défaut 1 = proxy de Replit). L'adresse du joueur est lue **à droite** de cet en-tête, jamais à gauche (falsifiable). Au démarrage, le serveur logge `Client IP taken from X-Forwarded-For` avec le nombre d'entrées, pour vérifier ce réglage. |
+| `GAME_TIME_SCALE` | **Tests uniquement** : accélère tous les chronos (0.05 = 20 fois plus vite). Toujours 1 en production. |
+
+## Pile technique
 
 - pnpm workspaces, Node.js 24, TypeScript 5.9
-- API: Express 5
-- DB: PostgreSQL + Drizzle ORM
-- Validation: Zod (`zod/v4`), `drizzle-zod`
-- API codegen: Orval (from OpenAPI spec)
-- Build: esbuild (CJS bundle)
+- API : Express 5 + Socket.IO 4, journaux Pino
+- Interface : React 19, Vite 7, Tailwind 4, composants Radix, animations en CSS pur
+- Base (optionnelle) : PostgreSQL + Drizzle ORM
+- Génération de code : Orval (clients et schémas Zod depuis OpenAPI)
+- Tests : Vitest, plus des clients Socket.IO réels contre un vrai serveur
 
-## Where things live
+## Où se trouvent les choses
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+| Quoi | Où |
+|---|---|
+| Moteur de jeu (salles, tours, chronos, ordinateur) | `artifacts/api-server/src/lib/game-engine.ts` |
+| Stratégie de l'ordinateur (fonctions pures) | `artifacts/api-server/src/lib/bot.ts` |
+| Statistiques, Elo, classement | `artifacts/api-server/src/lib/stats.ts` |
+| Limites de débit, adresse IP du client | `artifacts/api-server/src/lib/rate-limit.ts` |
+| Contrôle d'origine des WebSocket | `artifacts/api-server/src/lib/origin.ts` |
+| Portraits (AniList) | `artifacts/api-server/src/lib/character-images.ts` |
+| Personnages (74) | `artifacts/api-server/src/data/characters.json` |
+| Création du serveur (réutilisée par les tests) | `artifacts/api-server/src/server.ts` |
+| État du jeu côté navigateur | `artifacts/anime-guess-who/src/context/GameContext.tsx` |
+| Protocole temps réel (types des événements) | `artifacts/anime-guess-who/src/lib/socket.ts` |
+| Écrans | `artifacts/anime-guess-who/src/pages/` |
+| Traductions des caractéristiques | `artifacts/anime-guess-who/src/lib/fr.ts` |
+| Schéma de base | `lib/db/src/schema/` et `lib/db/src/ensure-schema.ts` |
+| Contrat HTTP | `lib/api-spec/openapi.yaml` |
 
-## Architecture decisions
+## Décisions d'architecture
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+- **Tout l'état des parties est en mémoire**, dans un seul processus. D'où le déploiement en **Reserved VM** (`.replit`) : l'autoscale pourrait séparer les deux joueurs ou arrêter le serveur en pleine partie. Un redéploiement met fin aux parties en cours.
+- **Le serveur est l'arbitre.** Le personnage secret n'est jamais envoyé avant la fin de la partie ; chaque joueur reçoit son propre message de fin avec le personnage de *l'autre*.
+- **Identité des joueurs** : un jeton de session secret (handshake Socket.IO), distinct de l'identifiant public affiché aux autres. Un rechargement ou une coupure rend sa place au joueur (45 s de grâce avant l'abandon) ; le chrono se met en pause pendant l'absence et reprend avec le temps restant.
+- **Questions vérifiées** : le joueur choisit un trait et une valeur, le serveur répond à partir de `characters.json` (liste blanche de 8 traits). Impossible de mentir. Les questions libres existent aussi (marquées « non vérifiée », récapitulatif en fin de partie).
+- **Chronos** : 90 s pour choisir, 60 s par tour, 45 s pour répondre ; le dépassement coûte une vie.
+- **L'ordinateur est un joueur ordinaire** côté serveur : mêmes règles, mêmes chronos. Il ne connaît que la grille et les réponses à ses propres questions. Ses parties ne comptent ni dans les statistiques ni dans le classement.
+- **Classement** : Elo (départ 1000, K = 32), uniquement pour les parties rapides entre deux adresses et deux profils différents, première manche seulement (jamais les revanches), 2 parties classées par paire et par jour au maximum. Pas de comptes : le navigateur garde un jeton de profil dont seule l'empreinte SHA-256 est stockée.
+- **Statistiques facultatives** : sans `DATABASE_URL`, tout le reste fonctionne.
 
-## Product
+## Tests
 
-_Describe the high-level user-facing capabilities of this app once they exist._
+`pnpm run test` lance Vitest dans chaque paquet.
 
-## User preferences
+- `api-server` : tests unitaires (adresse IP, Elo, force de l'ordinateur, données des personnages) et tests d'intégration avec de vrais sockets (partie complète, secrets, reconnexion, chronos, réactions, ordinateur, sécurité).
+- Les tests du classement (`stats.test.ts`) ont besoin d'une base : ils sont **sautés** sans `DATABASE_URL`. La CI en fournit une.
+- `anime-guess-who` : chaque valeur des fiches a une traduction française, chaque question est bien formée.
+- La CI GitHub (`.github/workflows/ci.yml`) lance types, tests et construction à chaque PR, plus un audit des dépendances (informatif).
 
-_Populate as you build — explicit user instructions worth remembering across sessions._
+## Pièges
 
-## Gotchas
+- **Ajouter un personnage** : renseigner tous les champs dans `characters.json` avec des valeurs en minuscules déjà connues, et vérifier la traduction dans `fr.ts` (le test web le rappelle). Deux personnages qui ne diffèrent sur aucun des 8 traits rendent la partie indevinable : le test de données refuse tout nouveau cas (seuls Edward et Alphonse Elric sont connus).
+- **Les images** viennent d'AniList à chaque démarrage. Si l'une est fausse ou manque, ajouter `"image": "https://…"` sur le personnage.
+- **Schéma de base** : les tables sont créées automatiquement, mais un *changement* de schéma se fait à la main avec `db push`. `ensure-schema.ts` doit rester identique à ce que produit Drizzle (mêmes noms de contraintes).
+- **Protocole temps réel** : les types des événements sont écrits à la main dans `socket.ts` (client) et dans `game-engine.ts` (serveur). Les modifier ensemble.
+- `artifacts/mockup-sandbox` sert à la maquette Replit : il n'est pas déployé et est exclu des commandes `typecheck`, `build` et `test` de la racine.
 
-_Populate as you build — sharp edges, "always run X before Y" rules._
+## Pour aller plus loin
 
-## Pointers
-
-- See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details
+- Voir le skill `pnpm-workspace` pour la structure du dépôt et la configuration TypeScript.
