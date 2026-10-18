@@ -1,17 +1,8 @@
 import { Character } from "@workspace/api-client-react";
+import type { VerifiableAttribute } from "@workspace/game-protocol";
 import { fr } from "./fr";
 
-// Questions the server answers itself from the character data (no lying).
-// Must match VERIFIABLE_ATTRIBUTES in the API server's game engine.
-export type VerifiableAttribute =
-  | "hairColor"
-  | "eyeColor"
-  | "gender"
-  | "ageRange"
-  | "species"
-  | "alignment"
-  | "role"
-  | "anime";
+export type { VerifiableAttribute };
 
 export const ATTRIBUTES: { key: VerifiableAttribute; label: string }[] = [
   { key: "hairColor", label: "Cheveux" },

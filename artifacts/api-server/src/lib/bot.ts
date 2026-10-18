@@ -2,9 +2,10 @@
 // sees the board and the answers to its own questions, never the human's
 // secret character, so it plays fair.
 
-export type BotLevel = "easy" | "normal" | "hard";
+import { BOT_LEVELS, VERIFIABLE_ATTRIBUTES, type BotLevel } from "@workspace/game-protocol";
 
-export const BOT_LEVELS: readonly BotLevel[] = ["easy", "normal", "hard"];
+export { BOT_LEVELS };
+export type { BotLevel };
 
 export const BOT_NAMES: Record<BotLevel, string> = {
   easy: "Ordinateur (facile)",
@@ -12,18 +13,7 @@ export const BOT_NAMES: Record<BotLevel, string> = {
   hard: "Ordinateur (difficile)",
 };
 
-// Traits the bot can ask about (same whitelist as verified questions).
-export const BOT_ATTRIBUTES = [
-  "hairColor",
-  "eyeColor",
-  "gender",
-  "ageRange",
-  "species",
-  "alignment",
-  "role",
-  "anime",
-] as const;
-type Attribute = (typeof BOT_ATTRIBUTES)[number];
+type Attribute = (typeof VERIFIABLE_ATTRIBUTES)[number];
 
 export type BotCharacter = { id: string } & Record<Attribute, string>;
 
@@ -59,7 +49,7 @@ interface Question {
 // Every question that would actually tell the bot something.
 function usefulQuestions(candidates: BotCharacter[]): Question[] {
   const questions: Question[] = [];
-  for (const attribute of BOT_ATTRIBUTES) {
+  for (const attribute of VERIFIABLE_ATTRIBUTES) {
     // Keyed case-insensitively, but keeps the original spelling for display.
     const counts = new Map<string, { value: string; yes: number }>();
     for (const c of candidates) {

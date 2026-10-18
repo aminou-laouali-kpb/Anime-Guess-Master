@@ -1,5 +1,17 @@
 import { randomBytes } from "crypto";
-import type { Server as SocketIOServer, Socket } from "socket.io";
+import type { Server, Socket } from "socket.io";
+import {
+  REACTIONS,
+  VERIFIABLE_ATTRIBUTES,
+  type BoardCharacter,
+  type ClientToServerEvents,
+  type GameOverReason,
+  type LogEntry,
+  type RoomMode,
+  type RoomPhase,
+  type ServerToClientEvents,
+  type VerifiableAttribute,
+} from "@workspace/game-protocol";
 import characters from "../data/characters.json" with { type: "json" };
 import { imageUrlFor } from "./character-images";
 import { logger } from "./logger";
@@ -34,33 +46,8 @@ export interface CharacterWithImage extends Omit<Character, "image"> {
   imageUrl: string | null;
 }
 
-export type LogEntry =
-  | {
-      type: "qna";
-      answer: "yes" | "no";
-      askerId: string;
-      // Free question: typed by the asker, answered (honestly or not) by the opponent.
-      question: string | null;
-      // Verified question: a trait/value pair the server answers from the data.
-      verified: boolean;
-      attribute: VerifiableAttribute | null;
-      value: string | null;
-    }
-  | { type: "guess"; guesserId: string; guessedCharacterId: string }
-  | { type: "timeout"; playerId: string };
-
-// Traits the server can check itself, so the answer can't be a lie.
-export const VERIFIABLE_ATTRIBUTES = [
-  "hairColor",
-  "eyeColor",
-  "gender",
-  "ageRange",
-  "species",
-  "alignment",
-  "role",
-  "anime",
-] as const;
-export type VerifiableAttribute = (typeof VERIFIABLE_ATTRIBUTES)[number];
+export type { LogEntry, VerifiableAttribute };
+export { VERIFIABLE_ATTRIBUTES, REACTIONS };
 
 function readAttribute(raw: unknown): VerifiableAttribute | null {
   return VERIFIABLE_ATTRIBUTES.find((a) => a === raw) ?? null;
@@ -79,14 +66,12 @@ export interface Player {
   isReady: boolean;
 }
 
-export type RoomPhase = "waiting" | "selection" | "playing" | "ended";
-
-export type GameOverReason = "correct_guess" | "out_of_lives" | "opponent_left";
+export type { RoomPhase, GameOverReason };
 
 export interface Room {
   code: string;
   phase: RoomPhase;
-  mode: "quick" | "private" | "bot"; // only quick-play games count for the leaderboard
+  mode: RoomMode; // only quick-play games count for the leaderboard
   round: number; // 1 for the first game, +1 per rematch (rematches are never ranked)
   botLevel: BotLevel | null;
   botTimer: NodeJS.Timeout | null;
@@ -128,8 +113,6 @@ interface Session {
 
 const MAX_LIVES = 3;
 
-// Reactions are picked from a fixed set: no free text, nothing to moderate.
-export const REACTIONS = ["👍", "😂", "😮", "😅", "🤔", "😱", "🔥", "👏"] as const;
 const REACTION_COOLDOWN_MS = 1_000;
 // Questions are free, so cap them: a game can't grow (or last) forever.
 const MAX_QUESTIONS_PER_GAME = 60;
@@ -340,13 +323,22 @@ function pickRandomCharacterId(room: Room): string {
 
 // ─── Socket.IO game logic ─────────────────────────────────────────────────────
 
-export function setupGameEngine(io: SocketIOServer): void {
-  function socketOf(session: Session | undefined): Socket | undefined {
+// The wire contract lives in @workspace/game-protocol, so every emit and
+// handler below is checked against it.
+export type GameServer = Server<ClientToServerEvents, ServerToClientEvents>;
+type GameSocket = Socket<ClientToServerEvents, ServerToClientEvents>;
+
+export function setupGameEngine(io: GameServer): void {
+  function socketOf(session: Session | undefined): GameSocket | undefined {
     return session?.socketId ? io.sockets.sockets.get(session.socketId) : undefined;
   }
 
-  function emitToPlayer(player: Player, event: string, payload?: unknown): void {
-    socketOf(sessions.get(player.token))?.emit(event, payload);
+  function emitToPlayer<E extends keyof ServerToClientEvents>(
+    player: Player,
+    event: E,
+    ...args: Parameters<ServerToClientEvents[E]>
+  ): void {
+    socketOf(sessions.get(player.token))?.emit(event, ...args);
   }
 
   function roomOf(session: Session): Room | undefined {
@@ -761,7 +753,7 @@ export function setupGameEngine(io: SocketIOServer): void {
     sessions.delete(session.token);
   }
 
-  function attachSession(socket: Socket): Session {
+  function attachSession(socket: GameSocket): Session {
     const auth = payloadOf(socket.handshake.auth);
     const token =
       typeof auth["token"] === "string" && TOKEN_RE.test(auth["token"])
@@ -825,7 +817,7 @@ export function setupGameEngine(io: SocketIOServer): void {
     next();
   });
 
-  io.on("connection", (socket: Socket) => {
+  io.on("connection", (socket: GameSocket) => {
     const session = attachSession(socket);
     const bucket = new TokenBucket(EVENT_BURST, EVENTS_PER_SECOND);
     let droppedEvents = 0;
@@ -852,8 +844,10 @@ export function setupGameEngine(io: SocketIOServer): void {
       // Not calling next(): the packet is dropped.
     });
 
-    function on(event: string, handler: (payload: Record<string, unknown>) => void) {
-      socket.on(event, (raw: unknown) => {
+    // The event name must exist in the contract. The payload stays untyped on
+    // purpose: it comes from the client, so each handler validates it itself.
+    function on(event: keyof ClientToServerEvents, handler: (payload: Record<string, unknown>) => void) {
+      (socket as Socket).on(event, (raw: unknown) => {
         try {
           handler(payloadOf(raw));
         } catch (err) {

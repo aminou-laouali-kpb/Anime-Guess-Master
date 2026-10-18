@@ -44,7 +44,7 @@ Jeu en ligne à deux joueurs, en français : chacun choisit en secret un personn
 | Personnages (99) | `artifacts/api-server/src/data/characters.json` |
 | Création du serveur (réutilisée par les tests) | `artifacts/api-server/src/server.ts` |
 | État du jeu côté navigateur | `artifacts/anime-guess-who/src/context/GameContext.tsx` |
-| Protocole temps réel (types des événements) | `artifacts/anime-guess-who/src/lib/socket.ts` |
+| Protocole temps réel (types des événements) | `lib/game-protocol/src/index.ts` (partagé client/serveur) |
 | Écrans | `artifacts/anime-guess-who/src/pages/` |
 | Traductions des caractéristiques | `artifacts/anime-guess-who/src/lib/fr.ts` |
 | Schéma de base | `lib/db/src/schema/` et `lib/db/src/ensure-schema.ts` |
@@ -75,7 +75,7 @@ Jeu en ligne à deux joueurs, en français : chacun choisit en secret un personn
 - **Ajouter un personnage** : renseigner tous les champs dans `characters.json` avec des valeurs en minuscules déjà connues, et vérifier la traduction dans `fr.ts` (le test web le rappelle). Deux personnages qui ne diffèrent sur aucun des 8 traits rendent la partie indevinable : le test de données refuse tout nouveau cas (seuls Edward et Alphonse Elric sont connus).
 - **Les images** viennent d'AniList à chaque démarrage. Si l'une est fausse ou manque, ajouter `"image": "https://…"` sur le personnage.
 - **Schéma de base** : les tables sont créées automatiquement, mais un *changement* de schéma se fait à la main avec `db push`. `ensure-schema.ts` doit rester identique à ce que produit Drizzle (mêmes noms de contraintes).
-- **Protocole temps réel** : les types des événements sont écrits à la main dans `socket.ts` (client) et dans `game-engine.ts` (serveur). Les modifier ensemble.
+- **Protocole temps réel** : les événements, leurs payloads, `REACTIONS`, `VERIFIABLE_ATTRIBUTES` et `BotLevel` vivent dans `lib/game-protocol`, importé par le client et le serveur (le serveur est typé `Server<ClientToServerEvents, ServerToClientEvents>`). Un changement de contrat se fait à un seul endroit ; le compilateur signale l’autre côté.
 - `artifacts/mockup-sandbox` sert à la maquette Replit : il n'est pas déployé et est exclu des commandes `typecheck`, `build` et `test` de la racine.
 
 ## Pour aller plus loin
