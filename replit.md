@@ -41,7 +41,7 @@ Jeu en ligne à deux joueurs, en français : chacun choisit en secret un personn
 | Limites de débit, adresse IP du client | `artifacts/api-server/src/lib/rate-limit.ts` |
 | Contrôle d'origine des WebSocket | `artifacts/api-server/src/lib/origin.ts` |
 | Portraits (AniList) | `artifacts/api-server/src/lib/character-images.ts` |
-| Personnages (74) | `artifacts/api-server/src/data/characters.json` |
+| Personnages (99) | `artifacts/api-server/src/data/characters.json` |
 | Création du serveur (réutilisée par les tests) | `artifacts/api-server/src/server.ts` |
 | État du jeu côté navigateur | `artifacts/anime-guess-who/src/context/GameContext.tsx` |
 | Protocole temps réel (types des événements) | `artifacts/anime-guess-who/src/lib/socket.ts` |
