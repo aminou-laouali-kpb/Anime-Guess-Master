@@ -2,7 +2,7 @@ import { logger } from "./lib/logger";
 import { createGameServer } from "./server";
 import { loadCharacterImages } from "./lib/character-images";
 import { initStats } from "./lib/stats";
-import { beginShutdown } from "./lib/game-engine";
+import { beginShutdown } from "./lib/engine";
 import characters from "./data/characters.json" with { type: "json" };
 
 const rawPort = process.env["PORT"];

@@ -5,7 +5,7 @@ import { type TestServer, TestClient, connectClient, startServer, wait } from ".
 const hasDatabase = Boolean(process.env["DATABASE_URL"]);
 
 let server: TestServer;
-let query: (sql: string) => Promise<{ rows: Record<string, any>[] }>;
+let query: (sql: string) => Promise<{ rows: Record<string, unknown>[] }>;
 const open: { close: () => void }[] = [];
 const track = <T extends { close: () => void }>(c: T): T => (open.push(c), c);
 
@@ -16,7 +16,7 @@ const newPlayer = async (opts: { ip?: string; profile?: string } = {}) =>
 
 async function myStats(client: TestClient) {
   client.emit("get_my_stats");
-  return (await client.next("my_stats"))["stats"] as Record<string, any> | null;
+  return (await client.next("my_stats"))["stats"] as Record<string, unknown> | null;
 }
 
 /** Quick-match `winner` against `loser`; `winner` guesses right. Resolves with `winner`'s rating update. */
@@ -162,7 +162,7 @@ describe.skipIf(!hasDatabase)("player stats and leaderboard (Postgres)", () => {
     const [a, b] = [await newPlayer(), await newPlayer()];
     const results: boolean[] = [];
     for (let i = 0; i < 3; i++) {
-      results.push((await playQuickGame(a, b))["ranked"]);
+      results.push((await playQuickGame(a, b))["ranked"] as boolean);
       await leave(a, b);
     }
     expect(results).toEqual([true, true, false]);
@@ -241,7 +241,7 @@ describe.skipIf(!hasDatabase)("player stats and leaderboard (Postgres)", () => {
       await leave(alice, opponent);
     }
     const res = await fetch(`${server.url}/api/leaderboard`, { headers: { "X-Forwarded-For": "203.0.113.250" } });
-    const board = (await res.json()) as { enabled: boolean; entries: Record<string, any>[] };
+    const board = (await res.json()) as { enabled: boolean; entries: Record<string, unknown>[] };
     expect(board.enabled).toBe(true);
     expect(board.entries).toHaveLength(1);
     expect(board.entries[0]).toMatchObject({ rank: 1, rankedGames: 5, wins: 5, losses: 0 });

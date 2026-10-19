@@ -1,7 +1,7 @@
 import type { AddressInfo } from "net";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createGameServer } from "../server";
-import { SHUTDOWN_MESSAGE, beginShutdown } from "../lib/game-engine";
+import { SHUTDOWN_MESSAGE, beginShutdown } from "../lib/engine";
 import { type TestServer, connectClient, startPrivateGame, wait } from "./helpers";
 
 // beginShutdown flips module state for good: this file has its own module

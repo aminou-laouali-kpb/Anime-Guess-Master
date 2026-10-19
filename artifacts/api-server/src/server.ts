@@ -3,7 +3,7 @@ import { Server as SocketIOServer } from "socket.io";
 import type { ClientToServerEvents, ServerToClientEvents } from "@workspace/game-protocol";
 import app, { allowedOrigins } from "./app";
 import { makeOriginCheck } from "./lib/origin";
-import { setupGameEngine } from "./lib/game-engine";
+import { setupGameEngine } from "./lib/engine";
 
 // Builds the HTTP + Socket.IO server without listening, so tests can start it
 // on any port.
