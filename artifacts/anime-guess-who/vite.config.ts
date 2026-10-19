@@ -53,6 +53,11 @@ function absoluteShareImage(): Plugin {
   };
 }
 
+// Libraries every screen needs: React, the socket client and the Radix
+// primitives. (runtimeErrorOverlay below only applies to the dev server.)
+const VENDOR_PACKAGES =
+  /[\\/]node_modules[\\/](?:react|react-dom|scheduler|socket\.io-client|socket\.io-parser|engine\.io-client|engine\.io-parser|@socket\.io[\\/][^\\/]+|@radix-ui[\\/][^\\/]+)[\\/]/;
+
 export default defineConfig({
   base: basePath,
   plugins: [
@@ -90,6 +95,16 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, 'dist/public'),
     emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        // Libraries change far less often than the app: keeping them in their
+        // own file means a deploy doesn't make returning players download
+        // them again.
+        manualChunks(id) {
+          return VENDOR_PACKAGES.test(id) ? 'vendor' : undefined;
+        },
+      },
+    },
   },
   server: {
     port,
