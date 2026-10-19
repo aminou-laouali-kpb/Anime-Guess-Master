@@ -8,7 +8,16 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/).
 
 ### Joueurs
 
-- _Rien pour l’instant._
+- **Classement plus juste** : un abandon ne compte pour le classement que si les deux joueurs ont vraiment joué (au moins 2 coups chacun) ; deux comptes sur le même réseau (y compris IPv6) ne se font plus gagner de points.
+- **Fin des parties sans fin** : chaque joueur dispose de 90 s de déconnexion par partie ; au-delà, la déconnexion compte comme un abandon.
+- **Elo** : K = 40 pour les 10 premières parties classées, puis 20 ; le plancher de score ne crée plus de points.
+- **Ordinateur difficile** plus fort : il devine dès que ses vies couvrent les candidats restants.
+- Couleurs de cheveux et d’yeux regroupées (17 → 12 et 15 → 12) : les questions départagent mieux la grille.
+- **Accessibilité** : tours annoncés aux lecteurs d’écran, titre d’onglet et focus à chaque écran, fenêtre « réponse attendue » vraiment modale, boutons désactivés hors connexion, contrastes et zones sûres sur mobile.
+- Règles affichées une fois aux nouveaux joueurs, astuce « touche une carte pour l’écarter ».
+- Typographie française complète (espaces insécables avant : ; ! ? et dans « »), pluriels et nombres signés.
+- Chargement plus léger (premier téléchargement 139 ko → 32 ko + 99 ko de bibliothèques mises en cache), portraits disponibles dès le démarrage une fois le cache rempli.
+- Avertissement avant un redémarrage du serveur.
 
 ### Développement
 
@@ -18,6 +27,12 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/).
 - `engines.node >= 22` à la racine, `.editorconfig`.
 - Nettoyage : suppression du script `hello` et d’entrées obsolètes de `pnpm-workspace.yaml` (`lib/integrations/*`, `stripe-replit-sync`, réglages liés à Expo).
 - `README.md` et ce journal.
+- Moteur de jeu découpé en modules (`artifacts/api-server/src/lib/engine/`) avec un contexte explicite{S}; types de personnages unifiés avec `BoardCharacter`.
+- Client{S}: état de partie dans un réducteur pur et testé (`gameReducer.ts`), écran de jeu découpé en composants (`components/playing/`), `useReactions()` séparé.
+- Sécurité{S}: clé réseau `networkKey()` (IPv6 par /64) pour les limites par IP, sockets inactives fermées après 10{S}min, codes de salle via `crypto.randomInt`, arrêt propre sur SIGTERM.
+- Index Postgres `games_pair_ranked_idx`{S}; cache d’URL de portraits `character-images.json` et script `fetch-character-images`{S}; service worker minimal pour les fichiers versionnés{S}; WebSocket tenté avant le polling.
+- TypeScript plus strict (`strictFunctionTypes`, `noUnusedLocals`){S}; ESLint sans avertissement.
+- Tests{S}: 107 côté serveur (dont 15 avec Postgres), 87 côté client.
 
 ## 2026-10-18
 

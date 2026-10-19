@@ -8,7 +8,7 @@ Jeu en ligne à deux joueurs, en français : chacun choisit en secret un personn
 - `pnpm --filter @workspace/anime-guess-who run dev` — interface web (port 20021, fixé par Replit)
 - `pnpm run typecheck` — vérification des types de tout le dépôt
 - `pnpm run test` — tous les tests (voir « Tests »)
-- `pnpm run lint` — ESLint sur tout le dépôt (`eslint.config.js` ; 0 erreur exigée par la CI, avertissements tolérés)
+- `pnpm run lint` — ESLint sur tout le dépôt (`eslint.config.js` ; 0 erreur exigée par la CI ; le dépôt est actuellement à 0 avertissement, à garder ainsi)
 - `pnpm run format:check` — Prettier (`.prettierrc`), informatif : le code n'est pas encore formaté
 - `pnpm run build` — types + construction de tous les paquets (hors `mockup-sandbox`)
 - `pnpm --filter @workspace/api-spec run codegen` — régénère les clients et schémas Zod depuis `lib/api-spec/openapi.yaml`
