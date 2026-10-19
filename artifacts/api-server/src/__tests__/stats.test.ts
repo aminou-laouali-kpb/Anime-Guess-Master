@@ -99,23 +99,23 @@ describe.skipIf(!hasDatabase)("player stats and leaderboard (Postgres)", () => {
     expect(await myStats(p)).toBeNull();
   });
 
-  it("ranks a first quick game: +16 / -16 Elo between new players", async () => {
+  it("ranks a first quick game: +20 / -20 Elo between new players (provisional K = 40)", async () => {
     const [a, b] = [await newPlayer(), await newPlayer()];
     const update = await playQuickGame(a, b);
-    expect(update).toMatchObject({ ranked: true, delta: 16, rating: 1016 });
+    expect(update).toMatchObject({ ranked: true, delta: 20, rating: 1020 });
     await b.until(() => b.has("rating_update"), 3000, "the loser's rating update");
-    expect(b.last("rating_update")).toMatchObject({ ranked: true, delta: -16, rating: 984 });
+    expect(b.last("rating_update")).toMatchObject({ ranked: true, delta: -20, rating: 980 });
   });
 
   it("settles a draw with a small Elo transfer and no win or loss", async () => {
     const [a, b] = [await newPlayer(), await newPlayer()];
-    await playQuickGame(a, b); // a: 1016, b: 984
+    await playQuickGame(a, b); // a: 1020, b: 980
     await leave(a, b);
     const drawUpdate = await playQuickGame(a, b, "draw");
     await b.until(() => b.count("rating_update") >= 2, 3000, "the second rating update");
-    // The higher-rated player gives up a point to the lower-rated one.
-    expect(drawUpdate).toMatchObject({ ranked: true, delta: -1, rating: 1015 });
-    expect(b.last("rating_update")).toMatchObject({ ranked: true, delta: 1, rating: 985 });
+    // The higher-rated player gives up two points to the lower-rated one.
+    expect(drawUpdate).toMatchObject({ ranked: true, delta: -2, rating: 1018 });
+    expect(b.last("rating_update")).toMatchObject({ ranked: true, delta: 2, rating: 982 });
     expect(await myStats(a)).toMatchObject({ gamesPlayed: 2, wins: 1, losses: 0, currentStreak: 0 });
     expect(await myStats(b)).toMatchObject({ gamesPlayed: 2, wins: 0, losses: 1, currentStreak: 0 });
   });
@@ -168,8 +168,8 @@ describe.skipIf(!hasDatabase)("player stats and leaderboard (Postgres)", () => {
     expect(results).toEqual([true, true, false]);
   });
 
-  it("counts leaving mid-game as a loss", async () => {
-    const [a, b] = [await newPlayer(), await newPlayer()];
+  /** Quick-matches a and b and starts the game; resolves with whose turn it is. */
+  async function startQuickGame(a: TestClient, b: TestClient) {
     a.emit("join_lobby", { name: "A" });
     await a.next("in_queue");
     b.emit("join_lobby", { name: "B" });
@@ -177,10 +177,47 @@ describe.skipIf(!hasDatabase)("player stats and leaderboard (Postgres)", () => {
     const board = a.last("room_joined")!["characters"] as { id: string }[];
     a.emit("select_character", { characterId: board[0]!.id });
     b.emit("select_character", { characterId: board[1]!.id });
-    await a.until(() => a.has("game_start"));
+    const start = await a.next("game_start");
+    return start["currentTurnPlayerId"] === a.playerId ? { mover: a, other: b } : { mover: b, other: a };
+  }
+
+  it("counts leaving right away as a loss, but doesn't rank it", async () => {
+    const [a, b] = [await newPlayer(), await newPlayer()];
+    await startQuickGame(a, b);
     b.emit("leave_room");
-    expect(await a.next("rating_update")).toMatchObject({ ranked: true, delta: 16 });
-    expect(await myStats(b)).toMatchObject({ losses: 1, currentStreak: 0 });
+    expect(await a.next("rating_update")).toMatchObject({ ranked: false, delta: 0 });
+    expect(await myStats(b)).toMatchObject({ losses: 1, currentStreak: 0, rankedGames: 0, rating: 1000 });
+  });
+
+  it("ranks leaving mid-game once both players have asked two questions", async () => {
+    const [a, b] = [await newPlayer(), await newPlayer()];
+    const { mover, other } = await startQuickGame(a, b);
+    for (const asker of [mover, other, mover, other]) {
+      const answered = asker.count("question_answered");
+      asker.emit("ask_question", { attribute: "gender", value: "male" });
+      await asker.until(() => asker.count("question_answered") > answered, 3000, "the answer");
+    }
+    b.emit("leave_room");
+    expect(await a.next("rating_update")).toMatchObject({ ranked: true, delta: 20 });
+    expect(await myStats(b)).toMatchObject({ losses: 1, rankedGames: 1, rating: 980 });
+  });
+
+  it("doesn't rank leaving when only one player really played", async () => {
+    const [a, b] = [await newPlayer(), await newPlayer()];
+    const { mover, other } = await startQuickGame(a, b);
+    // Three questions in all: the mover asks two, the other one only one.
+    for (const asker of [mover, other, mover]) {
+      const answered = asker.count("question_answered");
+      asker.emit("ask_question", { attribute: "gender", value: "male" });
+      await asker.until(() => asker.count("question_answered") > answered, 3000, "the answer");
+    }
+    other.emit("leave_room");
+    expect(await mover.next("rating_update")).toMatchObject({ ranked: false });
+  });
+
+  it("never ranks a game between two addresses of the same IPv6 /64", async () => {
+    const [a, b] = [await newPlayer({ ip: "2001:db8:5:6::a" }), await newPlayer({ ip: "2001:db8:5:6:ffff::b" })];
+    expect(await playQuickGame(a, b)).toMatchObject({ ranked: false });
   });
 
   it("doesn't record games against the computer", async () => {

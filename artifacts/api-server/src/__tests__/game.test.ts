@@ -45,6 +45,19 @@ describe("robustness", () => {
     expect(probe.connected).toBe(true);
   });
 
+  it("gives private rooms 6-character codes without look-alike characters", async () => {
+    const codes = new Set<string>();
+    for (let i = 0; i < 5; i++) {
+      const c = track(await connectClient(server));
+      c.emit("create_room", { name: "Hôte" });
+      const { code } = await c.next("room_created");
+      expect(code).toMatch(/^[A-HJ-NP-Z2-9]{6}$/);
+      codes.add(code);
+      c.emit("leave_room");
+    }
+    expect(codes.size).toBe(5);
+  });
+
   it("cleans player names", async () => {
     const a = track(await connectClient(server));
     a.emit("create_room", { name: "  Al‮ice​ \n  Dupont  " });
