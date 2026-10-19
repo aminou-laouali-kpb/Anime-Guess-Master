@@ -153,15 +153,15 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     socket.on("character_assigned", ({ characterId }) => {
       dispatch({ type: "character_assigned", characterId });
       const name = stateRef.current.characters.find(c => c.id === characterId)?.name;
-      toast.info(`Temps écoulé ! Ton personnage, choisi au hasard : ${name ?? "?"}.`, { duration: 6000 });
+      toast.info(`Temps écoulé ! Ton personnage, choisi au hasard : ${name ?? "?"}.`, { duration: 6000 });
     });
 
     socket.on("turn_timeout", ({ playerId, lives, currentTurnPlayerId, while: during }) => {
       dispatch({ type: "turn_timeout", playerId, lives, currentTurnPlayerId, logId: newLogId() });
       if (isMe(playerId)) {
         toast.error(during === "answering"
-          ? "Pas de réponse à temps ! Tu perds une vie."
-          : "Temps écoulé ! Tu perds une vie et ton tour.");
+          ? "Pas de réponse à temps ! Tu perds une vie."
+          : "Temps écoulé ! Tu perds une vie et ton tour.");
       } else {
         toast.success("Ton adversaire a dépassé le temps et perd une vie.");
       }
@@ -187,18 +187,18 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     socket.on("wrong_guess", ({ guesserId, guessedCharacterId, lives, currentTurnPlayerId }) => {
       dispatch({ type: "wrong_guess", guesserId, guessedCharacterId, lives, currentTurnPlayerId, logId: newLogId() });
       if (isMe(guesserId)) {
-        toast.error("Raté ! Tu perds une vie.");
+        toast.error("Raté ! Tu perds une vie.");
       } else {
-        toast.success("L’adversaire s’est trompé !");
+        toast.success("L’adversaire s’est trompé !");
       }
     });
 
     socket.on("last_chance", ({ playerId }) => {
       dispatch({ type: "last_chance", playerId });
       if (isMe(playerId)) {
-        toast.info("L’adversaire a trouvé ton personnage ! Dernière chance : devine le sien.", { duration: 6000 });
+        toast.info("L’adversaire a trouvé ton personnage ! Dernière chance : devine le sien.", { duration: 6000 });
       } else {
-        toast.success("Tu as trouvé ! L’adversaire a une dernière chance de deviner.", { duration: 6000 });
+        toast.success("Tu as trouvé ! L’adversaire a une dernière chance de deviner.", { duration: 6000 });
       }
     });
 
@@ -209,14 +209,14 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     socket.on("opponent_disconnected", ({ graceSeconds }) => {
       dispatch({ type: "opponent_disconnected" });
       if (stateRef.current.phase !== "ended") {
-        toast.warning(`Ton adversaire a perdu la connexion. On l’attend jusqu’à ${graceSeconds} s…`);
+        toast.warning(`Ton adversaire a perdu la connexion. On l’attend jusqu’à ${graceSeconds} s…`);
       }
     });
 
     socket.on("opponent_reconnected", () => {
       dispatch({ type: "opponent_reconnected" });
       if (stateRef.current.phase !== "ended") {
-        toast.success("Ton adversaire est de retour !");
+        toast.success("Ton adversaire est de retour !");
       }
     });
 
@@ -233,7 +233,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     socket.on("rematch_requested", ({ byPlayerId }) => {
       dispatch({ type: "rematch_requested", byPlayerId });
       if (!isMe(byPlayerId)) {
-        toast.info("Ton adversaire veut une revanche !");
+        toast.info("Ton adversaire veut une revanche !");
       }
     });
 

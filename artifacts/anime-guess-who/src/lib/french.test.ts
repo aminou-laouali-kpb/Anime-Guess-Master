@@ -111,6 +111,7 @@ describe('French typography in the interface', () => {
     ...sourcesIn('pages/'),
     ...sourcesIn('components/'),
     ...sourcesIn('hooks/'),
+    ...sourcesIn('context/'),
     'lib/questions.ts',
     'lib/fr.ts',
   ];
