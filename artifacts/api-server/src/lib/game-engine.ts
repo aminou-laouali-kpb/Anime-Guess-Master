@@ -1,4 +1,4 @@
-import { randomBytes } from "crypto";
+import { randomBytes, randomInt } from "crypto";
 import type { Server, Socket } from "socket.io";
 import {
   REACTIONS,
@@ -15,7 +15,7 @@ import {
 import characters from "../data/characters.json" with { type: "json" };
 import { imageUrlFor } from "./character-images";
 import { logger } from "./logger";
-import { TokenBucket, clientIp } from "./rate-limit";
+import { TokenBucket, clientIp, networkKey } from "./rate-limit";
 import { BOT_LEVELS, BOT_NAMES, type BotLevel, type BotMemory, chooseBotMove, remainingCandidates } from "./bot";
 import {
   MIN_RANKED_GAMES,
@@ -64,6 +64,10 @@ export interface Player {
   eliminatedIds: string[];
   lives: number;
   isReady: boolean;
+  // Time spent disconnected during this game (see DISCONNECT_BUDGET_MS), and
+  // when the current disconnection started (null while connected).
+  awayMs: number;
+  awaySince: number | null;
 }
 
 export type { RoomPhase, GameOverReason };
@@ -127,6 +131,11 @@ const BOARD_SIZE = 24;
 // Test hook: GAME_TIME_SCALE=0.05 makes every clock 20x faster. Always 1 in production.
 const TIME_SCALE = Number(process.env["GAME_TIME_SCALE"]) > 0 ? Number(process.env["GAME_TIME_SCALE"]) : 1;
 export const RECONNECT_GRACE_MS = 45_000 * TIME_SCALE;
+// The clocks pause while a player is away, so a player could otherwise stall
+// forever by dropping and coming back just before the grace period ends. Each
+// player gets this much disconnected time per game, all disconnections added
+// up; once it is spent, a disconnection is a forfeit (like grace expiry).
+export const DISCONNECT_BUDGET_MS = 90_000 * TIME_SCALE;
 
 // Nobody can stall a game forever: each step has a deadline.
 const SELECTION_TIME_MS = 90_000 * TIME_SCALE;
@@ -137,6 +146,10 @@ const ANSWER_TIME_MS = 45_000 * TIME_SCALE;
 // sessions caps rooms and the matchmaking queue too.
 const MAX_SESSIONS = 2_000;
 const MAX_CONNECTIONS_PER_IP = 20;
+// A socket that sits doing nothing outside a game (not in a room, not in the
+// queue, or alone in a private room nobody joined) is dropped after this
+// long, so idle tabs can't hold the per-network and server-wide caps.
+const IDLE_TIMEOUT_MS = 10 * 60_000 * TIME_SCALE;
 const EVENT_BURST = 20;
 const EVENTS_PER_SECOND = 5;
 const MAX_DROPPED_EVENTS = 100;
@@ -147,6 +160,19 @@ const matchmakingQueue: string[] = []; // tokens
 
 const allCharacters = characters as Character[];
 
+// Cleared when the process is asked to stop (see index.ts): no new game
+// starts, so nobody begins a match that is about to be cut off.
+let acceptingGames = true;
+export const SHUTDOWN_MESSAGE = "Le serveur redémarre, la partie va être interrompue.";
+
+// First step of a graceful shutdown: refuse new games and warn everyone
+// connected. index.ts then closes the server.
+export function beginShutdown(io: GameServer): void {
+  acceptingGames = false;
+  matchmakingQueue.length = 0;
+  io.emit("error", { message: SHUTDOWN_MESSAGE });
+}
+
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 
 const TOKEN_RE = /^[A-Za-z0-9_-]{32}$/;
@@ -155,11 +181,13 @@ function randomId(bytes: number): string {
   return randomBytes(bytes).toString("base64url");
 }
 
+// Private room codes are the only thing keeping strangers out of a private
+// game, so they come from the CSPRNG (Math.random is predictable).
 function generateCode(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   let code = "";
   for (let i = 0; i < 6; i++) {
-    code += chars[Math.floor(Math.random() * chars.length)];
+    code += chars[randomInt(chars.length)];
   }
   return rooms.has(code) ? generateCode() : code;
 }
@@ -207,6 +235,8 @@ function createPlayer(session: Session): Player {
     eliminatedIds: [],
     lives: MAX_LIVES,
     isReady: false,
+    awayMs: 0,
+    awaySince: null,
   };
 }
 
@@ -324,6 +354,22 @@ function timerPayload(room: Room) {
         actingPlayerId: room.timerPlayerId,
         msLeft: Math.max(0, room.timerDeadline - Date.now()),
       };
+}
+
+// A forfeit is only ranked when both players made at least this many moves
+// (a question asked or a wrong guess; timeouts don't count). Two questions
+// each is roughly a minute of real play: cheap for a genuine game that ends
+// in a rage-quit, but it makes "queue, meet my own alt, quit" farming slow.
+export const MIN_MOVES_FOR_RANKED_FORFEIT = 2;
+
+function movesBy(room: Room, player: Player): number {
+  return room.log.filter(
+    (e) => (e.type === "qna" && e.askerId === player.id) || (e.type === "guess" && e.guesserId === player.id),
+  ).length;
+}
+
+function hadRealPlay(room: Room, a: Player, b: Player): boolean {
+  return movesBy(room, a) >= MIN_MOVES_FOR_RANKED_FORFEIT && movesBy(room, b) >= MIN_MOVES_FOR_RANKED_FORFEIT;
 }
 
 function pickRandomCharacterId(room: Room): string {
@@ -515,9 +561,16 @@ export function setupGameEngine(io: GameServer): void {
   // Saves the result for stats and tells each player how their rating moved.
   function reportResult(room: Room, winner: Player, loser: Player, reason: string, draw = false): void {
     if (!statsEnabled || room.mode === "bot") return;
-    // Two players on the same network could be one person farming wins, and
-    // endless rematches between two accounts would farm Elo too.
-    const ranked = room.mode === "quick" && room.round === 1 && winner.ip !== loser.ip;
+    // Two players on the same network (same IPv4 address or IPv6 /64) could
+    // be one person farming wins, and endless rematches between two accounts
+    // would farm Elo too. A forfeit only moves the rating once the game was
+    // really played: otherwise an alt account could queue, meet its main and
+    // quit at once, again and again.
+    const ranked =
+      room.mode === "quick" &&
+      room.round === 1 &&
+      networkKey(winner.ip) !== networkKey(loser.ip) &&
+      (reason !== "forfeit" || hadRealPlay(room, winner, loser));
     recordGame({
       winner: { profileToken: winner.profileToken, name: winner.name },
       loser: { profileToken: loser.profileToken, name: loser.name },
@@ -705,6 +758,7 @@ export function setupGameEngine(io: GameServer): void {
       p.eliminatedIds = [];
       p.lives = MAX_LIVES;
       p.isReady = false;
+      p.awayMs = 0; // a fresh disconnection budget for the new game
     }
 
     io.to(room.code).emit("rematch_started", {
@@ -755,7 +809,7 @@ export function setupGameEngine(io: GameServer): void {
       // The pause scales with the clocks, so it can never outlast the turn clock.
       delay = (1800 + Math.random() * 1500) * TIME_SCALE;
       act = () => playBotTurn(room, bot);
-    } else if (room.phase === "ended" && room.rematchRequestedBy === human.id) {
+    } else if (room.phase === "ended" && room.rematchRequestedBy === human.id && acceptingGames) {
       delay = 900 * TIME_SCALE;
       act = () => startRematch(room);
     }
@@ -781,7 +835,7 @@ export function setupGameEngine(io: GameServer): void {
 
   function playBotTurn(room: Room, bot: Player): void {
     // Only what the bot legitimately knows: the board and its own answers.
-    const memory: BotMemory = { answers: [], wrongGuesses: [] };
+    const memory: BotMemory = { answers: [], wrongGuesses: [], lives: bot.lives };
     for (const entry of room.log) {
       if (entry.type === "qna" && entry.askerId === bot.id && entry.verified && entry.attribute && entry.value) {
         memory.answers.push({ attribute: entry.attribute, value: entry.value, answer: entry.answer });
@@ -855,12 +909,14 @@ export function setupGameEngine(io: GameServer): void {
     return session;
   }
 
-  // Caps how many sockets one IP and the whole server can hold.
+  // Caps how many sockets one network (IPv4 address or IPv6 /64, see
+  // networkKey) and the whole server can hold.
   const connectionsPerIp = new Map<string, number>();
 
   io.use((socket, next) => {
     const ip = clientIp(socket.request);
-    if ((connectionsPerIp.get(ip) ?? 0) >= MAX_CONNECTIONS_PER_IP) {
+    const netKey = networkKey(ip);
+    if ((connectionsPerIp.get(netKey) ?? 0) >= MAX_CONNECTIONS_PER_IP) {
       next(new Error("too_many_connections"));
       return;
     }
@@ -871,7 +927,8 @@ export function setupGameEngine(io: GameServer): void {
       return;
     }
     socket.data.ip = ip;
-    connectionsPerIp.set(ip, (connectionsPerIp.get(ip) ?? 0) + 1);
+    socket.data.netKey = netKey;
+    connectionsPerIp.set(netKey, (connectionsPerIp.get(netKey) ?? 0) + 1);
     next();
   });
 
@@ -879,6 +936,29 @@ export function setupGameEngine(io: GameServer): void {
     const session = attachSession(socket);
     const bucket = new TokenBucket(EVENT_BURST, EVENTS_PER_SECOND);
     let droppedEvents = 0;
+    let lastActivityAt = Date.now();
+
+    // Idle check: re-armed until the socket is in a game or goes away.
+    const isIdle = () => {
+      if (matchmakingQueue.includes(session.token)) return false;
+      const room = roomOf(session);
+      return !room || room.phase === "waiting";
+    };
+    let idleTimer: NodeJS.Timeout | null = null;
+    const checkIdle = () => {
+      idleTimer = null;
+      // Another tab took over: that socket is the one being watched now.
+      if (!socket.connected || session.socketId !== socket.id) return;
+      const quietFor = Date.now() - lastActivityAt;
+      const idle = isIdle();
+      if (idle && quietFor >= IDLE_TIMEOUT_MS) {
+        socket.emit("error", { message: "Déconnecté après un long moment d’inactivité. Recharge la page pour rejouer." });
+        socket.disconnect(true);
+        return;
+      }
+      idleTimer = setTimeout(checkIdle, idle ? IDLE_TIMEOUT_MS - quietFor : IDLE_TIMEOUT_MS);
+    };
+    idleTimer = setTimeout(checkIdle, IDLE_TIMEOUT_MS);
 
     // Wraps every handler so a malformed payload or a bug can never crash
     // the process (which would kill every game in progress), and drops
@@ -886,6 +966,7 @@ export function setupGameEngine(io: GameServer): void {
     // Flood limit on EVERY incoming packet, including event names we don't
     // handle (those used to skip the limit entirely).
     socket.use((_packet, next) => {
+      lastActivityAt = Date.now();
       if (bucket.take()) {
         droppedEvents = 0;
         next();
@@ -927,6 +1008,11 @@ export function setupGameEngine(io: GameServer): void {
 
       const restored = currentRoomAndPlayer();
       if (restored) {
+        const { player } = restored;
+        if (player.awaySince !== null) {
+          player.awayMs += Date.now() - player.awaySince;
+          player.awaySince = null;
+        }
         socket.join(restored.room.code);
         const opponent = opponentOf(restored.room, restored.player);
         if (opponent) emitToPlayer(opponent, "opponent_reconnected");
@@ -942,8 +1028,16 @@ export function setupGameEngine(io: GameServer): void {
       logger.error({ err }, "Failed to restore session");
     }
 
+    // The server is shutting down: no new game.
+    function refuseNewGame(): boolean {
+      if (acceptingGames) return false;
+      socket.emit("error", { message: "Le serveur redémarre : réessaie dans un instant." });
+      return true;
+    }
+
     // ── Join matchmaking queue ───────────────────────────────────────────────
     on("join_lobby", ({ name }) => {
+      if (refuseNewGame()) return;
       session.name = readName(name);
       leaveRoom(session);
 
@@ -977,6 +1071,7 @@ export function setupGameEngine(io: GameServer): void {
 
     // ── Play against the computer ────────────────────────────────────────────
     on("play_vs_bot", ({ name, level }) => {
+      if (refuseNewGame()) return;
       const botLevel = BOT_LEVELS.find((l) => l === level) ?? "normal";
       session.name = readName(name);
       removeFromQueue(session.token);
@@ -997,6 +1092,8 @@ export function setupGameEngine(io: GameServer): void {
         eliminatedIds: [],
         lives: MAX_LIVES,
         isReady: false,
+        awayMs: 0,
+        awaySince: null,
       });
       room.phase = "selection";
       room.characterIds = dealBoard();
@@ -1006,6 +1103,7 @@ export function setupGameEngine(io: GameServer): void {
 
     // ── Create private room ──────────────────────────────────────────────────
     on("create_room", ({ name }) => {
+      if (refuseNewGame()) return;
       session.name = readName(name);
       removeFromQueue(session.token);
       leaveRoom(session);
@@ -1018,6 +1116,7 @@ export function setupGameEngine(io: GameServer): void {
 
     // ── Join private room ────────────────────────────────────────────────────
     on("join_room", ({ code, name }) => {
+      if (refuseNewGame()) return;
       const roomCode = readString(code, 6)?.toUpperCase();
       const room = roomCode ? rooms.get(roomCode) : undefined;
 
@@ -1210,6 +1309,7 @@ export function setupGameEngine(io: GameServer): void {
     on("request_rematch", () => {
       const ctx = currentRoomAndPlayer();
       if (!ctx || ctx.room.phase !== "ended" || ctx.room.players.length < 2) return;
+      if (refuseNewGame()) return;
 
       ctx.room.rematchRequestedBy = ctx.player.id;
       io.to(ctx.room.code).emit("rematch_requested", { byPlayerId: ctx.player.id });
@@ -1223,15 +1323,17 @@ export function setupGameEngine(io: GameServer): void {
       if (room.phase !== "ended" || room.players.length < 2) return;
       // Only the player who did *not* ask can accept.
       if (!room.rematchRequestedBy || room.rematchRequestedBy === player.id) return;
+      if (refuseNewGame()) return;
       startRematch(room);
     });
 
     // ── Disconnect ───────────────────────────────────────────────────────────
     socket.on("disconnect", () => {
-      const ip = socket.data.ip as string;
-      const count = (connectionsPerIp.get(ip) ?? 1) - 1;
-      if (count > 0) connectionsPerIp.set(ip, count);
-      else connectionsPerIp.delete(ip);
+      if (idleTimer) clearTimeout(idleTimer);
+      const netKey = socket.data.netKey as string;
+      const count = (connectionsPerIp.get(netKey) ?? 1) - 1;
+      if (count > 0) connectionsPerIp.set(netKey, count);
+      else connectionsPerIp.delete(netKey);
 
       try {
         // A newer tab took over this session: nothing to clean up.
@@ -1245,9 +1347,16 @@ export function setupGameEngine(io: GameServer): void {
           return;
         }
 
-        // Keep the seat for a while so a reload or a network blip isn't a forfeit.
+        // Keep the seat for a while so a reload or a network blip isn't a
+        // forfeit, within what is left of this game's disconnection budget.
+        let graceMs = RECONNECT_GRACE_MS;
+        const player = room.players.find((p) => p.token === session.token);
+        if (player && (room.phase === "selection" || room.phase === "playing")) {
+          player.awaySince = Date.now();
+          graceMs = Math.min(graceMs, Math.max(0, DISCONNECT_BUDGET_MS - player.awayMs));
+        }
         socket.to(room.code).emit("opponent_disconnected", {
-          graceSeconds: RECONNECT_GRACE_MS / 1000,
+          graceSeconds: graceMs / 1000,
         });
         updateTimer(room); // pauses the clock until they're back
         session.disconnectTimer = setTimeout(() => {
@@ -1258,7 +1367,7 @@ export function setupGameEngine(io: GameServer): void {
           } catch (err) {
             logger.error({ err }, "Failed to end session");
           }
-        }, RECONNECT_GRACE_MS);
+        }, graceMs);
       } catch (err) {
         logger.error({ err }, "Disconnect handler failed");
       }

@@ -1,4 +1,5 @@
 import type { IncomingMessage } from "http";
+import { isIPv4, isIPv6 } from "net";
 import type { RequestHandler } from "express";
 import { logger } from "./logger";
 
@@ -62,7 +63,47 @@ export function clientIp(req: IncomingMessage): string {
   return entries[entries.length - 1] || req.socket.remoteAddress || "unknown";
 }
 
-// Fixed-window limiter for the REST API, keyed by client IP.
+// The unit a per-address limit should count. An IPv4 address is one
+// subscriber (or one NAT), but a single IPv6 subscriber usually gets a whole
+// /64 and can rotate through billions of addresses inside it: so IPv6
+// addresses are grouped by their /64 prefix. IPv4-mapped IPv6 addresses
+// (::ffff:1.2.3.4, how a dual-stack socket reports IPv4 clients) count as
+// the IPv4 address they carry. Anything that isn't an IP is returned as is.
+export function networkKey(ip: string): string {
+  let addr = ip.trim().toLowerCase();
+  if (addr.startsWith("[") && addr.endsWith("]")) addr = addr.slice(1, -1);
+  const zone = addr.indexOf("%"); // fe80::1%eth0
+  if (zone !== -1) addr = addr.slice(0, zone);
+  if (isIPv4(addr)) return addr;
+  if (!isIPv6(addr)) return ip;
+
+  const groups = expandIPv6(addr);
+  // ::ffff:a.b.c.d (also written ::ffff:102:304): an IPv4 client.
+  if (groups.slice(0, 5).every((g) => g === 0) && groups[5] === 0xffff) {
+    const [hi, lo] = [groups[6]!, groups[7]!];
+    return `${hi >> 8}.${hi & 255}.${lo >> 8}.${lo & 255}`;
+  }
+  return `${groups.slice(0, 4).map((g) => g.toString(16)).join(":")}::/64`;
+}
+
+// The eight 16-bit groups of a valid IPv6 address (handles "::" and a
+// trailing dotted IPv4 part).
+function expandIPv6(addr: string): number[] {
+  let text = addr;
+  const dotted = /(\d+)\.(\d+)\.(\d+)\.(\d+)$/.exec(text);
+  if (dotted) {
+    const [a, b, c, d] = dotted.slice(1).map(Number) as [number, number, number, number];
+    text = `${text.slice(0, dotted.index)}${((a << 8) | b).toString(16)}:${((c << 8) | d).toString(16)}`;
+  }
+  const [head, tail] = text.split("::") as [string, string | undefined];
+  const parse = (part: string) => (part ? part.split(":").map((g) => parseInt(g, 16)) : []);
+  const left = parse(head);
+  if (tail === undefined) return left;
+  const right = parse(tail);
+  return [...left, ...new Array<number>(8 - left.length - right.length).fill(0), ...right];
+}
+
+// Fixed-window limiter for the REST API, keyed by client network (see networkKey).
 export function httpRateLimit(maxPerMinute: number): RequestHandler {
   const windows = new Map<string, { count: number; resetAt: number }>();
 
@@ -72,7 +113,7 @@ export function httpRateLimit(maxPerMinute: number): RequestHandler {
   }, 60_000).unref();
 
   return (req, res, next) => {
-    const ip = clientIp(req);
+    const ip = networkKey(clientIp(req));
     const now = Date.now();
     let w = windows.get(ip);
     if (!w || w.resetAt <= now) {

@@ -35,6 +35,27 @@ describe("client address (X-Forwarded-For)", () => {
     }
     expect(tooMany).toBeGreaterThanOrEqual(5);
   });
+
+  it("caps connections per IPv6 /64, so rotating addresses inside it doesn't help", async () => {
+    const clients: TestClient[] = [];
+    for (let i = 0; i < 21; i++) {
+      clients.push(track(new TestClient(server.url, { ip: `2001:db8:77:1::${(i + 1).toString(16)}` })));
+    }
+    await wait(1200);
+    expect(clients.filter((c) => c.connected)).toHaveLength(20);
+    expect(clients.find((c) => !c.connected)!.last("connect_error")?.["message"]).toBe("too_many_connections");
+    // Another /64 is another network.
+    expect(track(await connectClient(server, { ip: "2001:db8:77:2::1" })).connected).toBe(true);
+  });
+
+  it("applies the HTTP rate limit per IPv6 /64", async () => {
+    let tooMany = 0;
+    for (let i = 0; i < 130; i++) {
+      const res = await fetch(`${server.url}/api/healthz`, { headers: { "X-Forwarded-For": `2001:db8:88:1:${i.toString(16)}::1` } });
+      if (res.status === 429) tooMany += 1;
+    }
+    expect(tooMany).toBeGreaterThanOrEqual(5);
+  });
 });
 
 describe("websocket origin", () => {

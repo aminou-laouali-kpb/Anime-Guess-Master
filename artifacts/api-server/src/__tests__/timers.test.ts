@@ -99,6 +99,29 @@ describe("disconnections and the clock", () => {
     expect(left).toBeLessThan(2700);
   });
 
+  it("turns repeated disconnections into a forfeit once the game's disconnection budget is spent", async () => {
+    // Budget 4.5 s per player per game (90 s × 0.05), grace 2.25 s per disconnection.
+    const g = trackGame(await startPrivateGame(server));
+    const { token, profile } = g.b;
+    let staller = g.b;
+    for (let i = 0; i < 2; i++) {
+      staller.socket.disconnect();
+      expect((await g.a.next("opponent_disconnected"))["graceSeconds"]).toBeCloseTo(2.25);
+      await wait(1900); // back just before the grace period ends
+      const reconnected = g.a.next("opponent_reconnected");
+      staller = track(await connectClient(server, { token, profile }));
+      await reconnected;
+    }
+    expect(g.a.has("opponent_left")).toBe(false);
+
+    // ~3.8 s of the 4.5 s budget is gone: this time the seat is only kept for what's left.
+    staller.socket.disconnect();
+    const grace = (await g.a.next("opponent_disconnected"))["graceSeconds"] as number;
+    expect(grace).toBeGreaterThan(0);
+    expect(grace).toBeLessThan(0.8);
+    await g.a.next("opponent_left", 1500);
+  }, 20_000);
+
   it("makes a player lose by forfeit once the grace period runs out", async () => {
     const g = trackGame(await startPrivateGame(server));
     g.b.socket.disconnect();
