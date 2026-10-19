@@ -101,9 +101,16 @@ describe('plural and signed number helpers', () => {
 // never code (ternaries, object keys, types, ?? and ?.).
 describe('French typography in the interface', () => {
   const src = new URL('../', import.meta.url);
+  // Every .ts/.tsx file under a folder, subfolders included (but not the
+  // generic shadcn primitives in components/ui, which hold no French text).
+  const sourcesIn = (dir: string): string[] =>
+    readdirSync(new URL(dir, src), { recursive: true, encoding: 'utf8' })
+      .map((f) => `${dir}${f.replaceAll('\\', '/')}`)
+      .filter((f) => /\.tsx?$/.test(f) && !f.endsWith('.test.ts') && !f.startsWith('components/ui/'));
   const files = [
-    ...readdirSync(new URL('pages/', src)).filter((f) => f.endsWith('.tsx')).map((f) => `pages/${f}`),
-    ...readdirSync(new URL('components/', src)).filter((f) => f.endsWith('.tsx')).map((f) => `components/${f}`),
+    ...sourcesIn('pages/'),
+    ...sourcesIn('components/'),
+    ...sourcesIn('hooks/'),
     'lib/questions.ts',
     'lib/fr.ts',
   ];
@@ -148,7 +155,10 @@ describe('French typography in the interface', () => {
 
   it('finds the interface files', () => {
     expect(files.length).toBeGreaterThan(8);
-    expect(textsOf('pages/Playing.tsx').length).toBeGreaterThan(20);
+    expect(textsOf('pages/Playing.tsx').length).toBeGreaterThan(5);
+    // The game screen's pieces live in subfolders: they must be scanned too.
+    expect(files).toContain('components/playing/AskDialog.tsx');
+    expect(files).toContain('hooks/use-auto-eliminate.ts');
   });
 
   for (const file of files) {
