@@ -52,7 +52,9 @@ export const Portrait: React.FC<{ character: Character; size: "sm" | "md" | "lg"
       <img
         src={character.imageUrl}
         alt=""
-        loading="lazy"
+        // Eager: the 24 cards of a board are on screen (or one scroll away)
+        // as soon as it's dealt, and lazy loading waited for layout first.
+        loading="eager"
         decoding="async"
         referrerPolicy="no-referrer"
         draggable={false}

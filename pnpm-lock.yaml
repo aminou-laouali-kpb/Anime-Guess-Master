@@ -60,6 +60,9 @@ catalogs:
     tailwindcss:
       specifier: ^4.1.14
       version: 4.3.3
+    tsx:
+      specifier: ^4.21.0
+      version: 4.23.15
     vite:
       specifier: ^7.3.2
       version: 7.3.6
@@ -544,7 +547,11 @@ importers:
 
   lib/game-protocol: {}
 
-  scripts: {}
+  scripts:
+    devDependencies:
+      tsx:
+        specifier: 'catalog:'
+        version: 4.23.15
 
 packages:
 

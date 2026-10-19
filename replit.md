@@ -42,7 +42,7 @@ Jeu en ligne à deux joueurs, en français : chacun choisit en secret un personn
 | Statistiques, Elo, classement | `artifacts/api-server/src/lib/stats.ts` |
 | Limites de débit, adresse IP du client | `artifacts/api-server/src/lib/rate-limit.ts` |
 | Contrôle d'origine des WebSocket | `artifacts/api-server/src/lib/origin.ts` |
-| Portraits (AniList) | `artifacts/api-server/src/lib/character-images.ts` |
+| Portraits (AniList) | `artifacts/api-server/src/lib/character-images.ts`, URLs en cache dans `src/data/character-images.json` |
 | Personnages (99) | `artifacts/api-server/src/data/characters.json` |
 | Création du serveur (réutilisée par les tests) | `artifacts/api-server/src/server.ts` |
 | État du jeu côté navigateur | `artifacts/anime-guess-who/src/context/GameContext.tsx` |
@@ -76,9 +76,10 @@ Jeu en ligne à deux joueurs, en français : chacun choisit en secret un personn
 ## Pièges
 
 - **Ajouter un personnage** : renseigner tous les champs dans `characters.json` avec des valeurs en minuscules déjà connues, et vérifier la traduction dans `fr.ts` (le test web le rappelle). Deux personnages qui ne diffèrent sur aucun des 8 traits rendent la partie indevinable : le test de données refuse tout nouveau cas (seuls Edward et Alphonse Elric sont connus).
-- **Les images** viennent d'AniList à chaque démarrage. Si l'une est fausse ou manque, ajouter `"image": "https://…"` sur le personnage.
+- **Les images** : les adresses déjà trouvées sont dans `artifacts/api-server/src/data/character-images.json` (id → URL), utilisées dès le démarrage ; AniList n'est interrogé (~25 s pour tout) que pour les personnages absents de ce fichier. Après un ajout de personnages, régénérer le fichier avec `pnpm --filter @workspace/scripts run fetch-character-images` (réseau requis vers `graphql.anilist.co`), relire le diff et le committer. Si une image est fausse ou manque, ajouter `"image": "https://…"` sur le personnage dans `characters.json` : elle passe avant le cache.
 - **Schéma de base** : les tables sont créées automatiquement, mais un *changement* de schéma se fait à la main avec `db push`. `ensure-schema.ts` doit rester identique à ce que produit Drizzle (mêmes noms de contraintes).
 - **Protocole temps réel** : les événements, leurs payloads, `REACTIONS`, `VERIFIABLE_ATTRIBUTES` et `BotLevel` vivent dans `lib/game-protocol`, importé par le client et le serveur (le serveur est typé `Server<ClientToServerEvents, ServerToClientEvents>`). Un changement de contrat se fait à un seul endroit ; le compilateur signale l’autre côté.
+- **Service worker** (`artifacts/anime-guess-who/public/sw.js`, enregistré en production seulement) : il ne met en cache que les fichiers hachés de `assets/` (jamais `index.html`, `/api` ni les portraits). Ne pas le supprimer simplement du dépôt (l'hébergement répond `index.html` à sa place et l'ancien resterait actif) : pour le retirer, le remplacer par un fichier qui appelle `self.registration.unregister()`.
 - `artifacts/mockup-sandbox` sert à la maquette Replit : il n'est pas déployé et est exclu des commandes `typecheck`, `build` et `test` de la racine.
 
 ## Pour aller plus loin

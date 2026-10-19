@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { SmilePlus, Volume2, VolumeX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { useGame } from "@/context/GameContext";
+import { useGame, useReactions } from "@/context/GameContext";
 import { REACTIONS, Reaction } from "@/lib/socket";
 import { cn } from "@/lib/utils";
 
@@ -22,7 +22,8 @@ const offsetFor = (id: number) => ((id * 37) % 60) - 30;
 
 // Floating emojis: mine rise from the bottom, the opponent's from the top.
 export const FloatingReactions: React.FC = () => {
-  const { reactions, myPlayerId, players } = useGame();
+  const { myPlayerId, players } = useGame();
+  const { reactions } = useReactions();
   if (players.length < 2) return null;
 
   return (

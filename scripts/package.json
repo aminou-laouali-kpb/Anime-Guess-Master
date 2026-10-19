@@ -2,8 +2,13 @@
   "name": "@workspace/scripts",
   "version": "0.0.0",
   "private": true,
-  "description": "Workspace maintenance scripts (shell). post-merge.sh is run by Replit after a merge (see .replit).",
+  "type": "module",
+  "description": "Workspace maintenance scripts. post-merge.sh is run by Replit after a merge (see .replit); fetch-character-images regenerates the cached portrait URLs.",
   "scripts": {
-    "post-merge": "bash ./post-merge.sh"
+    "post-merge": "bash ./post-merge.sh",
+    "fetch-character-images": "tsx ../artifacts/api-server/scripts/fetch-character-images.ts"
+  },
+  "devDependencies": {
+    "tsx": "catalog:"
   }
 }

@@ -68,9 +68,14 @@ export const saveProfileToken = (token: string) => save(PROFILE_KEY, token);
 // /api/socket.io/*) to the API artifact, so no absolute URL is needed.
 // The session token lets the server hand us back our seat after a reload or
 // a dropped connection.
+// WebSocket first: one round trip instead of a polling handshake + upgrade
+// (the server accepts both on the same path, and Replit's proxy forwards the
+// upgrade). tryAllTransports falls back to long-polling when a network blocks
+// WebSockets; reconnection works as before for either transport.
 export const socket: Socket<ServerToClientEvents, ClientToServerEvents> = io({
   path: "/api/socket.io",
   autoConnect: false,
-  transports: ["polling", "websocket"],
+  transports: ["websocket", "polling"],
+  tryAllTransports: true,
   auth: (cb) => cb({ token: loadSessionToken(), profile: load(PROFILE_KEY) }),
 });

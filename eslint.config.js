@@ -58,4 +58,11 @@ export default tseslint.config(
       "react-hooks/exhaustive-deps": "warn",
     },
   },
+  {
+    // Runs as a service worker, not in a page or in Node.
+    files: ["artifacts/anime-guess-who/public/sw.js"],
+    languageOptions: {
+      globals: { ...globals.serviceworker },
+    },
+  },
 );
