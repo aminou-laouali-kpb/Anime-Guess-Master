@@ -20,6 +20,7 @@ const SPECIES: Record<string, string> = {
   "titan shifter": "titan métamorphe", namekian: "namek", alien: "extraterrestre",
   "chimera ant": "fourmi-chimère", android: "androïde",
   immortal: "immortel", "half-elf": "demi-elfe", devil: "diable", "soul in armor": "âme dans une armure",
+  ghoul: "goule", elf: "elfe",
 };
 
 const GENDER: Record<string, string> = { male: "homme", female: "femme" };

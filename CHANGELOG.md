@@ -8,6 +8,7 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/).
 
 ### Joueurs
 
+- **66 nouveaux personnages** issus des mangas les plus acclamés et les plus vendus (165 au total).
 - **Classement plus juste** : un abandon ne compte pour le classement que si les deux joueurs ont vraiment joué (au moins 2 coups chacun) ; deux comptes sur le même réseau (y compris IPv6) ne se font plus gagner de points.
 - **Fin des parties sans fin** : chaque joueur dispose de 90 s de déconnexion par partie ; au-delà, la déconnexion compte comme un abandon.
 - **Elo** : K = 40 pour les 10 premières parties classées, puis 20 ; le plancher de score ne crée plus de points.
