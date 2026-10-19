@@ -1,20 +1,18 @@
 // French labels for the character traits stored in English in characters.json.
 // Unknown values fall back to the original text.
 
+// Shades are merged on purpose (dark blue → blue, gold → yellow…): a question
+// about a colour only one character has barely helps split the board.
 const HAIR: Record<string, string> = {
   black: "noirs", blonde: "blonds", none: "aucun", brown: "bruns", red: "roux",
   green: "verts", orange: "orange", pink: "roses", silver: "argentés",
-  "dark blue": "bleu foncé", yellow: "jaunes", "white and red": "blancs et rouges",
-  "pale white": "blanc pâle", white: "blancs", "dark green": "vert foncé",
-  blue: "bleus", "light green": "vert clair", purple: "violets",
+  white: "blancs", blue: "bleus", purple: "violets",
 };
 
 const EYES: Record<string, string> = {
-  blue: "bleus", red: "rouges", dark: "sombres", gray: "gris", black: "noirs",
-  brown: "marron", green: "verts", yellow: "jaunes", violet: "violets",
-  gold: "dorés", golden: "dorés", amber: "ambrés", "pale green": "vert pâle",
-  white: "blancs", teal: "bleu-vert", "dark red": "rouge foncé", pink: "roses",
-  heterochromia: "vairons",
+  blue: "bleus", red: "rouges", gray: "gris", black: "noirs", brown: "marron",
+  green: "verts", yellow: "jaunes", purple: "violets", white: "blancs",
+  teal: "bleu-vert", pink: "roses", heterochromia: "vairons",
 };
 
 const SPECIES: Record<string, string> = {

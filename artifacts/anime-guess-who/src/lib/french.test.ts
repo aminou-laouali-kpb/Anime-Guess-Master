@@ -35,6 +35,11 @@ describe('French labels for the character data', () => {
     });
   }
 
+  it('keeps no leftover hair or eye colour labels', () => {
+    expect(Object.keys(FR_LABELS.hair).filter((v) => !values('hairColor').includes(v))).toEqual([]);
+    expect(Object.keys(FR_LABELS.eyes).filter((v) => !values('eyeColor').includes(v))).toEqual([]);
+  });
+
   it('knows how to phrase every age range and alignment', () => {
     expect(values('ageRange').filter((v) => !(v in AGE_PHRASES))).toEqual([]);
     expect(values('alignment').filter((v) => !(v in ALIGNMENT_PHRASES))).toEqual([]);
