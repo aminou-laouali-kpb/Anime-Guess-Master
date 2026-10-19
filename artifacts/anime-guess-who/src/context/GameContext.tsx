@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from "react";
+import React, { createContext, useContext, useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { socket, saveSessionToken, saveProfileToken, MyStatsPayload, RatingUpdate, RoomMode, BotLevel, Reaction, GamePhase, GameOverReason, PlayerState, GameLogEntry, RoomSnapshot, TimerPayload } from "../lib/socket";
 import type { Character } from "@workspace/api-client-react";
 import type { VerifiableAttribute } from "../lib/questions";
@@ -27,7 +27,6 @@ interface GameState {
   revealedOpponentCharacterId: string | null;
   rematchRequestedBy: string | null;
   timer: TurnTimer | null;
-  reactions: LiveReaction[]; // currently floating on screen
   reactionsMuted: boolean; // hide the opponent's reactions
   myStats: MyStatsPayload | null;
   ratingUpdate: RatingUpdate | null; // result of the game that just ended
@@ -77,6 +76,14 @@ interface GameContextType extends GameState {
 }
 
 const GameContext = createContext<GameContextType | null>(null);
+
+// Floating reactions change several times a second during emoji spam; they get
+// their own context so a reaction only redraws the overlay, not the whole game.
+interface ReactionsContextType {
+  reactions: LiveReaction[]; // currently floating on screen
+}
+
+const ReactionsContext = createContext<ReactionsContextType | null>(null);
 
 const NAME_KEY = "anime_who_name";
 
@@ -211,14 +218,15 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setTimer(toTurnTimer(room.timer));
   };
 
-  const setMyName = (name: string) => {
+  const setMyName = useCallback((name: string) => {
     try {
       localStorage.setItem(NAME_KEY, name);
     } catch {
       // Storage blocked (private mode…): the name just won't be remembered.
     }
+    myNameRef.current = name;
     setMyNameState(name);
-  };
+  }, []);
 
   useEffect(() => {
     socket.on("connect", () => {
@@ -475,31 +483,36 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, []);
 
+  // The actions read the name from a ref so they never change identity.
   const joinQueue = useCallback(() => {
-    if (!myName) return;
+    const name = myNameRef.current;
+    if (!name) return;
     resetGameState();
     setPhase("queue");
-    socket.emit("join_lobby", { name: myName });
-  }, [myName]);
+    socket.emit("join_lobby", { name });
+  }, []);
 
   const joinRoom = useCallback((code: string) => {
-    if (!myName) return;
+    const name = myNameRef.current;
+    if (!name) return;
     resetGameState();
-    socket.emit("join_room", { code, name: myName });
-  }, [myName]);
+    socket.emit("join_room", { code, name });
+  }, []);
 
   const createPrivateRoom = useCallback(() => {
-    if (!myName) return;
+    const name = myNameRef.current;
+    if (!name) return;
     resetGameState();
     setPhase("lobby");
-    socket.emit("create_room", { name: myName });
-  }, [myName]);
+    socket.emit("create_room", { name });
+  }, []);
 
   const playVsBot = useCallback((level: BotLevel) => {
-    if (!myName) return;
+    const name = myNameRef.current;
+    if (!name) return;
     resetGameState();
-    socket.emit("play_vs_bot", { name: myName, level });
-  }, [myName]);
+    socket.emit("play_vs_bot", { name, level });
+  }, []);
 
   const selectCharacter = useCallback((id: string) => {
     setMyCharacterId(id);
@@ -554,59 +567,110 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setPhase("home");
   }, []);
 
+  const value = useMemo<GameContextType>(
+    () => ({
+      phase,
+      roomCode,
+      roomMode,
+      queuePosition,
+      players,
+      characters,
+      myPlayerId,
+      myCharacterId,
+      myEliminatedIds,
+      opponentReady,
+      opponentConnected,
+      opponentLeft,
+      currentTurnId,
+      pendingQuestion,
+      awaitingAnswerFor,
+      gameLog,
+      winnerId,
+      gameOverReason,
+      lastChanceFor,
+      revealedOpponentCharacterId,
+      rematchRequestedBy,
+      timer,
+      reactionsMuted,
+      myStats,
+      ratingUpdate,
+      isConnected,
+      hasConnectedOnce,
+      connectionReplaced,
+      myName,
+      setMyName,
+      joinQueue,
+      joinRoom,
+      createPrivateRoom,
+      playVsBot,
+      selectCharacter,
+      askQuestion,
+      askVerifiedQuestion,
+      answerQuestion,
+      makeGuess,
+      syncEliminations,
+      requestRematch,
+      acceptRematch,
+      leaveGame,
+      refreshMyStats,
+      sendReaction,
+      setReactionsMuted,
+    }),
+    [
+      phase,
+      roomCode,
+      roomMode,
+      queuePosition,
+      players,
+      characters,
+      myPlayerId,
+      myCharacterId,
+      myEliminatedIds,
+      opponentReady,
+      opponentConnected,
+      opponentLeft,
+      currentTurnId,
+      pendingQuestion,
+      awaitingAnswerFor,
+      gameLog,
+      winnerId,
+      gameOverReason,
+      lastChanceFor,
+      revealedOpponentCharacterId,
+      rematchRequestedBy,
+      timer,
+      reactionsMuted,
+      myStats,
+      ratingUpdate,
+      isConnected,
+      hasConnectedOnce,
+      connectionReplaced,
+      myName,
+      setMyName,
+      joinQueue,
+      joinRoom,
+      createPrivateRoom,
+      playVsBot,
+      selectCharacter,
+      askQuestion,
+      askVerifiedQuestion,
+      answerQuestion,
+      makeGuess,
+      syncEliminations,
+      requestRematch,
+      acceptRematch,
+      leaveGame,
+      refreshMyStats,
+      sendReaction,
+      setReactionsMuted,
+    ],
+  );
+
+  const reactionsValue = useMemo<ReactionsContextType>(() => ({ reactions }), [reactions]);
+
   return (
-    <GameContext.Provider
-      value={{
-        phase,
-        roomCode,
-        roomMode,
-        queuePosition,
-        players,
-        characters,
-        myPlayerId,
-        myCharacterId,
-        myEliminatedIds,
-        opponentReady,
-        opponentConnected,
-        opponentLeft,
-        currentTurnId,
-        pendingQuestion,
-        awaitingAnswerFor,
-        gameLog,
-        winnerId,
-        gameOverReason,
-        lastChanceFor,
-        revealedOpponentCharacterId,
-        rematchRequestedBy,
-        timer,
-        reactions,
-        reactionsMuted,
-        myStats,
-        ratingUpdate,
-        isConnected,
-        hasConnectedOnce,
-        connectionReplaced,
-        myName,
-        setMyName,
-        joinQueue,
-        joinRoom,
-        createPrivateRoom,
-        playVsBot,
-        selectCharacter,
-        askQuestion,
-        askVerifiedQuestion,
-        answerQuestion,
-        makeGuess,
-        syncEliminations,
-        requestRematch,
-        acceptRematch,
-        leaveGame,
-        refreshMyStats,
-        sendReaction,
-        setReactionsMuted,
-      }}
-    >
-      {children}
+    <GameContext.Provider value={value}>
+      <ReactionsContext.Provider value={reactionsValue}>{children}</ReactionsContext.Provider>
     </GameContext.Provider>
   );
 };
@@ -615,6 +679,16 @@ export const useGame = () => {
   const context = useContext(GameContext);
   if (!context) {
     throw new Error("useGame must be used within GameProvider");
+  }
+  return context;
+};
+
+
+// The emojis currently floating on screen (see ReactionsContext).
+export const useReactions = () => {
+  const context = useContext(ReactionsContext);
+  if (!context) {
+    throw new Error("useReactions must be used within GameProvider");
   }
   return context;
 };
