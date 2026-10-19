@@ -8,6 +8,8 @@ Jeu en ligne à deux joueurs, en français : chacun choisit en secret un personn
 - `pnpm --filter @workspace/anime-guess-who run dev` — interface web (port 20021, fixé par Replit)
 - `pnpm run typecheck` — vérification des types de tout le dépôt
 - `pnpm run test` — tous les tests (voir « Tests »)
+- `pnpm run lint` — ESLint sur tout le dépôt (`eslint.config.js` ; 0 erreur exigée par la CI, avertissements tolérés)
+- `pnpm run format:check` — Prettier (`.prettierrc`), informatif : le code n'est pas encore formaté
 - `pnpm run build` — types + construction de tous les paquets (hors `mockup-sandbox`)
 - `pnpm --filter @workspace/api-spec run codegen` — régénère les clients et schémas Zod depuis `lib/api-spec/openapi.yaml`
 - `pnpm --filter @workspace/db run push` — applique un changement de schéma à la base (à la main, voir « Pièges »)
@@ -69,7 +71,7 @@ Jeu en ligne à deux joueurs, en français : chacun choisit en secret un personn
 - `api-server` : tests unitaires (adresse IP, Elo, force de l'ordinateur, données des personnages) et tests d'intégration avec de vrais sockets (partie complète, secrets, reconnexion, chronos, réactions, ordinateur, sécurité).
 - Les tests du classement (`stats.test.ts`) ont besoin d'une base : ils sont **sautés** sans `DATABASE_URL`. La CI en fournit une.
 - `anime-guess-who` : chaque valeur des fiches a une traduction française, chaque question est bien formée.
-- La CI GitHub (`.github/workflows/ci.yml`) lance types, tests et construction à chaque PR, plus un audit des dépendances (informatif).
+- La CI GitHub (`.github/workflows/ci.yml`) lance à chaque PR, en parallèle : lint, types + tests (avec Postgres), construction, et un audit des dépendances qui n'échoue que sur une faille critique. La version de Node vient de `.nvmrc`.
 
 ## Pièges
 
@@ -81,4 +83,5 @@ Jeu en ligne à deux joueurs, en français : chacun choisit en secret un personn
 
 ## Pour aller plus loin
 
+- [`README.md`](README.md) : présentation et démarrage rapide ; [`CHANGELOG.md`](CHANGELOG.md) : historique des changements (tenir à jour la section « Non publié »).
 - Voir le skill `pnpm-workspace` pour la structure du dépôt et la configuration TypeScript.
