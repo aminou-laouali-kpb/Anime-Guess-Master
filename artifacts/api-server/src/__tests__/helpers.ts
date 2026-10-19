@@ -19,7 +19,7 @@ export async function startServer(): Promise<TestServer> {
   };
 }
 
-type Payload = Record<string, any>;
+type Payload = Record<string, unknown>;
 
 export interface ClientOptions {
   /** Fake client address, as a reverse proxy would put it in X-Forwarded-For. */
@@ -56,10 +56,10 @@ export class TestClient {
     this.socket.onAny((event: string, payload: Payload) => {
       this.events.push([event, payload]);
       if (event === "session") {
-        this.playerId = payload.playerId;
-        this.token = payload.token;
+        this.playerId = payload["playerId"] as string;
+        this.token = payload["token"] as string;
       }
-      if (event === "profile") this.profile = payload.token;
+      if (event === "profile") this.profile = payload["token"] as string;
     });
     this.socket.on("connect_error", (err) => this.events.push(["connect_error", { message: err.message }]));
   }
@@ -138,7 +138,7 @@ export async function startPrivateGame(server: TestServer): Promise<Game> {
   a.emit("select_character", { characterId: board[0]!["id"] });
   b.emit("select_character", { characterId: board[1]!["id"] });
   await a.until(() => a.has("game_start") && b.has("game_start"));
-  return { a, b, board, aChar: board[0]!["id"], bChar: board[1]!["id"] };
+  return { a, b, board, aChar: board[0]!["id"] as string, bChar: board[1]!["id"] as string };
 }
 
 /**

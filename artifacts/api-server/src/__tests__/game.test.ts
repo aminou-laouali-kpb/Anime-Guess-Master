@@ -52,7 +52,7 @@ describe("robustness", () => {
       c.emit("create_room", { name: "Hôte" });
       const { code } = await c.next("room_created");
       expect(code).toMatch(/^[A-HJ-NP-Z2-9]{6}$/);
-      codes.add(code);
+      codes.add(code as string);
       c.emit("leave_room");
     }
     expect(codes.size).toBe(5);
@@ -301,7 +301,7 @@ describe("reconnection", () => {
     other.socket.disconnect();
     await mover.next("opponent_disconnected");
     const back = track(await connectClient(server, { token: other.token, profile: other.profile }));
-    const room = back.last("state_sync")!["room"] as Record<string, any>;
+    const room = back.last("state_sync")!["room"] as Record<string, unknown>;
     expect(room["phase"]).toBe("playing");
     expect(room["pendingQuestion"]).toBe("Une épée ?");
     expect(room["opponentConnected"]).toBe(true);
@@ -347,7 +347,7 @@ describe("rematch", () => {
     other.emit("accept_rematch");
     const started = await mover.next("rematch_started");
     expect(started["characters"]).toHaveLength(24);
-    expect(started["characters"].map((c: { id: string }) => c.id).join()).not.toBe(g.board.map((c) => c["id"]).join());
+    expect((started["characters"] as { id: string }[]).map((c) => c.id).join()).not.toBe(g.board.map((c) => c["id"]).join());
   });
 });
 
@@ -382,10 +382,10 @@ describe("computer opponent", () => {
     h.emit("play_vs_bot", { name: "Hana", level: "hard" });
     const joined = await h.next("room_joined");
     expect(joined["mode"]).toBe("bot");
-    expect(joined["players"][1].name).toBe("Ordinateur (difficile)");
+    expect((joined["players"] as { name: string }[])[1]!.name).toBe("Ordinateur (difficile)");
     await h.until(() => h.has("opponent_ready"), 4000, "the computer to pick a character");
 
-    h.emit("select_character", { characterId: joined["characters"][0].id });
+    h.emit("select_character", { characterId: (joined["characters"] as { id: string }[])[0]!.id });
     const start = await h.next("game_start");
     if (start["currentTurnPlayerId"] === h.playerId) {
       h.emit("ask_question", { question: "Une épée ?" });
