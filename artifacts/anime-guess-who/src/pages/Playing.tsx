@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import * as AlertDialogPrimitive from "@radix-ui/react-alert-dialog";
 import { useGame } from "@/context/GameContext";
 import { CharacterCard } from "@/components/CharacterCard";
 import { Button } from "@/components/ui/button";
@@ -14,7 +15,11 @@ import { LeaveGameButton } from "@/components/LeaveGameButton";
 import { MyCharacterChip } from "@/components/MyCharacterChip";
 import { ATTRIBUTES, VerifiableAttribute, hasTrait, questionText, valueLabel, valuesOnBoard } from "@/lib/questions";
 import { plural } from "@/lib/fr";
+import { usePageHeading } from "@/components/PageHeading";
+import { CROSS_OUT_HINT_KEY, CrossOutHint, hasSeen, markSeen } from "@/components/Onboarding";
 import { toast } from "sonner";
+
+const ASK_MODES = ["verified", "free"] as const;
 
 export const Playing: React.FC = () => {
   const {
@@ -35,7 +40,8 @@ export const Playing: React.FC = () => {
     timer,
     roomMode,
     myCharacterId,
-    lastChanceFor
+    lastChanceFor,
+    isConnected
   } = useGame();
   const myCharacter = characters.find(c => c.id === myCharacterId);
   // The computer only understands verified questions.
@@ -77,6 +83,49 @@ export const Playing: React.FC = () => {
   const canAct = isMyTurn && !awaitingAnswerFor;
   // Last chance: the only move left is a guess.
   const canAsk = canAct && !lastChanceFor;
+  // While the link to the server is down a move would go nowhere: the buttons
+  // wait (the dialogs stay open, so nothing typed or picked is lost).
+  const offline = !isConnected;
+
+  const turnText = !opponentConnected
+    ? "Adversaire déconnecté — on l’attend…"
+    : lastChanceFor
+      ? (isMyTurn ? "Dernière chance : devine !" : "Dernière chance de l’adversaire")
+      : isMyTurn ? "À toi de jouer" : "Tour de l’adversaire";
+  // The tab title follows the game, so a player in another tab sees their turn.
+  const headingRef = usePageHeading(
+    pendingQuestion ? "Question reçue" : awaitingAnswerFor ? "En attente de la réponse" : turnText,
+    // A question dialog open on arrival takes the focus itself.
+    !pendingQuestion && !awaitingAnswerFor,
+  );
+
+  // First game: a one-time tip above the board.
+  const [showHint, setShowHint] = useState(() => !hasSeen(CROSS_OUT_HINT_KEY));
+  const dismissHint = useCallback(() => {
+    markSeen(CROSS_OUT_HINT_KEY);
+    setShowHint(false);
+  }, []);
+  // Crossing out a card means the tip has done its job.
+  const initialEliminations = useRef(eliminatedIds);
+  useEffect(() => {
+    if (showHint && eliminatedIds !== initialEliminations.current) dismissHint();
+  }, [eliminatedIds, showHint, dismissHint]);
+
+  // Question type tabs: arrow keys move between them (WAI-ARIA tabs pattern).
+  const tabsId = useId();
+  const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const onTabKeyDown = (e: React.KeyboardEvent) => {
+    const index = ASK_MODES.indexOf(askMode);
+    let next: number | null = null;
+    if (e.key === "ArrowRight" || e.key === "ArrowDown") next = (index + 1) % ASK_MODES.length;
+    else if (e.key === "ArrowLeft" || e.key === "ArrowUp") next = (index - 1 + ASK_MODES.length) % ASK_MODES.length;
+    else if (e.key === "Home") next = 0;
+    else if (e.key === "End") next = ASK_MODES.length - 1;
+    if (next === null) return;
+    e.preventDefault();
+    setAskMode(ASK_MODES[next]);
+    tabRefs.current[ASK_MODES[next]]?.focus();
+  };
 
   // If my turn ends while a dialog is open (time out), close it: acting now
   // would only get "Ce n'est pas ton tour."
@@ -177,13 +226,17 @@ export const Playing: React.FC = () => {
       <div className="sticky top-0 z-40">
         <div className="bg-card border-b-4 border-card-border p-3 flex justify-between items-center shadow-sm">
           <div className="flex flex-col">
-            <span className="text-xs uppercase font-bold text-muted-foreground tracking-wider">Adversaire</span>
-            <span className="font-display font-black text-lg text-secondary truncate max-w-[150px]">
+            {/* Screen-reader heading for the game screen; the focus lands here on arrival. */}
+            <h1 ref={headingRef} tabIndex={-1} className="sr-only">
+              Partie contre {opponent?.name || "Joueur 2"}
+            </h1>
+            <span className="text-xs uppercase font-bold text-muted-foreground tracking-wider" aria-hidden>Adversaire</span>
+            <span className="font-display font-black text-lg text-secondary truncate max-w-[150px]" aria-hidden>
               {opponent?.name || "Joueur 2"}
             </span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="flex gap-1" aria-label={`Vies de l’adversaire : ${opponent?.lives ?? 0} sur 3`}>
+            <div className="flex gap-1" role="img" aria-label={`Vies de l’adversaire : ${opponent?.lives ?? 0} sur 3`}>
               {Array.from({ length: 3 }).map((_, i) => (
                 <Heart
                   key={i}
@@ -198,14 +251,19 @@ export const Playing: React.FC = () => {
         {/* Turn Indicator Banner */}
         <div className={cn(
           "py-1.5 px-4 text-center font-bold uppercase tracking-widest text-xs transition-colors shadow-sm z-30 relative",
-          isMyTurn ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+          isMyTurn ? "bg-primary text-primary-foreground" : "bg-muted text-foreground"
         )}>
-          {!opponentConnected ? "Adversaire déconnecté — on l’attend…" : lastChanceFor ? (isMyTurn ? "Dernière chance : devine !" : "Dernière chance de l’adversaire") : isMyTurn ? "À toi de jouer" : "Tour de l’adversaire"}
+          {/* Only the turn text is announced: the ticking seconds would talk non-stop. */}
+          <span role="status" aria-live="polite">{turnText}</span>
           {opponentConnected && !pendingQuestion && !awaitingAnswerFor && (
             <Countdown deadline={timer?.deadline}>
               {(seconds, urgent) => (
-                // Red on the blue "your turn" banner would be unreadable.
-                <span className={cn("ml-2 tabular-nums", urgent && (isMyTurn ? "text-yellow-200 font-black animate-pulse" : "text-red-600 animate-pulse"))}>
+                // Red text on the blue "your turn" banner would be unreadable:
+                // a white pill instead. No blinking, which would fade the text.
+                <span className={cn(
+                  "ml-2 tabular-nums",
+                  urgent && (isMyTurn ? "bg-white text-red-700 font-black rounded px-1.5" : "text-red-700 font-black")
+                )}>
                   · {seconds} s
                 </span>
               )}
@@ -214,6 +272,8 @@ export const Playing: React.FC = () => {
         </div>
       </div>
 
+      {showHint && <CrossOutHint onDismiss={dismissHint} />}
+
       {/* Game Board (Grid) */}
       <div className="p-3 grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-8 gap-2 max-w-6xl mx-auto w-full content-start">
         {characters.map(char => (
@@ -221,6 +281,7 @@ export const Playing: React.FC = () => {
             key={char.id}
             character={char}
             size="sm"
+            action="eliminate"
             eliminated={eliminatedIds.has(char.id)}
             onPick={toggleElimination}
           />
@@ -252,6 +313,7 @@ export const Playing: React.FC = () => {
               className="font-bold relative px-2"
               aria-label="Historique"
               aria-expanded={showLog}
+              aria-controls="game-log"
             >
               <MessageSquare className="w-5 h-5 sm:mr-2" />
               <span className="hidden sm:inline">Historique</span>
@@ -259,7 +321,7 @@ export const Playing: React.FC = () => {
                 <span className="absolute top-0 right-0 w-2.5 h-2.5 bg-primary rounded-full" />
               )}
             </Button>
-            <div className="flex gap-0.5" aria-label={`Tes vies : ${me?.lives ?? 0} sur 3`}>
+            <div className="flex gap-0.5" role="img" aria-label={`Tes vies : ${me?.lives ?? 0} sur 3`}>
               {Array.from({ length: 3 }).map((_, i) => (
                 <Heart
                   key={i}
@@ -273,7 +335,7 @@ export const Playing: React.FC = () => {
         <div className="p-3 flex gap-2 sm:gap-3 max-w-2xl mx-auto">
           <Button
             className="flex-1 min-w-0 h-12 font-bold text-sm sm:text-base bg-blue-600 hover:bg-blue-700"
-            disabled={!canAsk}
+            disabled={!canAsk || offline}
             onClick={() => setShowAskModal(true)}
           >
             <Search className="w-5 h-5 mr-1.5 shrink-0" />
@@ -282,7 +344,7 @@ export const Playing: React.FC = () => {
           </Button>
           <Button
             className="flex-1 min-w-0 h-12 font-bold text-sm sm:text-base bg-red-600 hover:bg-red-700"
-            disabled={!canAct}
+            disabled={!canAct || offline}
             onClick={() => setShowGuessModal(true)}
           >
             <Crosshair className="w-5 h-5 mr-1.5 shrink-0" /> Deviner
@@ -318,10 +380,10 @@ export const Playing: React.FC = () => {
             </p>
           </DialogHeader>
           <div className="flex gap-4 mt-6 pointer-events-auto">
-            <Button className="flex-1 h-14 bg-green-600 hover:bg-green-700 text-xl font-bold" onClick={() => answerQuestion("yes")}>
+            <Button className="flex-1 h-14 bg-green-600 hover:bg-green-700 text-xl font-bold" disabled={offline} onClick={() => answerQuestion("yes")}>
               <Check className="w-6 h-6 mr-2" /> OUI
             </Button>
-            <Button className="flex-1 h-14 bg-red-600 hover:bg-red-700 text-xl font-bold" onClick={() => answerQuestion("no")}>
+            <Button className="flex-1 h-14 bg-red-600 hover:bg-red-700 text-xl font-bold" disabled={offline} onClick={() => answerQuestion("no")}>
               <X className="w-6 h-6 mr-2" /> NON
             </Button>
           </div>
@@ -329,11 +391,23 @@ export const Playing: React.FC = () => {
       </Dialog>
 
       {/* Awaiting Answer Overlay */}
-      {awaitingAnswerFor && (
-        <div className="fixed inset-0 z-[60] bg-background/80 backdrop-blur-sm flex flex-col items-center justify-center p-6 animate-in fade-in">
-          <div className="bg-card border-2 border-primary p-6 rounded-2xl max-w-md w-full text-center space-y-4 shadow-2xl">
-            <h3 className="font-display text-xl font-bold text-primary uppercase">En attente de la réponse…</h3>
-            <p className="text-lg font-medium">« {awaitingAnswerFor} »</p>
+      {/* A real modal that can't be dismissed: the focus stays inside and the
+          page behind is hidden from screen readers until the answer comes. */}
+      <AlertDialogPrimitive.Root open={!!awaitingAnswerFor} onOpenChange={() => {}}>
+        <AlertDialogPrimitive.Portal>
+          <AlertDialogPrimitive.Overlay className="fixed inset-0 z-[60] bg-background/80 backdrop-blur-sm animate-in fade-in" />
+          <AlertDialogPrimitive.Content
+            onEscapeKeyDown={(e) => e.preventDefault()}
+            // The button that opened the question is gone by now: back to the heading.
+            onCloseAutoFocus={(e) => { e.preventDefault(); headingRef.current?.focus({ preventScroll: true }); }}
+            className="fixed left-1/2 top-1/2 z-[60] -translate-x-1/2 -translate-y-1/2 w-[calc(100%-3rem)] max-w-md bg-card border-2 border-primary p-6 rounded-2xl text-center space-y-4 shadow-2xl focus:outline-none animate-in fade-in"
+          >
+            <AlertDialogPrimitive.Title className="font-display text-xl font-bold text-primary uppercase">
+              En attente de la réponse…
+            </AlertDialogPrimitive.Title>
+            <AlertDialogPrimitive.Description className="text-lg font-medium">
+              « {awaitingAnswerFor} »
+            </AlertDialogPrimitive.Description>
             <Countdown deadline={timer?.deadline}>
               {(seconds) => (
                 <p className="text-sm text-muted-foreground font-bold tabular-nums">
@@ -341,15 +415,15 @@ export const Playing: React.FC = () => {
                 </p>
               )}
             </Countdown>
-            <div className="flex justify-center mt-4">
+            <div className="flex justify-center mt-4" aria-hidden>
               <span className="flex h-3 w-3 relative">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-3 w-3 bg-primary"></span>
               </span>
             </div>
-          </div>
-        </div>
-      )}
+          </AlertDialogPrimitive.Content>
+        </AlertDialogPrimitive.Portal>
+      </AlertDialogPrimitive.Root>
 
       {/* Ask Question Modal */}
       <Dialog open={showAskModal} onOpenChange={setShowAskModal}>
@@ -363,17 +437,23 @@ export const Playing: React.FC = () => {
             </DialogDescription>
           </DialogHeader>
 
-          {!vsBot && <div className="grid grid-cols-2 gap-1 p-1 bg-muted rounded-lg" role="tablist">
-            {(["verified", "free"] as const).map(mode => (
+          {!vsBot && <div className="grid grid-cols-2 gap-1 p-1 bg-muted rounded-lg" role="tablist" aria-label="Type de question">
+            {ASK_MODES.map(mode => (
               <button
                 key={mode}
+                ref={el => { tabRefs.current[mode] = el; }}
+                id={`${tabsId}-tab-${mode}`}
                 type="button"
                 role="tab"
                 aria-selected={askMode === mode}
+                aria-controls={`${tabsId}-panel`}
+                // Roving focus: Tab reaches the selected tab, the arrows the other.
+                tabIndex={askMode === mode ? 0 : -1}
                 onClick={() => setAskMode(mode)}
+                onKeyDown={onTabKeyDown}
                 className={cn(
-                  "py-2 rounded-md text-sm font-bold transition-colors",
-                  askMode === mode ? "bg-background shadow-sm" : "text-muted-foreground"
+                  "py-2 rounded-md text-sm font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
+                  askMode === mode ? "bg-background shadow-sm" : "text-foreground/70"
                 )}
               >
                 {mode === "verified" ? "Question vérifiée" : "Question libre"}
@@ -382,28 +462,34 @@ export const Playing: React.FC = () => {
           </div>}
 
           <form onSubmit={handleAsk} className="space-y-4 mt-2">
+            <div
+              {...(vsBot ? {} : { role: "tabpanel", id: `${tabsId}-panel`, "aria-labelledby": `${tabsId}-tab-${askMode}` })}
+              className="space-y-4"
+            >
             {askMode === "verified" || vsBot ? (
               <>
-                <div className="flex flex-wrap gap-1.5">
+                <div className="flex flex-wrap gap-1.5" role="group" aria-label="Caractéristique">
                   {ATTRIBUTES.map(({ key, label }) => (
                     <Button
                       key={key}
                       type="button"
                       size="sm"
                       variant={askAttribute === key ? "default" : "outline"}
+                      aria-pressed={askAttribute === key}
                       onClick={() => { setAskAttribute(key); setAskValue(null); }}
                     >
                       {label}
                     </Button>
                   ))}
                 </div>
-                <div className="flex flex-wrap gap-1.5">
+                <div className="flex flex-wrap gap-1.5" role="group" aria-label="Réponse possible">
                   {valuesOnBoard(characters, askAttribute).map(value => (
                     <Button
                       key={value}
                       type="button"
                       size="sm"
                       variant={askValue === value ? "secondary" : "ghost"}
+                      aria-pressed={askValue === value}
                       className={cn("border", askValue === value && "ring-2 ring-secondary")}
                       onClick={() => setAskValue(value)}
                     >
@@ -411,7 +497,7 @@ export const Playing: React.FC = () => {
                     </Button>
                   ))}
                 </div>
-                <p className="min-h-6 text-center font-bold italic">
+                <p className="min-h-6 text-center font-bold italic" aria-live="polite">
                   {askValue ? `« ${questionText(askAttribute, askValue)} »` : "Choisis une réponse possible ci-dessus."}
                 </p>
               </>
@@ -419,16 +505,18 @@ export const Playing: React.FC = () => {
               <Input
                 autoFocus
                 placeholder="ex. Ton personnage se bat-il avec une épée ?"
+                aria-label="Ta question"
                 value={freeQuestion}
                 onChange={e => setFreeQuestion(e.target.value)}
                 maxLength={200}
                 className="h-12"
               />
             )}
+            </div>
             <DialogFooter>
               <Button
                 type="submit"
-                disabled={askMode === "verified" || vsBot ? !askValue : !freeQuestion.trim()}
+                disabled={offline || (askMode === "verified" || vsBot ? !askValue : !freeQuestion.trim())}
                 className="w-full h-12 text-lg font-bold"
               >
                 Envoyer
@@ -489,7 +577,7 @@ export const Playing: React.FC = () => {
             </p>
             <Button
               className="bg-red-600 hover:bg-red-700 font-bold shrink-0"
-              disabled={!guessCandidate}
+              disabled={!guessCandidate || offline}
               onClick={confirmGuess}
             >
               Confirmer
@@ -499,17 +587,18 @@ export const Playing: React.FC = () => {
       </Dialog>
 
       {/* Game Log Drawer */}
-      <div className={cn(
+      {/* dvh, not vh: on phones vh ignores the browser bars and the drawer overflowed. */}
+      <div id="game-log" className={cn(
         "fixed inset-x-0 z-40 bg-card/95 backdrop-blur-xl border-t-2 border-border shadow-2xl transition-transform duration-300 ease-out",
-        showLog ? "translate-y-0 h-[40vh]" : "translate-y-[120%] invisible"
+        showLog ? "translate-y-0 h-[40dvh]" : "translate-y-[120%] invisible"
       )} style={{ bottom: hudHeight }} aria-hidden={!showLog}>
         <div className="flex items-center justify-between p-3 border-b">
-          <h3 className="font-bold uppercase tracking-wider text-sm">Historique</h3>
+          <h2 className="font-bold uppercase tracking-wider text-sm">Historique</h2>
           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setShowLog(false)} aria-label="Fermer l’historique">
             <ChevronDown className="w-4 h-4" />
           </Button>
         </div>
-        <ScrollArea className="h-[calc(40vh-45px)] p-4">
+        <ScrollArea className="h-[calc(40dvh-45px)] p-4">
           <div className="space-y-3">
             {gameLog.length === 0 ? (
               <p className="text-center text-muted-foreground text-sm py-4">Aucune action pour l’instant.</p>

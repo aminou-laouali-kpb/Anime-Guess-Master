@@ -2,11 +2,14 @@ import React, { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { useGame } from "@/context/GameContext";
 import { Button } from "@/components/ui/button";
+import { usePageHeading } from "@/components/PageHeading";
 import { Loader2, ArrowLeft, Copy, CheckCircle2, Bot } from "lucide-react";
 
 export const QueueLobby: React.FC = () => {
   const { phase, queuePosition, roomCode, leaveGame, playVsBot } = useGame();
   const [copied, setCopied] = useState(false);
+  const heading = phase === "queue" ? "Recherche d’un adversaire" : "En attente d’un adversaire";
+  const headingRef = usePageHeading(heading);
 
   // After a while with nobody to play against, offer to practise meanwhile.
   const [waitedSeconds, setWaitedSeconds] = useState(0);
@@ -46,9 +49,9 @@ export const QueueLobby: React.FC = () => {
         </div>
 
         <div className="space-y-2">
-          <h2 className="text-3xl font-display font-black uppercase tracking-tight">
-            {phase === "queue" ? "Recherche d’un adversaire" : "En attente d’un adversaire"}
-          </h2>
+          <h1 ref={headingRef} tabIndex={-1} className="text-3xl font-display font-black uppercase tracking-tight focus:outline-none">
+            {heading}
+          </h1>
           <p className="text-muted-foreground font-medium">
             {phase === "queue" 
               ? `Position dans la file : ${queuePosition || '…'}`
@@ -71,7 +74,7 @@ export const QueueLobby: React.FC = () => {
               <span className="font-mono text-3xl tracking-[0.3em] font-bold w-full text-center pl-4">
                 {roomCode}
               </span>
-              <Button size="icon" variant="ghost" onClick={copyCode} className="shrink-0" aria-label="Copier le code">
+              <Button size="icon" variant="ghost" onClick={copyCode} className="shrink-0" aria-label={copied ? "Code copié" : "Copier le code"}>
                 {copied ? <CheckCircle2 className="w-5 h-5 text-green-700" /> : <Copy className="w-5 h-5" />}
               </Button>
             </div>

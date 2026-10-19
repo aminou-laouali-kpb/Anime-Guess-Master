@@ -1,5 +1,7 @@
-import React, { Suspense, lazy, useState } from "react";
+import React, { Suspense, lazy, useEffect, useState } from "react";
 import { useGame } from "@/context/GameContext";
+import { APP_NAME, usePageHeading } from "@/components/PageHeading";
+import { RULES_SEEN_KEY, hasSeen, markSeen } from "@/components/Onboarding";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -24,6 +26,16 @@ export const Home: React.FC = () => {
 
   const [localName, setLocalName] = useState(myName);
   const [showNameModal, setShowNameModal] = useState(!myName);
+
+  // The name dialog, when it opens with the page, takes the focus itself.
+  const headingRef = usePageHeading(`${APP_NAME} — Qui est-ce ? version anime`, Boolean(myName));
+
+  // A first-time player gets the rules once, right after choosing a name.
+  useEffect(() => {
+    if (!myName || showNameModal || hasSeen(RULES_SEEN_KEY)) return;
+    markSeen(RULES_SEEN_KEY);
+    setShowHowToPlay(true);
+  }, [myName, showNameModal]);
 
   const handleSaveName = (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,7 +63,12 @@ export const Home: React.FC = () => {
 
       <div className="z-10 w-full max-w-md flex flex-col gap-8">
         <div className="text-center space-y-2">
-          <h1 className="text-5xl md:text-7xl font-display font-black text-transparent bg-clip-text bg-gradient-to-br from-primary to-secondary drop-shadow-sm uppercase italic tracking-tighter transform -skew-x-6">
+          <h1
+            ref={headingRef}
+            tabIndex={-1}
+            aria-label="AnimeWho"
+            className="text-5xl md:text-7xl font-display font-black text-transparent bg-clip-text bg-gradient-to-br from-primary to-secondary drop-shadow-sm uppercase italic tracking-tighter transform -skew-x-6 focus:outline-none"
+          >
             Anime<br />Who
           </h1>
           <p className="text-muted-foreground font-bold tracking-widest uppercase text-sm">
