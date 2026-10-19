@@ -37,7 +37,16 @@ Jeu en ligne à deux joueurs, en français : chacun choisit en secret un personn
 
 | Quoi | Où |
 |---|---|
-| Moteur de jeu (salles, tours, chronos, ordinateur) | `artifacts/api-server/src/lib/game-engine.ts` |
+| Moteur de jeu : branchement Socket.IO et exports | `artifacts/api-server/src/lib/engine/index.ts` |
+| Moteur : types, état partagé, contexte `Engine` | `artifacts/api-server/src/lib/engine/state.ts` |
+| Moteur : constantes (vies, chronos, limites) | `artifacts/api-server/src/lib/engine/config.ts` |
+| Moteur : création des salles, grille, instantanés | `artifacts/api-server/src/lib/engine/rooms.ts` |
+| Moteur : chronos, budget d'absence | `artifacts/api-server/src/lib/engine/timers.ts` |
+| Moteur : règles (questions, devinettes, dernière chance, fin de partie, résultats) | `artifacts/api-server/src/lib/engine/rules.ts` |
+| Moteur : tours de l'ordinateur | `artifacts/api-server/src/lib/engine/bot-driver.ts` |
+| Moteur : file d'attente des parties rapides | `artifacts/api-server/src/lib/engine/matchmaking.ts` |
+| Moteur : sessions (jeton, onglets, reconnexion) | `artifacts/api-server/src/lib/engine/sessions.ts` |
+| Moteur : événements Socket.IO, limites de connexion | `artifacts/api-server/src/lib/engine/handlers.ts` (validation des entrées dans `input.ts`) |
 | Stratégie de l'ordinateur (fonctions pures) | `artifacts/api-server/src/lib/bot.ts` |
 | Statistiques, Elo, classement | `artifacts/api-server/src/lib/stats.ts` |
 | Limites de débit, adresse IP du client | `artifacts/api-server/src/lib/rate-limit.ts` |
@@ -60,7 +69,7 @@ Jeu en ligne à deux joueurs, en français : chacun choisit en secret un personn
 - **Limites par réseau** : le plafond de 20 connexions et la limite HTTP comptent par « réseau » (`networkKey` dans `rate-limit.ts`) : une adresse IPv4 exacte, ou le **préfixe /64** d'une adresse IPv6 (un abonné IPv6 dispose de tout un /64) ; `::ffff:1.2.3.4` compte comme `1.2.3.4`. Une connexion qui ne fait rien hors partie (ni salle, ni file d'attente, ou seule dans une salle privée que personne n'a rejointe) est coupée après **10 min d'inactivité**.
 - **Arrêt propre** : sur `SIGTERM`/`SIGINT` (redéploiement), le serveur refuse les nouvelles parties, envoie « Le serveur redémarre, la partie va être interrompue. » à tous les joueurs, ferme Socket.IO et HTTP puis quitte (sortie forcée après 8 s).
 - **Questions vérifiées** : le joueur choisit un trait et une valeur, le serveur répond à partir de `characters.json` (liste blanche de 8 traits). Impossible de mentir. Les questions libres existent aussi (marquées « non vérifiée », récapitulatif en fin de partie).
-- **Dernière chance** : celui qui joue en premier trouve le personnage un tour plus tôt, ce qui lui donnait ~70 % des victoires (simulation bot contre bot). Quand le premier joueur devine juste, l’autre a donc **une dernière devinette** (plus de question) : s’il trouve aussi, c’est **égalité** (`winnerId: null`, raison `draw`, Elo à demi-point, ni victoire ni défaite) ; sinon la victoire du premier joueur est confirmée (chrono dépassé = pareil). Si le second joueur devine juste en premier, la partie s’arrête tout de suite. Voir `startLastChance` dans `game-engine.ts`.
+- **Dernière chance** : celui qui joue en premier trouve le personnage un tour plus tôt, ce qui lui donnait ~70 % des victoires (simulation bot contre bot). Quand le premier joueur devine juste, l’autre a donc **une dernière devinette** (plus de question) : s’il trouve aussi, c’est **égalité** (`winnerId: null`, raison `draw`, Elo à demi-point, ni victoire ni défaite) ; sinon la victoire du premier joueur est confirmée (chrono dépassé = pareil). Si le second joueur devine juste en premier, la partie s’arrête tout de suite. Voir `startLastChance` dans `engine/rules.ts`.
 - **Chronos** : 90 s pour choisir, 60 s par tour, 45 s pour répondre ; le dépassement coûte une vie.
 - **L'ordinateur est un joueur ordinaire** côté serveur : mêmes règles, mêmes chronos. Il ne connaît que la grille et les réponses à ses propres questions. Ses parties ne comptent ni dans les statistiques ni dans le classement.
 - **Classement** : Elo (départ 1000, plancher 100), avec un **K provisoire** : K = 40 pendant les 10 premières parties classées d'un joueur, puis K = 20 ; chacun utilise son propre K, donc les deux variations d'une partie peuvent différer. Quand le perdant touche le plancher, le gagnant ne gagne que ce que le perdant a réellement perdu (pas de création de points). Uniquement pour les parties rapides entre deux réseaux (IPv4 ou /64 IPv6) et deux profils différents, première manche seulement (jamais les revanches), 2 parties classées par paire et par jour au maximum. Un **abandon** (quitter, ou ne pas revenir à temps) compte comme une défaite, mais n'est classé que si chaque joueur a fait au moins **2 coups** (question posée ou mauvaise devinette ; `MIN_MOVES_FOR_RANKED_FORFEIT`), pour qu'un second compte ne puisse pas « offrir » des victoires en quittant aussitôt. Pas de comptes : le navigateur garde un jeton de profil dont seule l'empreinte SHA-256 est stockée. La colonne `games.rating_change` garde la variation du gagnant.
