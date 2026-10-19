@@ -35,7 +35,7 @@ export const FloatingReactions: React.FC = () => {
           <div
             key={r.id}
             role="img"
-            aria-label={`${who} : ${LABELS[r.emoji]}`}
+            aria-label={`${who} : ${LABELS[r.emoji]}`}
             className={cn("reaction-float absolute left-1/2 text-5xl drop-shadow-lg select-none", mine ? "bottom-40" : "top-24")}
             style={{ "--rx": `${offsetFor(r.id)}px`, "--dir": mine ? -1 : 1 } as React.CSSProperties}
           >

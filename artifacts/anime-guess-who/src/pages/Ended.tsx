@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import { CharacterCard } from "@/components/CharacterCard";
 import { LogEntryView } from "@/components/LogEntryView";
 import { ReactionRow } from "@/components/Reactions";
+import { signed } from "@/lib/fr";
+import { usePageHeading } from "@/components/PageHeading";
 import { Home, RotateCcw, Trophy, Skull, Handshake } from "lucide-react";
 
 export const Ended: React.FC = () => {
@@ -34,6 +36,9 @@ export const Ended: React.FC = () => {
     log => log.type === "qna" && !log.verified && log.askerId === myPlayerId
   );
 
+  const heading = isDisconnect ? "Victoire par abandon" : isDraw ? "Égalité !" : (isWinner ? "Victoire !" : "Défaite");
+  const headingRef = usePageHeading(heading);
+
   return (
     <div className="min-h-[100dvh] w-full flex flex-col items-center justify-center p-6 bg-background relative overflow-hidden">
       
@@ -47,8 +52,8 @@ export const Ended: React.FC = () => {
           <div className={`inline-flex p-4 rounded-full ${isDraw ? 'bg-amber-500/20 text-amber-700' : isWinner ? 'bg-green-500/20 text-green-700' : 'bg-red-500/20 text-red-600'}`}>
             {isDraw ? <Handshake className="w-16 h-16" /> : isWinner ? <Trophy className="w-16 h-16" /> : <Skull className="w-16 h-16" />}
           </div>
-          <h1 className={`${isDisconnect ? 'text-4xl md:text-6xl' : 'text-6xl md:text-8xl'} font-display font-black uppercase tracking-tighter transform ${isDraw ? 'text-amber-600' : isWinner ? '-skew-x-6 text-green-600 drop-shadow-[0_0_15px_rgba(34,197,94,0.5)]' : 'text-red-600'}`}>
-            {isDisconnect ? "Victoire par abandon" : isDraw ? "Égalité !" : (isWinner ? "Victoire !" : "Défaite")}
+          <h1 ref={headingRef} tabIndex={-1} className={`focus:outline-none ${isDisconnect ? 'text-4xl md:text-6xl' : 'text-6xl md:text-8xl'} font-display font-black uppercase tracking-tighter transform ${isDraw ? 'text-amber-600' : isWinner ? '-skew-x-6 text-green-600 drop-shadow-[0_0_15px_rgba(34,197,94,0.5)]' : 'text-red-600'}`}>
+            {heading}
           </h1>
           <p className="text-xl font-bold uppercase tracking-widest text-muted-foreground">
             {gameOverReason === "out_of_lives" && !isWinner && "Tu n’as plus de vies !"}
@@ -65,9 +70,9 @@ export const Ended: React.FC = () => {
           <div className="bg-card/70 border border-card-border rounded-xl px-4 py-2 text-sm font-bold">
             {ratingUpdate.ranked ? (
               <>
-                Score : <span className="font-display text-lg tabular-nums">{ratingUpdate.rating}</span>{" "}
+                Score : <span className="font-display text-lg tabular-nums">{ratingUpdate.rating}</span>{" "}
                 <span className={ratingUpdate.delta >= 0 ? "text-green-700" : "text-red-600"}>
-                  ({ratingUpdate.delta >= 0 ? "+" : ""}{ratingUpdate.delta})
+                  ({signed(ratingUpdate.delta)})
                 </span>
               </>
             ) : (
@@ -86,7 +91,7 @@ export const Ended: React.FC = () => {
         {!isDisconnect && opponentCharacter && (
           <div className="flex flex-col items-center gap-4 w-full">
             <span className="text-sm font-bold uppercase tracking-widest text-muted-foreground">
-              Son personnage secret :
+              Son personnage secret :
             </span>
             <div className="w-full max-w-[250px] transform hover:scale-105 transition-transform duration-500">
               <CharacterCard character={opponentCharacter} />
@@ -135,7 +140,7 @@ export const Ended: React.FC = () => {
             </h2>
             {hasFreeAnswersFromOpponent && opponentCharacter && (
               <p className="text-xs text-muted-foreground text-center">
-                Compare les réponses « non vérifiées » de ton adversaire avec la fiche de {opponentCharacter.name} ci-dessus.
+                Compare les réponses « non vérifiées » de ton adversaire avec la fiche de {opponentCharacter.name} ci-dessus.
               </p>
             )}
             <div className="space-y-2">

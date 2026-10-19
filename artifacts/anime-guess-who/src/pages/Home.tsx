@@ -1,5 +1,7 @@
-import React, { Suspense, lazy, useState } from "react";
+import React, { Suspense, lazy, useEffect, useState } from "react";
 import { useGame } from "@/context/GameContext";
+import { APP_NAME, usePageHeading } from "@/components/PageHeading";
+import { RULES_SEEN_KEY, hasSeen, markSeen } from "@/components/Onboarding";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -24,6 +26,16 @@ export const Home: React.FC = () => {
 
   const [localName, setLocalName] = useState(myName);
   const [showNameModal, setShowNameModal] = useState(!myName);
+
+  // The name dialog, when it opens with the page, takes the focus itself.
+  const headingRef = usePageHeading(`${APP_NAME} — Qui est-ce ? version anime`, Boolean(myName));
+
+  // A first-time player gets the rules once, right after choosing a name.
+  useEffect(() => {
+    if (!myName || showNameModal || hasSeen(RULES_SEEN_KEY)) return;
+    markSeen(RULES_SEEN_KEY);
+    setShowHowToPlay(true);
+  }, [myName, showNameModal]);
 
   const handleSaveName = (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,11 +63,16 @@ export const Home: React.FC = () => {
 
       <div className="z-10 w-full max-w-md flex flex-col gap-8">
         <div className="text-center space-y-2">
-          <h1 className="text-5xl md:text-7xl font-display font-black text-transparent bg-clip-text bg-gradient-to-br from-primary to-secondary drop-shadow-sm uppercase italic tracking-tighter transform -skew-x-6">
+          <h1
+            ref={headingRef}
+            tabIndex={-1}
+            aria-label="AnimeWho"
+            className="text-5xl md:text-7xl font-display font-black text-transparent bg-clip-text bg-gradient-to-br from-primary to-secondary drop-shadow-sm uppercase italic tracking-tighter transform -skew-x-6 focus:outline-none"
+          >
             Anime<br />Who
           </h1>
           <p className="text-muted-foreground font-bold tracking-widest uppercase text-sm">
-            Qui est-ce ? Édition anime
+            Qui est-ce ? Édition anime
           </p>
         </div>
 
@@ -140,7 +157,7 @@ export const Home: React.FC = () => {
           <DialogHeader>
             <DialogTitle className="font-display text-2xl">Choisis ta voie du ninja</DialogTitle>
             <DialogDescription>
-              Quel nom veux-tu porter dans l’arène ?
+              Quel nom veux-tu porter dans l’arène ?
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSaveName} className="space-y-4 pt-4">
@@ -235,10 +252,10 @@ export const Home: React.FC = () => {
             <DialogTitle className="font-display text-2xl">Comment jouer</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 text-sm leading-relaxed">
-            <p><strong>1. Choix :</strong> chaque joueur choisit en secret un personnage parmi les 24 de la grille.</p>
-            <p><strong>2. Déduction :</strong> à tour de rôle, posez des questions fermées (oui / non) sur le personnage secret de l’adversaire (ex. « Ton personnage a-t-il les cheveux en pétard ? »).</p>
-            <p><strong>3. Élimination :</strong> selon la réponse, touche les personnages de ta grille pour les écarter. Touche-les à nouveau pour les remettre.</p>
-            <p><strong>4. Victoire :</strong> quand tu penses avoir trouvé, utilise ton tour pour deviner ! Attention : une mauvaise réponse coûte une vie, et à 3 vies perdues tu as perdu. Chaque tour est chronométré : si le temps est écoulé, tu perds aussi une vie.</p>
+            <p><strong>1. Choix :</strong> chaque joueur choisit en secret un personnage parmi les 24 de la grille.</p>
+            <p><strong>2. Déduction :</strong> à tour de rôle, posez des questions fermées (oui / non) sur le personnage secret de l’adversaire (ex. « Ton personnage a-t-il les cheveux en pétard ? »).</p>
+            <p><strong>3. Élimination :</strong> selon la réponse, touche les personnages de ta grille pour les écarter. Touche-les à nouveau pour les remettre.</p>
+            <p><strong>4. Victoire :</strong> quand tu penses avoir trouvé, utilise ton tour pour deviner ! Attention : une mauvaise réponse coûte une vie, et à 3 vies perdues tu as perdu. Chaque tour est chronométré : si le temps est écoulé, tu perds aussi une vie.</p>
           </div>
           <DialogFooter>
             <Button onClick={() => setShowHowToPlay(false)}>Compris</Button>
