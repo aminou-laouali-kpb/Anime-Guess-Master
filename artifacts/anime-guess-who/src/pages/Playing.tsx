@@ -15,6 +15,8 @@ import { MyCharacterChip } from "@/components/MyCharacterChip";
 import { ATTRIBUTES, VerifiableAttribute, hasTrait, questionText, valueLabel, valuesOnBoard } from "@/lib/questions";
 import { toast } from "sonner";
 
+const RULE_OUT_TOAST = "rule-out";
+
 export const Playing: React.FC = () => {
   const {
     players,
@@ -84,6 +86,11 @@ export const Playing: React.FC = () => {
     }
   }, [canAct]);
 
+  // The "Les écarter" offer would sit on top of a dialog: drop it when one opens.
+  useEffect(() => {
+    if (showAskModal || showGuessModal) toast.dismiss(RULE_OUT_TOAST);
+  }, [showAskModal, showGuessModal]);
+
   // One stable function for all 24 cards, so they don't all redraw on each toggle.
   const toggleElimination = useCallback((id: string) => {
     setEliminatedIds(prev => {
@@ -134,6 +141,9 @@ export const Playing: React.FC = () => {
       .map(c => c.id);
     if (ruledOut.length === 0) return;
     toast(`Réponse : ${keep ? "OUI" : "NON"}`, {
+      id: RULE_OUT_TOAST,
+      // Near the thumb and the action buttons, not over the turn banner.
+      position: "bottom-center",
       description: `${ruledOut.length} personnage${ruledOut.length > 1 ? "s ne correspondent" : " ne correspond"} pas.`,
       action: {
         label: "Les écarter",
@@ -160,6 +170,14 @@ export const Playing: React.FC = () => {
   };
   const guessCandidateChar = characters.find(c => c.id === guessCandidate);
   const guessable = characters.filter(c => !eliminatedIds.has(c.id));
+  const remaining = guessable.length;
+
+  // The history dot means "something new since you last looked".
+  const [seenLogCount, setSeenLogCount] = useState(gameLog.length);
+  useEffect(() => {
+    if (showLog) setSeenLogCount(gameLog.length);
+  }, [showLog, gameLog.length]);
+  const unreadLog = gameLog.length > seenLogCount;
   const guessResults = guessable.filter(c => c.name.toLowerCase().includes(guessSearch.toLowerCase()));
 
   // Scroll log to bottom effect could go here if we were showing it inline permanently
@@ -170,9 +188,9 @@ export const Playing: React.FC = () => {
       {/* Top HUD (Opponent) + turn banner stay visible while scrolling the board */}
       <div className="sticky top-0 z-40">
         <div className="bg-card border-b-4 border-card-border p-3 flex justify-between items-center shadow-sm">
-          <div className="flex flex-col">
+          <div className="flex flex-col min-w-0 flex-1 mr-2">
             <span className="text-xs uppercase font-bold text-muted-foreground tracking-wider">Adversaire</span>
-            <span className="font-display font-black text-lg text-secondary truncate max-w-[150px]">
+            <span className="font-display font-black text-lg text-secondary truncate">
               {opponent?.name || "Joueur 2"}
             </span>
           </div>
@@ -207,6 +225,12 @@ export const Playing: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* How many are left, and how to cross one out (the board is the main tool). */}
+      <p className="px-3 pt-3 max-w-6xl mx-auto w-full text-xs font-bold text-muted-foreground" aria-live="polite">
+        <span className="text-foreground tabular-nums">{remaining}</span> possible{remaining > 1 ? "s" : ""} sur {characters.length}
+        <span className="font-medium"> · touche une carte pour l’écarter</span>
+      </p>
 
       {/* Game Board (Grid) */}
       <div className="p-3 grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-8 gap-2 max-w-6xl mx-auto w-full content-start">
@@ -244,12 +268,12 @@ export const Playing: React.FC = () => {
               size="sm"
               onClick={() => setShowLog(!showLog)}
               className="font-bold relative px-2"
-              aria-label="Historique"
+              aria-label={unreadLog ? "Historique (nouveau)" : "Historique"}
               aria-expanded={showLog}
             >
               <MessageSquare className="w-5 h-5 sm:mr-2" />
               <span className="hidden sm:inline">Historique</span>
-              {gameLog.length > 0 && (
+              {unreadLog && (
                 <span className="absolute top-0 right-0 w-2.5 h-2.5 bg-primary rounded-full" />
               )}
             </Button>
@@ -391,20 +415,29 @@ export const Playing: React.FC = () => {
                     </Button>
                   ))}
                 </div>
-                <div className="flex flex-wrap gap-1.5">
-                  {valuesOnBoard(characters, askAttribute).map(value => (
-                    <Button
-                      key={value}
-                      type="button"
-                      size="sm"
-                      variant={askValue === value ? "secondary" : "ghost"}
-                      className={cn("border", askValue === value && "ring-2 ring-secondary")}
-                      onClick={() => setAskValue(value)}
-                    >
-                      {valueLabel(askAttribute, value)}
-                    </Button>
-                  ))}
+                {/* The count is how many of MY remaining cards have this trait:
+                    it shows at a glance which question splits the board best. */}
+                <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Réponse à tester</p>
+                <div className="flex flex-wrap gap-1.5 -mt-2">
+                  {valuesOnBoard(characters, askAttribute).map(value => {
+                    const count = guessable.filter(c => hasTrait(c, askAttribute, value)).length;
+                    return (
+                      <Button
+                        key={value}
+                        type="button"
+                        size="sm"
+                        variant={askValue === value ? "secondary" : "outline"}
+                        className={cn(askValue === value && "ring-2 ring-secondary/40", count === 0 && askValue !== value && "opacity-60")}
+                        onClick={() => setAskValue(value)}
+                        aria-pressed={askValue === value}
+                      >
+                        {valueLabel(askAttribute, value)}
+                        <span className="ml-1 tabular-nums opacity-70">({count})</span>
+                      </Button>
+                    );
+                  })}
                 </div>
+                <p className="text-[11px] text-muted-foreground -mt-2">Entre parenthèses : combien de tes personnages restants ont ce trait.</p>
                 <p className="min-h-6 text-center font-bold italic">
                   {askValue ? `« ${questionText(askAttribute, askValue)} »` : "Choisis une réponse possible ci-dessus."}
                 </p>
@@ -479,7 +512,7 @@ export const Playing: React.FC = () => {
           </ScrollArea>
           <div className="p-3 border-t bg-card flex items-center gap-2">
             <p className="flex-1 min-w-0 text-sm font-bold truncate">
-              {guessCandidateChar ? `Deviner ${guessCandidateChar.name} ?` : "Touche un personnage pour le choisir."}
+              {guessCandidateChar ? `Deviner ${guessCandidateChar.name} ?` : "Choisis un personnage"}
             </p>
             <Button
               className="bg-red-600 hover:bg-red-700 font-bold shrink-0"

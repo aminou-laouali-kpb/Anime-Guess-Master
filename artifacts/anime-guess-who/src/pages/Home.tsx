@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useState } from "react";
+import React, { Suspense, lazy, useEffect, useState } from "react";
 import { useGame } from "@/context/GameContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,15 +12,33 @@ const LeaderboardDialog = lazy(() =>
   import("@/components/LeaderboardDialog").then((m) => ({ default: m.LeaderboardDialog })),
 );
 
+// Room codes are 6 letters or digits. Players may also paste a whole invite
+// link into the box: keep only the code.
+function normalizeCode(input: string): string {
+  const fromLink = input.match(/[?&]code=([A-Za-z0-9]+)/)?.[1];
+  return (fromLink ?? input).replace(/[^A-Za-z0-9]/g, "").toUpperCase().slice(0, 6);
+}
+
+function codeFromUrl(): string {
+  const code = new URLSearchParams(window.location.search).get("code");
+  return code ? normalizeCode(code) : "";
+}
+
 export const Home: React.FC = () => {
   const { myName, setMyName, joinQueue, joinRoom, createPrivateRoom, playVsBot, myStats } = useGame();
   const [showBot, setShowBot] = useState(false);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [leaderboardLoaded, setLeaderboardLoaded] = useState(false);
 
-  const [showJoin, setShowJoin] = useState(false);
-  const [joinCode, setJoinCode] = useState("");
+  // Opened from an invite link (?code=ABC234): the join dialog comes up with
+  // the code filled in, right away or once the player has picked a name.
+  const [invitedCode] = useState(() => codeFromUrl());
+  const [showJoin, setShowJoin] = useState(Boolean(invitedCode && myName));
+  const [joinCode, setJoinCode] = useState(invitedCode);
   const [showHowToPlay, setShowHowToPlay] = useState(false);
+  useEffect(() => {
+    if (invitedCode) window.history.replaceState(null, "", window.location.pathname);
+  }, [invitedCode]);
 
   const [localName, setLocalName] = useState(myName);
   const [showNameModal, setShowNameModal] = useState(!myName);
@@ -30,6 +48,7 @@ export const Home: React.FC = () => {
     if (localName.trim()) {
       setMyName(localName.trim());
       setShowNameModal(false);
+      if (invitedCode && !myName) setShowJoin(true);
     }
   };
 
@@ -61,9 +80,15 @@ export const Home: React.FC = () => {
 
         {myName && (
           <div className="bg-card/50 backdrop-blur-md border border-card-border p-3 rounded-xl flex items-center justify-between">
-            <div className="flex flex-col">
+            <div className="flex flex-col min-w-0">
               <span className="text-xs text-muted-foreground font-bold uppercase tracking-wider">Pseudo</span>
-              <span className="font-display font-bold text-lg">{myName}</span>
+              <span className="font-display font-bold text-lg truncate">{myName}</span>
+              {myStats?.stats && (
+                <span className="text-xs font-semibold text-muted-foreground tabular-nums">
+                  Score {myStats.stats.rating} · {myStats.stats.wins} V / {myStats.stats.losses} D
+                  {myStats.stats.rank ? ` · ${myStats.stats.rank}ᵉ` : ""}
+                </span>
+              )}
             </div>
             <Button variant="ghost" size="sm" onClick={() => setShowNameModal(true)}>
               Modifier
@@ -172,22 +197,24 @@ export const Home: React.FC = () => {
           </DialogHeader>
           <form onSubmit={(e) => {
             e.preventDefault();
-            if (joinCode.trim()) joinRoom(joinCode.trim().toUpperCase());
+            if (joinCode.length === 6) joinRoom(joinCode);
           }} className="space-y-4 pt-4">
             <div className="space-y-2">
               <Label htmlFor="code">Code de la partie</Label>
-              <Input 
-                id="code" 
+              <Input
+                id="code"
                 autoFocus
-                placeholder="ABCDEF" 
-                value={joinCode} 
-                onChange={(e) => setJoinCode(e.target.value)}
+                placeholder="ABCDEF"
+                value={joinCode}
+                onChange={(e) => setJoinCode(normalizeCode(e.target.value))}
                 className="uppercase font-mono text-center tracking-[0.5em] text-2xl h-14"
-                maxLength={6}
+                autoComplete="off"
+                autoCapitalize="characters"
+                spellCheck={false}
               />
             </div>
             <DialogFooter>
-              <Button type="submit" disabled={joinCode.trim().length === 0} className="w-full">
+              <Button type="submit" disabled={joinCode.length !== 6} className="w-full">
                 Entrer dans l’arène <ArrowRight className="ml-2 w-4 h-4" />
               </Button>
             </DialogFooter>
@@ -235,10 +262,10 @@ export const Home: React.FC = () => {
             <DialogTitle className="font-display text-2xl">Comment jouer</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 text-sm leading-relaxed">
-            <p><strong>1. Choix :</strong> chaque joueur choisit en secret un personnage parmi les 24 de la grille.</p>
-            <p><strong>2. Déduction :</strong> à tour de rôle, posez des questions fermées (oui / non) sur le personnage secret de l’adversaire (ex. « Ton personnage a-t-il les cheveux en pétard ? »).</p>
-            <p><strong>3. Élimination :</strong> selon la réponse, touche les personnages de ta grille pour les écarter. Touche-les à nouveau pour les remettre.</p>
-            <p><strong>4. Victoire :</strong> quand tu penses avoir trouvé, utilise ton tour pour deviner ! Attention : une mauvaise réponse coûte une vie, et à 3 vies perdues tu as perdu. Chaque tour est chronométré : si le temps est écoulé, tu perds aussi une vie.</p>
+            <p><strong>1. Choix :</strong> chaque joueur choisit en secret un personnage parmi les 24 de la grille (90 s).</p>
+            <p><strong>2. Questions :</strong> à ton tour (60 s), pose une question fermée sur le personnage de l’adversaire. Une <em>question vérifiée</em> (cheveux, yeux, anime…) reçoit sa réponse directement du jeu : impossible de mentir. Une <em>question libre</em> (« Se bat-il avec une épée ? ») est posée à ton adversaire, et ses réponses sont révélées à la fin.</p>
+            <p><strong>3. Élimination :</strong> touche les personnages de ta grille pour les écarter, touche-les à nouveau pour les remettre. Après une question vérifiée, le bouton « Les écarter » le fait pour toi.</p>
+            <p><strong>4. Victoire :</strong> quand tu penses avoir trouvé, utilise ton tour pour deviner. Une mauvaise réponse ou un temps écoulé coûte une vie ; à 3 vies perdues, la partie est perdue.</p>
           </div>
           <DialogFooter>
             <Button onClick={() => setShowHowToPlay(false)}>Compris</Button>

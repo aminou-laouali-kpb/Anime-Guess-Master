@@ -20,6 +20,7 @@ export const Selection: React.FC = () => {
   };
 
   const isLockedIn = myCharacterId !== null;
+  const pickedName = characters.find(c => c.id === localSelection)?.name;
   const pickCharacter = useCallback(
     (id: string) => {
       if (!isLockedIn) setLocalSelection(id);
@@ -34,21 +35,18 @@ export const Selection: React.FC = () => {
   }, [myCharacterId]);
 
   return (
-    <div className="min-h-[100dvh] w-full flex flex-col bg-background relative pb-24">
+    <div className="min-h-[100dvh] w-full flex flex-col bg-background relative pb-32">
       {/* Header Sticky */}
-      <div className="sticky top-0 z-40 bg-background/80 backdrop-blur-md border-b border-border px-4 py-4 flex flex-col items-center justify-center shadow-sm">
+      <div className="sticky top-0 z-40 bg-background/80 backdrop-blur-md border-b border-border px-4 py-3 sm:py-4 flex flex-col items-center justify-center shadow-sm">
         <LeaveGameButton countsAsLoss={false} className="absolute top-2 right-2 text-muted-foreground" />
-        <h2 className="font-display font-black text-2xl uppercase tracking-tight text-center px-8">
+        <h2 className="font-display font-black text-xl sm:text-2xl uppercase tracking-tight text-center px-10">
           {isLockedIn ? "En attente de l’adversaire" : "Choisis ton personnage secret"}
         </h2>
-        <div className="flex items-center gap-4 mt-2 text-sm font-bold">
-          <span className={isLockedIn ? "text-primary" : "text-muted-foreground"}>
-            {myName} {isLockedIn ? "✓" : "…"}
-          </span>
-          <span className="text-muted-foreground/30">VS</span>
-          <span className={opponentReady ? "text-secondary" : "text-muted-foreground"}>
-            {opponentName} {opponentReady ? "✓" : "…"}
-          </span>
+        {/* Who has chosen: a clear status rather than "…", which read like a cut-off name. */}
+        <div className="flex items-center justify-center gap-2 mt-2 text-xs sm:text-sm font-bold w-full">
+          <PlayerStatus name={myName} ready={isLockedIn} tone="text-primary" />
+          <span className="text-muted-foreground/50 shrink-0">VS</span>
+          <PlayerStatus name={opponentName} ready={opponentReady} tone="text-secondary" />
         </div>
         {!isLockedIn && (
           <Countdown deadline={timer?.deadline}>
@@ -85,8 +83,13 @@ export const Selection: React.FC = () => {
               disabled={!localSelection}
               onClick={handleConfirm}
             >
-              Valider mon choix
+              <span className="truncate">{pickedName ? `Valider : ${pickedName}` : "Valider mon choix"}</span>
             </Button>
+            {!localSelection && (
+              <p className="mt-2 text-center text-xs text-muted-foreground">
+                Touche un personnage : c’est lui que ton adversaire devra deviner.
+              </p>
+            )}
           </div>
         </div>
       )}
@@ -102,3 +105,16 @@ export const Selection: React.FC = () => {
     </div>
   );
 };
+
+const PlayerStatus: React.FC<{ name: string; ready: boolean; tone: string }> = ({ name, ready, tone }) => (
+  <span className="flex items-center gap-1.5 min-w-0">
+    <span className={`truncate ${ready ? tone : "text-foreground"}`}>{name}</span>
+    <span
+      className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] ${
+        ready ? "bg-green-600/15 text-green-700" : "bg-muted text-muted-foreground"
+      }`}
+    >
+      {ready ? "prêt ✓" : "réfléchit"}
+    </span>
+  </span>
+);

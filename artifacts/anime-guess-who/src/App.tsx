@@ -46,7 +46,15 @@ function App() {
         <FloatingReactions />
         <ConnectionStatus />
       </GameProvider>
-      <Toaster position="top-center" theme="light" richColors />
+      {/* Clear of the in-game header and bottom bar, so a toast never hides
+          whose turn it is, the clock or the action buttons. */}
+      <Toaster
+        position="top-center"
+        theme="light"
+        richColors
+        offset={{ top: 104, bottom: 168 }}
+        mobileOffset={{ top: 104, bottom: 168 }}
+      />
     </ErrorBoundary>
   );
 }
