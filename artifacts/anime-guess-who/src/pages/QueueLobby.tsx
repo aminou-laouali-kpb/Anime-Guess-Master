@@ -27,7 +27,7 @@ export const QueueLobby: React.FC = () => {
       setTimeout(() => setCopied(false), 2000);
     } catch {
       // Clipboard blocked (insecure page, denied permission…): don't pretend it worked.
-      toast.error("Copie impossible : recopie le code à la main.");
+      toast.error("Copie impossible : recopie le code à la main.");
     }
   };
 
@@ -51,14 +51,14 @@ export const QueueLobby: React.FC = () => {
           </h2>
           <p className="text-muted-foreground font-medium">
             {phase === "queue" 
-              ? `Position dans la file : ${queuePosition || '…'}`
+              ? `Position dans la file : ${queuePosition || '…'}`
               : "Envoie ce code à la personne avec qui tu veux jouer."}
           </p>
         </div>
 
         {phase === "queue" && waitedSeconds >= 15 && (
           <div className="w-full flex flex-col gap-2 border-t border-border pt-6">
-            <p className="text-sm text-muted-foreground">Personne pour l’instant ? Entraîne-toi en attendant.</p>
+            <p className="text-sm text-muted-foreground">Personne pour l’instant ? Entraîne-toi en attendant.</p>
             <Button variant="outline" size="lg" className="h-12 font-bold border-2" onClick={() => playVsBot("normal")}>
               <Bot className="mr-2 w-5 h-5" /> Jouer contre l’ordinateur
             </Button>

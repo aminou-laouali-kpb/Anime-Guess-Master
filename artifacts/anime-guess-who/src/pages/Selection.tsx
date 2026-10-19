@@ -54,7 +54,7 @@ export const Selection: React.FC = () => {
           <Countdown deadline={timer?.deadline}>
             {(seconds, urgent) => (
               <p className={`mt-1 text-xs font-bold uppercase tracking-widest tabular-nums ${urgent ? "text-red-600 animate-pulse" : "text-muted-foreground"}`}>
-                encore {seconds} s — sinon on choisit pour toi
+                encore {seconds} s — sinon on choisit pour toi
               </p>
             )}
           </Countdown>

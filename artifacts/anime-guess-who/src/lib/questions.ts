@@ -39,14 +39,14 @@ export function questionText(attribute: VerifiableAttribute, value: string): str
     case "hairColor":
       return value === "none"
         ? "Ton personnage est-il chauve ?"
-        : `Ton personnage a-t-il les cheveux ${fr.hair(value)} ?`;
-    case "eyeColor": return `Ton personnage a-t-il les yeux ${fr.eyes(value)} ?`;
+        : `Ton personnage a-t-il les cheveux ${fr.hair(value)} ?`;
+    case "eyeColor": return `Ton personnage a-t-il les yeux ${fr.eyes(value)} ?`;
     case "gender": return value === "female" ? "Ton personnage est-il une femme ?" : "Ton personnage est-il un homme ?";
-    case "ageRange": return `Ton personnage est-il ${AGE_PHRASES[value] ?? value} ?`;
-    case "species": return `Ton personnage est-il de l’espèce « ${fr.species(value)} » ?`;
-    case "alignment": return `Ton personnage est-il ${ALIGNMENT_PHRASES[value] ?? value} ?`;
-    case "role": return `Ton personnage est-il un personnage ${fr.role(value)} ?`;
-    case "anime": return `Ton personnage vient-il de « ${value} » ?`;
+    case "ageRange": return `Ton personnage est-il ${AGE_PHRASES[value] ?? value} ?`;
+    case "species": return `Ton personnage est-il de l’espèce « ${fr.species(value)} » ?`;
+    case "alignment": return `Ton personnage est-il ${ALIGNMENT_PHRASES[value] ?? value} ?`;
+    case "role": return `Ton personnage est-il un personnage ${fr.role(value)} ?`;
+    case "anime": return `Ton personnage vient-il de « ${value} » ?`;
   }
 }
 

@@ -1,6 +1,7 @@
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
+import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
-import { FR_LABELS } from './fr';
+import { FR_LABELS, plural, signed } from './fr';
 import {
   AGE_PHRASES,
   ALIGNMENT_PHRASES,
@@ -76,5 +77,104 @@ describe('verified questions', () => {
     const board = characters as unknown as Parameters<typeof valuesOnBoard>[0];
     const labels = valuesOnBoard(board, 'hairColor').map((v) => valueLabel('hairColor', v));
     expect(labels).toEqual([...labels].sort((a, b) => a.localeCompare(b, 'fr')));
+  });
+});
+
+describe('plural and signed number helpers', () => {
+  it('follows French plural rules (0 and 1 are singular)', () => {
+    expect(plural(0, 'partie', 'parties')).toBe('partie');
+    expect(plural(1, 'partie', 'parties')).toBe('partie');
+    expect(plural(2, 'partie', 'parties')).toBe('parties');
+    expect(plural(1_000_000, 'partie', 'parties')).toBe('parties');
+  });
+
+  it('always shows the sign of a score change', () => {
+    expect(signed(12)).toBe('+12');
+    expect(signed(0)).toBe('+0');
+    expect(signed(-7)).toMatch(/^[-\u2212]7$/);
+  });
+});
+
+// French typography in the interface text: a no-break space before : ; ! ?,
+// inside « », and between a number and its unit. The files are parsed with
+// the TypeScript compiler, so only string literals and JSX text are checked,
+// never code (ternaries, object keys, types, ?? and ?.).
+describe('French typography in the interface', () => {
+  const src = new URL('../', import.meta.url);
+  const files = [
+    ...readdirSync(new URL('pages/', src)).filter((f) => f.endsWith('.tsx')).map((f) => `pages/${f}`),
+    ...readdirSync(new URL('components/', src)).filter((f) => f.endsWith('.tsx')).map((f) => `components/${f}`),
+    'lib/questions.ts',
+    'lib/fr.ts',
+  ];
+
+  // A plain (breakable) space where French needs a no-break one.
+  const RULES: [RegExp, string][] = [
+    [/[ \t][!?;]/, 'plain space before ! ? ; (use U+202F)'],
+    [/[ \t]:(?=\s|$)/, 'plain space before : (use U+00A0)'],
+    [/«[ \t]/, 'plain space after « (use U+00A0)'],
+    [/[ \t]»/, 'plain space before » (use U+00A0)'],
+    [/\d[ \t](?:s|%)(?![\p{L}\d])/u, 'plain space between a number and its unit (use U+00A0)'],
+    // Text right after an expression: "{seconds} s", `${rate} %`.
+    [/^[ \t](?:s|%)(?![\p{L}\d])/u, 'plain space between a number and its unit (use U+00A0)'],
+  ];
+
+  function textsOf(file: string): { line: number; text: string }[] {
+    const code = readFileSync(new URL(file, src), 'utf8');
+    const sf = ts.createSourceFile(file, code, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+    const out: { line: number; text: string }[] = [];
+    const visit = (node: ts.Node) => {
+      if (
+        ts.isStringLiteral(node) ||
+        ts.isNoSubstitutionTemplateLiteral(node) ||
+        ts.isTemplateHead(node) ||
+        ts.isTemplateMiddle(node) ||
+        ts.isTemplateTail(node) ||
+        ts.isJsxText(node)
+      ) {
+        // Import paths aren't interface text.
+        if (!ts.isImportDeclaration(node.parent) && !ts.isExportDeclaration(node.parent)) {
+          const line = sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1;
+          // JSX text: line breaks and indentation are not real spaces.
+          const text = ts.isJsxText(node) ? node.text.replace(/[ \t\r]*\n[ \t\r]*/g, '\n') : node.text;
+          out.push({ line, text });
+        }
+      }
+      ts.forEachChild(node, visit);
+    };
+    visit(sf);
+    return out;
+  }
+
+  it('finds the interface files', () => {
+    expect(files.length).toBeGreaterThan(8);
+    expect(textsOf('pages/Playing.tsx').length).toBeGreaterThan(20);
+  });
+
+  for (const file of files) {
+    it(`uses no-break spaces in ${file}`, () => {
+      const problems: string[] = [];
+      for (const { line, text } of textsOf(file)) {
+        for (const [re, why] of RULES) {
+          if (re.test(text)) problems.push(`${file}:${line} ${why}: ${JSON.stringify(text.trim())}`);
+        }
+      }
+      expect(problems).toEqual([]);
+    });
+  }
+
+  it('catches the mistakes it is meant to catch, and not code', () => {
+    const flagged = (s: string) => RULES.some(([re]) => re.test(s));
+    expect(flagged('Prêt ?')).toBe(true);
+    expect(flagged('Réponse : oui')).toBe(true);
+    expect(flagged('« Naruto »')).toBe(true);
+    expect(flagged('encore 12 s')).toBe(true);
+    expect(flagged('50 %')).toBe(true);
+    expect(flagged('Prêt\u202f?')).toBe(false);
+    expect(flagged('Réponse\u00a0: oui')).toBe(false);
+    expect(flagged('«\u00a0Naruto\u00a0»')).toBe(false);
+    expect(flagged('encore 12\u00a0s')).toBe(false);
+    expect(flagged('w-5 h-5 sm:inline shrink-0')).toBe(false);
+    expect(flagged('3 secondes')).toBe(false);
   });
 });

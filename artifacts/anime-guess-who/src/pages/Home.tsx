@@ -55,7 +55,7 @@ export const Home: React.FC = () => {
             Anime<br />Who
           </h1>
           <p className="text-muted-foreground font-bold tracking-widest uppercase text-sm">
-            Qui est-ce ? Édition anime
+            Qui est-ce ? Édition anime
           </p>
         </div>
 
@@ -140,7 +140,7 @@ export const Home: React.FC = () => {
           <DialogHeader>
             <DialogTitle className="font-display text-2xl">Choisis ta voie du ninja</DialogTitle>
             <DialogDescription>
-              Quel nom veux-tu porter dans l’arène ?
+              Quel nom veux-tu porter dans l’arène ?
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSaveName} className="space-y-4 pt-4">
@@ -235,10 +235,10 @@ export const Home: React.FC = () => {
             <DialogTitle className="font-display text-2xl">Comment jouer</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 text-sm leading-relaxed">
-            <p><strong>1. Choix :</strong> chaque joueur choisit en secret un personnage parmi les 24 de la grille.</p>
-            <p><strong>2. Déduction :</strong> à tour de rôle, posez des questions fermées (oui / non) sur le personnage secret de l’adversaire (ex. « Ton personnage a-t-il les cheveux en pétard ? »).</p>
-            <p><strong>3. Élimination :</strong> selon la réponse, touche les personnages de ta grille pour les écarter. Touche-les à nouveau pour les remettre.</p>
-            <p><strong>4. Victoire :</strong> quand tu penses avoir trouvé, utilise ton tour pour deviner ! Attention : une mauvaise réponse coûte une vie, et à 3 vies perdues tu as perdu. Chaque tour est chronométré : si le temps est écoulé, tu perds aussi une vie.</p>
+            <p><strong>1. Choix :</strong> chaque joueur choisit en secret un personnage parmi les 24 de la grille.</p>
+            <p><strong>2. Déduction :</strong> à tour de rôle, posez des questions fermées (oui / non) sur le personnage secret de l’adversaire (ex. « Ton personnage a-t-il les cheveux en pétard ? »).</p>
+            <p><strong>3. Élimination :</strong> selon la réponse, touche les personnages de ta grille pour les écarter. Touche-les à nouveau pour les remettre.</p>
+            <p><strong>4. Victoire :</strong> quand tu penses avoir trouvé, utilise ton tour pour deviner ! Attention : une mauvaise réponse coûte une vie, et à 3 vies perdues tu as perdu. Chaque tour est chronométré : si le temps est écoulé, tu perds aussi une vie.</p>
           </div>
           <DialogFooter>
             <Button onClick={() => setShowHowToPlay(false)}>Compris</Button>

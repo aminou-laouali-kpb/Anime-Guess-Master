@@ -1,7 +1,7 @@
 {
-  "name": "AnimeWho — Qui est-ce ? version anime",
+  "name": "AnimeWho — Qui est-ce ? version anime",
   "short_name": "AnimeWho",
-  "description": "Le « Qui est-ce ? » des fans d’anime : devine le personnage secret de ton adversaire.",
+  "description": "Le « Qui est-ce ? » des fans d’anime : devine le personnage secret de ton adversaire.",
   "lang": "fr",
   "start_url": "./",
   "scope": "./",

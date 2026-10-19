@@ -13,6 +13,7 @@ import { ReactionPicker } from "@/components/Reactions";
 import { LeaveGameButton } from "@/components/LeaveGameButton";
 import { MyCharacterChip } from "@/components/MyCharacterChip";
 import { ATTRIBUTES, VerifiableAttribute, hasTrait, questionText, valueLabel, valuesOnBoard } from "@/lib/questions";
+import { plural } from "@/lib/fr";
 import { toast } from "sonner";
 
 export const Playing: React.FC = () => {
@@ -138,8 +139,8 @@ export const Playing: React.FC = () => {
       .filter(c => !eliminatedIds.has(c.id) && hasTrait(c, attribute, value) !== keep)
       .map(c => c.id);
     if (ruledOut.length === 0) return;
-    toast(`Réponse : ${keep ? "OUI" : "NON"}`, {
-      description: `${ruledOut.length} personnage${ruledOut.length > 1 ? "s ne correspondent" : " ne correspond"} pas.`,
+    toast(`Réponse : ${keep ? "OUI" : "NON"}`, {
+      description: `${ruledOut.length} ${plural(ruledOut.length, "personnage ne correspond", "personnages ne correspondent")} pas.`,
       action: {
         label: "Les écarter",
         onClick: () => {
@@ -182,7 +183,7 @@ export const Playing: React.FC = () => {
             </span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="flex gap-1" aria-label={`Vies de l’adversaire : ${opponent?.lives ?? 0} sur 3`}>
+            <div className="flex gap-1" aria-label={`Vies de l’adversaire : ${opponent?.lives ?? 0} sur 3`}>
               {Array.from({ length: 3 }).map((_, i) => (
                 <Heart
                   key={i}
@@ -199,13 +200,13 @@ export const Playing: React.FC = () => {
           "py-1.5 px-4 text-center font-bold uppercase tracking-widest text-xs transition-colors shadow-sm z-30 relative",
           isMyTurn ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
         )}>
-          {!opponentConnected ? "Adversaire déconnecté — on l’attend…" : lastChanceFor ? (isMyTurn ? "Dernière chance : devine !" : "Dernière chance de l’adversaire") : isMyTurn ? "À toi de jouer" : "Tour de l’adversaire"}
+          {!opponentConnected ? "Adversaire déconnecté — on l’attend…" : lastChanceFor ? (isMyTurn ? "Dernière chance : devine !" : "Dernière chance de l’adversaire") : isMyTurn ? "À toi de jouer" : "Tour de l’adversaire"}
           {opponentConnected && !pendingQuestion && !awaitingAnswerFor && (
             <Countdown deadline={timer?.deadline}>
               {(seconds, urgent) => (
                 // Red on the blue "your turn" banner would be unreadable.
                 <span className={cn("ml-2 tabular-nums", urgent && (isMyTurn ? "text-yellow-200 font-black animate-pulse" : "text-red-600 animate-pulse"))}>
-                  · {seconds} s
+                  · {seconds} s
                 </span>
               )}
             </Countdown>
@@ -258,7 +259,7 @@ export const Playing: React.FC = () => {
                 <span className="absolute top-0 right-0 w-2.5 h-2.5 bg-primary rounded-full" />
               )}
             </Button>
-            <div className="flex gap-0.5" aria-label={`Tes vies : ${me?.lives ?? 0} sur 3`}>
+            <div className="flex gap-0.5" aria-label={`Tes vies : ${me?.lives ?? 0} sur 3`}>
               {Array.from({ length: 3 }).map((_, i) => (
                 <Heart
                   key={i}
@@ -297,23 +298,23 @@ export const Playing: React.FC = () => {
           <DialogHeader className="text-center">
             <DialogTitle className="font-display text-2xl uppercase text-secondary">Question reçue !</DialogTitle>
             <DialogDescription className="text-lg font-bold text-foreground mt-4">
-              « {pendingQuestion} »
+              « {pendingQuestion} »
             </DialogDescription>
             <Countdown deadline={timer?.deadline}>
               {(seconds, urgent) => (
                 <p className={cn("text-sm font-bold mt-2 tabular-nums", urgent ? "text-red-600" : "text-muted-foreground")}>
-                  Réponds dans les {seconds} s ou tu perds une vie
+                  Réponds dans les {seconds} s ou tu perds une vie
                 </p>
               )}
             </Countdown>
             {myCharacter && (
               <p className="text-sm font-bold mt-2">
-                Ton personnage : <span className="text-primary">{myCharacter.name}</span>
+                Ton personnage : <span className="text-primary">{myCharacter.name}</span>
                 <span className="text-muted-foreground font-normal"> ({myCharacter.anime})</span>
               </p>
             )}
             <p className="text-xs text-muted-foreground mt-1">
-              Réponds honnêtement : ton personnage et toutes tes réponses seront révélés à la fin.
+              Réponds honnêtement : ton personnage et toutes tes réponses seront révélés à la fin.
             </p>
           </DialogHeader>
           <div className="flex gap-4 mt-6 pointer-events-auto">
@@ -332,11 +333,11 @@ export const Playing: React.FC = () => {
         <div className="fixed inset-0 z-[60] bg-background/80 backdrop-blur-sm flex flex-col items-center justify-center p-6 animate-in fade-in">
           <div className="bg-card border-2 border-primary p-6 rounded-2xl max-w-md w-full text-center space-y-4 shadow-2xl">
             <h3 className="font-display text-xl font-bold text-primary uppercase">En attente de la réponse…</h3>
-            <p className="text-lg font-medium">« {awaitingAnswerFor} »</p>
+            <p className="text-lg font-medium">« {awaitingAnswerFor} »</p>
             <Countdown deadline={timer?.deadline}>
               {(seconds) => (
                 <p className="text-sm text-muted-foreground font-bold tabular-nums">
-                  L’adversaire a {seconds} s pour répondre
+                  L’adversaire a {seconds} s pour répondre
                 </p>
               )}
             </Countdown>
@@ -357,8 +358,8 @@ export const Playing: React.FC = () => {
             <DialogTitle className="font-display text-2xl">Poser une question</DialogTitle>
             <DialogDescription>
               {askMode === "verified"
-                ? "Le jeu répond à ta place à partir de la fiche du personnage : impossible de mentir."
-                : "C’est ton adversaire qui répond : sa réponse pourra être vérifiée à la fin de la partie."}
+                ? "Le jeu répond à ta place à partir de la fiche du personnage : impossible de mentir."
+                : "C’est ton adversaire qui répond : sa réponse pourra être vérifiée à la fin de la partie."}
             </DialogDescription>
           </DialogHeader>
 
@@ -411,7 +412,7 @@ export const Playing: React.FC = () => {
                   ))}
                 </div>
                 <p className="min-h-6 text-center font-bold italic">
-                  {askValue ? `« ${questionText(askAttribute, askValue)} »` : "Choisis une réponse possible ci-dessus."}
+                  {askValue ? `« ${questionText(askAttribute, askValue)} »` : "Choisis une réponse possible ci-dessus."}
                 </p>
               </>
             ) : (
@@ -446,10 +447,10 @@ export const Playing: React.FC = () => {
         >
           <div className="p-4 border-b bg-card">
             <DialogTitle className="font-display text-2xl text-red-600 flex items-center">
-              <Crosshair className="w-6 h-6 mr-2" /> Qui est-ce ?
+              <Crosshair className="w-6 h-6 mr-2" /> Qui est-ce ?
             </DialogTitle>
             <DialogDescription className="text-sm text-muted-foreground mt-1 font-bold">
-              Choisis un personnage puis confirme. Une mauvaise réponse te coûte 1 vie !
+              Choisis un personnage puis confirme. Une mauvaise réponse te coûte 1 vie !
             </DialogDescription>
             <Input
               placeholder="Rechercher un personnage…"
@@ -473,18 +474,18 @@ export const Playing: React.FC = () => {
               ))}
               {guessable.length === 0 ? (
                 <div className="col-span-full py-12 text-center text-muted-foreground">
-                  Plus aucun personnage ! Remets-en un sur ta grille d’abord.
+                  Plus aucun personnage ! Remets-en un sur ta grille d’abord.
                 </div>
               ) : guessResults.length === 0 && (
                 <div className="col-span-full py-12 text-center text-muted-foreground">
-                  Aucun personnage ne correspond à « {guessSearch} ».
+                  Aucun personnage ne correspond à « {guessSearch} ».
                 </div>
               )}
             </div>
           </ScrollArea>
           <div className="p-3 border-t bg-card flex items-center gap-2">
             <p className="flex-1 min-w-0 text-sm font-bold truncate">
-              {guessCandidateChar ? `Deviner ${guessCandidateChar.name} ?` : "Touche un personnage pour le choisir."}
+              {guessCandidateChar ? `Deviner ${guessCandidateChar.name} ?` : "Touche un personnage pour le choisir."}
             </p>
             <Button
               className="bg-red-600 hover:bg-red-700 font-bold shrink-0"

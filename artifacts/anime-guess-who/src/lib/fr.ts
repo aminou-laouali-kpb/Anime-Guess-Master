@@ -40,6 +40,16 @@ export const FR_LABELS = {
   role: ROLE,
 };
 
+// French plurals: 0 and 1 take the singular ("0 partie", "1 partie", "2 parties").
+const pluralRules = new Intl.PluralRules("fr");
+export function plural(n: number, one: string, other: string): string {
+  return pluralRules.select(n) === "one" ? one : other;
+}
+
+// A score change with its sign, French style: "+12", "-7", "+0".
+const signedFormat = new Intl.NumberFormat("fr-FR", { signDisplay: "always" });
+export const signed = (n: number): string => signedFormat.format(n);
+
 const lookup = (table: Record<string, string>) => (value: string) =>
   table[value?.toLowerCase()] ?? value;
 

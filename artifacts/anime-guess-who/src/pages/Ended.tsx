@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { CharacterCard } from "@/components/CharacterCard";
 import { LogEntryView } from "@/components/LogEntryView";
 import { ReactionRow } from "@/components/Reactions";
+import { signed } from "@/lib/fr";
 import { Home, RotateCcw, Trophy, Skull, Handshake } from "lucide-react";
 
 export const Ended: React.FC = () => {
@@ -65,9 +66,9 @@ export const Ended: React.FC = () => {
           <div className="bg-card/70 border border-card-border rounded-xl px-4 py-2 text-sm font-bold">
             {ratingUpdate.ranked ? (
               <>
-                Score : <span className="font-display text-lg tabular-nums">{ratingUpdate.rating}</span>{" "}
+                Score : <span className="font-display text-lg tabular-nums">{ratingUpdate.rating}</span>{" "}
                 <span className={ratingUpdate.delta >= 0 ? "text-green-700" : "text-red-600"}>
-                  ({ratingUpdate.delta >= 0 ? "+" : ""}{ratingUpdate.delta})
+                  ({signed(ratingUpdate.delta)})
                 </span>
               </>
             ) : (
@@ -86,7 +87,7 @@ export const Ended: React.FC = () => {
         {!isDisconnect && opponentCharacter && (
           <div className="flex flex-col items-center gap-4 w-full">
             <span className="text-sm font-bold uppercase tracking-widest text-muted-foreground">
-              Son personnage secret :
+              Son personnage secret :
             </span>
             <div className="w-full max-w-[250px] transform hover:scale-105 transition-transform duration-500">
               <CharacterCard character={opponentCharacter} />
@@ -135,7 +136,7 @@ export const Ended: React.FC = () => {
             </h2>
             {hasFreeAnswersFromOpponent && opponentCharacter && (
               <p className="text-xs text-muted-foreground text-center">
-                Compare les réponses « non vérifiées » de ton adversaire avec la fiche de {opponentCharacter.name} ci-dessus.
+                Compare les réponses « non vérifiées » de ton adversaire avec la fiche de {opponentCharacter.name} ci-dessus.
               </p>
             )}
             <div className="space-y-2">
