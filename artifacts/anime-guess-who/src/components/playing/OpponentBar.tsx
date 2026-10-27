@@ -10,13 +10,13 @@ export const OpponentBar: React.FC<{
   headingRef: React.Ref<HTMLHeadingElement>;
 }> = ({ opponent, vsBot, headingRef }) => (
   <div className="bg-card border-b-4 border-card-border p-3 flex justify-between items-center shadow-sm">
-    <div className="flex flex-col">
+    <div className="flex flex-col min-w-0 flex-1 mr-2">
       {/* Screen-reader heading for the game screen; the focus lands here on arrival. */}
       <h1 ref={headingRef} tabIndex={-1} className="sr-only">
         Partie contre {opponent?.name || "Joueur 2"}
       </h1>
       <span className="text-xs uppercase font-bold text-muted-foreground tracking-wider" aria-hidden>Adversaire</span>
-      <span className="font-display font-black text-lg text-secondary truncate max-w-[150px]" aria-hidden>
+      <span className="font-display font-black text-lg text-secondary truncate" aria-hidden>
         {opponent?.name || "Joueur 2"}
       </span>
     </div>

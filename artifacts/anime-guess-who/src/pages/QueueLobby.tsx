@@ -3,7 +3,7 @@ import { toast } from "sonner";
 import { useGame } from "@/context/GameContext";
 import { Button } from "@/components/ui/button";
 import { usePageHeading } from "@/components/PageHeading";
-import { Loader2, ArrowLeft, Copy, CheckCircle2, Bot } from "lucide-react";
+import { Loader2, ArrowLeft, Copy, CheckCircle2, Bot, Share2 } from "lucide-react";
 
 export const QueueLobby: React.FC = () => {
   const { phase, queuePosition, roomCode, leaveGame, playVsBot } = useGame();
@@ -31,6 +31,30 @@ export const QueueLobby: React.FC = () => {
     } catch {
       // Clipboard blocked (insecure page, denied permission…): don't pretend it worked.
       toast.error("Copie impossible : recopie le code à la main.");
+    }
+  };
+
+  // A link that opens the game with the code already filled in: easier to send
+  // in a chat than a code to retype.
+  const inviteLink = roomCode
+    ? `${window.location.origin}${import.meta.env.BASE_URL.replace(/\/?$/, "/")}?code=${roomCode}`
+    : "";
+  const shareInvite = async () => {
+    if (!roomCode) return;
+    const text = `Viens jouer à AnimeWho avec moi ! Code : ${roomCode}`;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: "AnimeWho", text, url: inviteLink });
+        return;
+      } catch (err) {
+        if ((err as Error).name === "AbortError") return; // the player closed the share sheet
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(inviteLink);
+      toast.success("Lien d’invitation copié");
+    } catch {
+      toast.error("Copie impossible : envoie le code à la main.");
     }
   };
 
@@ -80,6 +104,12 @@ export const QueueLobby: React.FC = () => {
             </div>
             <p className="text-xs text-muted-foreground uppercase tracking-widest font-bold">
               Code de la partie
+            </p>
+            <Button size="lg" className="mt-4 h-12 font-bold" onClick={shareInvite}>
+              <Share2 className="mr-2 w-5 h-5" /> Inviter avec un lien
+            </Button>
+            <p className="text-xs text-muted-foreground">
+              La partie commence dès que ton adversaire arrive.
             </p>
           </div>
         )}

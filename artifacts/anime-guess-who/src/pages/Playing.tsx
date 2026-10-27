@@ -11,7 +11,9 @@ import { AwaitingAnswer } from "@/components/playing/AwaitingAnswer";
 import { AskDialog } from "@/components/playing/AskDialog";
 import { GuessDialog } from "@/components/playing/GuessDialog";
 import { HistoryDrawer } from "@/components/playing/HistoryDrawer";
-import { useAutoEliminate } from "@/hooks/use-auto-eliminate";
+import { RULE_OUT_TOAST, useAutoEliminate } from "@/hooks/use-auto-eliminate";
+import { plural } from "@/lib/fr";
+import { toast } from "sonner";
 
 export const Playing: React.FC = () => {
   const {
@@ -136,6 +138,21 @@ export const Playing: React.FC = () => {
 
   useAutoEliminate({ gameLog, myPlayerId, characters, eliminatedIds, eliminate });
 
+  // The "Les écarter" offer would sit on top of a dialog: drop it when one opens.
+  useEffect(() => {
+    if (showAskModal || showGuessModal) toast.dismiss(RULE_OUT_TOAST);
+  }, [showAskModal, showGuessModal]);
+
+  // How many are left, and how to cross one out (the board is the main tool).
+  const remaining = characters.filter(c => !eliminatedIds.has(c.id)).length;
+
+  // The history dot means "something new since you last looked".
+  const [seenLogCount, setSeenLogCount] = useState(gameLog.length);
+  useEffect(() => {
+    if (showLog) setSeenLogCount(gameLog.length);
+  }, [showLog, gameLog.length]);
+  const unreadLog = gameLog.length > seenLogCount;
+
   const toggleLog = useCallback(() => setShowLog(show => !show), []);
   const closeLog = useCallback(() => setShowLog(false), []);
   const openAsk = useCallback(() => setShowAskModal(true), []);
@@ -155,6 +172,11 @@ export const Playing: React.FC = () => {
         />
       </div>
 
+      <p className="px-3 pt-3 max-w-6xl mx-auto w-full text-xs font-bold text-muted-foreground" aria-live="polite">
+        <span className="text-foreground tabular-nums">{remaining}</span> {plural(remaining, "possible", "possibles")} sur {characters.length}
+        <span className="font-medium"> · touche une carte pour l’écarter</span>
+      </p>
+
       {showHint && <CrossOutHint onDismiss={dismissHint} />}
 
       <Board characters={characters} eliminatedIds={eliminatedIds} onToggle={toggleElimination} />
@@ -163,7 +185,7 @@ export const Playing: React.FC = () => {
         ref={hudRef}
         me={me}
         myCharacter={myCharacter}
-        hasLog={gameLog.length > 0}
+        unreadLog={unreadLog}
         showLog={showLog}
         onToggleLog={toggleLog}
         canAsk={canAsk && !offline}
@@ -188,6 +210,7 @@ export const Playing: React.FC = () => {
         open={showAskModal}
         onOpenChange={setShowAskModal}
         characters={characters}
+        eliminatedIds={eliminatedIds}
         vsBot={vsBot}
         offline={offline}
         onAskVerified={askVerifiedQuestion}

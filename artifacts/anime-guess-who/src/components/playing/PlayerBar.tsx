@@ -12,14 +12,15 @@ export const PlayerBar: React.FC<{
   ref?: React.Ref<HTMLDivElement>;
   me: PlayerState | undefined;
   myCharacter: Character | undefined;
-  hasLog: boolean;
+  // Something new in the history since it was last opened.
+  unreadLog: boolean;
   showLog: boolean;
   onToggleLog: () => void;
   canAsk: boolean;
   canGuess: boolean;
   onAsk: () => void;
   onGuess: () => void;
-}> = ({ ref, me, myCharacter, hasLog, showLog, onToggleLog, canAsk, canGuess, onAsk, onGuess }) => (
+}> = ({ ref, me, myCharacter, unreadLog, showLog, onToggleLog, canAsk, canGuess, onAsk, onGuess }) => (
   <div
     ref={ref}
     className="fixed bottom-0 left-0 right-0 bg-card border-t-4 border-card-border z-50 animate-in slide-in-from-bottom"
@@ -42,13 +43,13 @@ export const PlayerBar: React.FC<{
           size="sm"
           onClick={onToggleLog}
           className="font-bold relative px-2"
-          aria-label="Historique"
+          aria-label={unreadLog ? "Historique (nouveau)" : "Historique"}
           aria-expanded={showLog}
           aria-controls="game-log"
         >
           <MessageSquare className="w-5 h-5 sm:mr-2" />
           <span className="hidden sm:inline">Historique</span>
-          {hasLog && (
+          {unreadLog && (
             <span className="absolute top-0 right-0 w-2.5 h-2.5 bg-primary rounded-full" />
           )}
         </Button>

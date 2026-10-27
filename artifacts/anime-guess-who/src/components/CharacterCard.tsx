@@ -103,7 +103,8 @@ const CharacterCardView: React.FC<CharacterCardProps> = ({
         <Portrait character={character} size={size} />
         {/* Name over the picture, like the board game */}
         <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/50 to-transparent px-2 pt-6 pb-1.5 text-left">
-          <h3 className={cn("font-display font-bold leading-tight text-white drop-shadow", compact ? "text-xs" : "text-base")}>
+          {/* Long names ("Ippo Makunouchi") wrap inside small cards instead of overflowing. */}
+          <h3 className={cn("font-display font-bold leading-tight text-white drop-shadow line-clamp-2 [overflow-wrap:anywhere]", compact ? "text-xs" : "text-base")}>
             {character.name}
           </h3>
           <p className={cn("text-white/90 font-semibold uppercase tracking-wide truncate drop-shadow", compact ? "text-[11px]" : "text-xs")}>

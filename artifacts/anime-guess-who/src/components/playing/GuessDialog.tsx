@@ -82,7 +82,7 @@ export const GuessDialog: React.FC<{
         </ScrollArea>
         <div className="p-3 border-t bg-card flex items-center gap-2">
           <p className="flex-1 min-w-0 text-sm font-bold truncate">
-            {guessCandidateChar ? `Deviner ${guessCandidateChar.name} ?` : "Touche un personnage pour le choisir."}
+            {guessCandidateChar ? `Deviner ${guessCandidateChar.name} ?` : "Choisis un personnage"}
           </p>
           <Button
             className="bg-red-600 hover:bg-red-700 font-bold shrink-0"

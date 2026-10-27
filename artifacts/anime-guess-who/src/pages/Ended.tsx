@@ -40,22 +40,23 @@ export const Ended: React.FC = () => {
   const headingRef = usePageHeading(heading);
 
   return (
-    <div className="min-h-[100dvh] w-full flex flex-col items-center justify-center p-6 bg-background relative overflow-hidden">
-      
+    // Bottom padding leaves room for the action bar, which stays on screen.
+    <div className="min-h-[100dvh] w-full flex flex-col items-center p-6 pb-44 bg-background relative overflow-hidden">
+
       {/* Background Effect */}
       <div className={`absolute inset-0 opacity-10 ${isDraw ? 'bg-amber-500' : isWinner ? 'bg-green-500' : 'bg-red-500'}`} />
-      
-      <div className="z-10 w-full max-w-lg flex flex-col items-center text-center gap-8">
-        
+
+      <div className="z-10 w-full max-w-lg flex flex-col items-center text-center gap-6 sm:gap-8">
+
         {/* Banner */}
-        <div className="space-y-4">
-          <div className={`inline-flex p-4 rounded-full ${isDraw ? 'bg-amber-500/20 text-amber-700' : isWinner ? 'bg-green-500/20 text-green-700' : 'bg-red-500/20 text-red-600'}`}>
-            {isDraw ? <Handshake className="w-16 h-16" /> : isWinner ? <Trophy className="w-16 h-16" /> : <Skull className="w-16 h-16" />}
+        <div className="space-y-3">
+          <div className={`inline-flex p-3 sm:p-4 rounded-full ${isDraw ? 'bg-amber-500/20 text-amber-700' : isWinner ? 'bg-green-500/20 text-green-700' : 'bg-red-500/20 text-red-600'}`}>
+            {isDraw ? <Handshake className="w-12 h-12 sm:w-16 sm:h-16" /> : isWinner ? <Trophy className="w-12 h-12 sm:w-16 sm:h-16" /> : <Skull className="w-12 h-12 sm:w-16 sm:h-16" />}
           </div>
-          <h1 ref={headingRef} tabIndex={-1} className={`focus:outline-none ${isDisconnect ? 'text-4xl md:text-6xl' : 'text-6xl md:text-8xl'} font-display font-black uppercase tracking-tighter transform ${isDraw ? 'text-amber-600' : isWinner ? '-skew-x-6 text-green-600 drop-shadow-[0_0_15px_rgba(34,197,94,0.5)]' : 'text-red-600'}`}>
+          <h1 ref={headingRef} tabIndex={-1} className={`focus:outline-none ${isDisconnect ? 'text-4xl md:text-6xl' : 'text-5xl sm:text-6xl md:text-8xl'} font-display font-black uppercase tracking-tighter transform ${isDraw ? 'text-amber-600' : isWinner ? '-skew-x-6 text-green-600 drop-shadow-[0_0_15px_rgba(34,197,94,0.5)]' : 'text-red-600'}`}>
             {heading}
           </h1>
-          <p className="text-xl font-bold uppercase tracking-widest text-muted-foreground">
+          <p className="text-base sm:text-xl font-bold uppercase tracking-widest text-muted-foreground">
             {gameOverReason === "out_of_lives" && !isWinner && "Tu n’as plus de vies !"}
             {gameOverReason === "out_of_lives" && isWinner && "L’adversaire n’a plus de vies !"}
             {gameOverReason === "correct_guess" && isWinner && "Bien deviné !"}
@@ -93,7 +94,7 @@ export const Ended: React.FC = () => {
             <span className="text-sm font-bold uppercase tracking-widest text-muted-foreground">
               Son personnage secret :
             </span>
-            <div className="w-full max-w-[250px] transform hover:scale-105 transition-transform duration-500">
+            <div className="w-full max-w-[200px] sm:max-w-[250px] transform hover:scale-105 transition-transform duration-500">
               <CharacterCard character={opponentCharacter} />
             </div>
           </div>
@@ -102,35 +103,11 @@ export const Ended: React.FC = () => {
         {/* Reactions ("GG 👏") while the opponent is still here */}
         {!opponentLeft && !isDisconnect && <ReactionRow showMute={false} />}
 
-        {/* Actions */}
-        <div className="flex flex-col w-full gap-3 mt-4">
-          {opponentLeft && !isDisconnect && (
-            <p className="text-sm font-bold uppercase tracking-widest text-muted-foreground">
-              Ton adversaire a quitté la partie.
-            </p>
-          )}
-          {!isDisconnect && !opponentLeft && (
-            <>
-              {rematchRequestedBy === myPlayerId ? (
-                <Button size="lg" disabled className="w-full h-14 text-lg bg-secondary/50 font-bold">
-                  En attente de l’adversaire…
-                </Button>
-              ) : rematchRequestedBy ? (
-                <Button size="lg" className="w-full h-14 text-lg bg-secondary hover:bg-secondary/80 font-bold animate-pulse" onClick={acceptRematch}>
-                  <RotateCcw className="w-5 h-5 mr-2" /> Accepter la revanche
-                </Button>
-              ) : (
-                <Button size="lg" className="w-full h-14 text-lg bg-primary hover:bg-primary/90 font-bold" onClick={requestRematch}>
-                  <RotateCcw className="w-5 h-5 mr-2" /> Revanche
-                </Button>
-              )}
-            </>
-          )}
-          
-          <Button variant="outline" size="lg" className="w-full h-14 text-lg font-bold border-2" onClick={leaveGame}>
-            <Home className="w-5 h-5 mr-2" /> Retour à l’accueil
-          </Button>
-        </div>
+        {opponentLeft && !isDisconnect && (
+          <p className="text-sm font-bold uppercase tracking-widest text-muted-foreground">
+            Ton adversaire a quitté la partie.
+          </p>
+        )}
 
         {/* Recap: with the secret character revealed, every free answer can be checked */}
         {gameLog.length > 0 && (
@@ -157,6 +134,33 @@ export const Ended: React.FC = () => {
           </section>
         )}
 
+      </div>
+
+      {/* Actions stay visible: on a phone they used to sit below the revealed card. */}
+      <div
+        className="fixed bottom-0 inset-x-0 z-40 bg-background/90 backdrop-blur-md border-t border-border p-3"
+        style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 0.75rem)" }}
+      >
+        <div className="max-w-lg mx-auto flex flex-col sm:flex-row gap-2">
+          {!isDisconnect && !opponentLeft && (
+            rematchRequestedBy === myPlayerId ? (
+              <Button size="lg" disabled className="sm:flex-1 h-12 text-base bg-secondary/50 font-bold">
+                En attente de l’adversaire…
+              </Button>
+            ) : rematchRequestedBy ? (
+              <Button size="lg" className="sm:flex-1 h-12 text-base bg-secondary hover:bg-secondary/80 font-bold animate-pulse" onClick={acceptRematch}>
+                <RotateCcw className="w-5 h-5 mr-2" /> Accepter la revanche
+              </Button>
+            ) : (
+              <Button size="lg" className="sm:flex-1 h-12 text-base bg-primary hover:bg-primary/90 font-bold" onClick={requestRematch}>
+                <RotateCcw className="w-5 h-5 mr-2" /> Revanche
+              </Button>
+            )
+          )}
+          <Button variant="outline" size="lg" className="sm:flex-1 h-12 text-base font-bold border-2" onClick={leaveGame}>
+            <Home className="w-5 h-5 mr-2" /> Retour à l’accueil
+          </Button>
+        </div>
       </div>
     </div>
   );

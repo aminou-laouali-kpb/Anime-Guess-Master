@@ -5,6 +5,9 @@ import type { GameLogEntry } from "@/lib/socket";
 import { hasTrait } from "@/lib/questions";
 import { plural } from "@/lib/fr";
 
+// One id, so the offer is replaced (never stacked) and can be dismissed when a dialog opens.
+export const RULE_OUT_TOAST = "rule-out";
+
 // After one of my verified questions, offer to cross out every character
 // the answer rules out (the answer is guaranteed true, so this is safe).
 export function useAutoEliminate({
@@ -41,6 +44,9 @@ export function useAutoEliminate({
       .map(c => c.id);
     if (ruledOut.length === 0) return;
     toast(`Réponse : ${keep ? "OUI" : "NON"}`, {
+      id: RULE_OUT_TOAST,
+      // Near the thumb and the action buttons, not over the turn banner.
+      position: "bottom-center",
       description: `${ruledOut.length} ${plural(ruledOut.length, "personnage ne correspond", "personnages ne correspondent")} pas.`,
       action: {
         label: "Les écarter",

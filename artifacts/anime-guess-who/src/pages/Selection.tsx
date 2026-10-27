@@ -7,14 +7,6 @@ import { Countdown } from "@/components/Countdown";
 import { LeaveGameButton } from "@/components/LeaveGameButton";
 import { usePageHeading } from "@/components/PageHeading";
 
-// ✓ / … next to each name, with words for screen readers.
-const ReadyMark: React.FC<{ ready: boolean }> = ({ ready }) => (
-  <>
-    <span aria-hidden>{ready ? "✓" : "…"}</span>
-    <span className="sr-only">{ready ? "prêt" : "en train de choisir"}</span>
-  </>
-);
-
 export const Selection: React.FC = () => {
   const { characters, selectCharacter, myCharacterId, opponentReady, myName, timer, players, myPlayerId, isConnected } = useGame();
   const opponentName = players.find(p => p.id !== myPlayerId)?.name ?? "Adversaire";
@@ -29,6 +21,7 @@ export const Selection: React.FC = () => {
   };
 
   const isLockedIn = myCharacterId !== null;
+  const pickedName = characters.find(c => c.id === localSelection)?.name;
   const pickCharacter = useCallback(
     (id: string) => {
       if (!isLockedIn) setLocalSelection(id);
@@ -52,26 +45,22 @@ export const Selection: React.FC = () => {
   }, [isLockedIn, headingRef]);
 
   return (
-    <div className="min-h-[100dvh] w-full flex flex-col bg-background relative pb-[calc(6rem+env(safe-area-inset-bottom))]">
+    <div className="min-h-[100dvh] w-full flex flex-col bg-background relative pb-[calc(8rem+env(safe-area-inset-bottom))]">
       {/* Header Sticky */}
-      <div className="sticky top-0 z-40 bg-background/80 backdrop-blur-md border-b border-border px-4 py-4 flex flex-col items-center justify-center shadow-sm">
+      <div className="sticky top-0 z-40 bg-background/80 backdrop-blur-md border-b border-border px-4 py-3 sm:py-4 flex flex-col items-center justify-center shadow-sm">
         <LeaveGameButton countsAsLoss={false} className="absolute top-2 right-2 text-muted-foreground" />
         <h1
           ref={headingRef}
           tabIndex={-1}
-          className="font-display font-black text-2xl uppercase tracking-tight text-center px-8 focus:outline-none"
+          className="font-display font-black text-xl sm:text-2xl uppercase tracking-tight text-center px-10 focus:outline-none"
         >
           {heading}
         </h1>
-        {/* Announced when the opponent (or the clock) locks a choice in. */}
-        <div className="flex items-center gap-4 mt-2 text-sm font-bold" role="status" aria-live="polite">
-          <span className={isLockedIn ? "text-primary" : "text-muted-foreground"}>
-            {myName} <ReadyMark ready={isLockedIn} />
-          </span>
-          <span className="text-muted-foreground" aria-hidden>VS</span>
-          <span className={opponentReady ? "text-secondary" : "text-muted-foreground"}>
-            {opponentName} <ReadyMark ready={opponentReady} />
-          </span>
+        {/* Who has chosen: a clear status, announced when the opponent (or the clock) locks a choice in. */}
+        <div className="flex items-center justify-center gap-2 mt-2 text-xs sm:text-sm font-bold w-full" role="status" aria-live="polite">
+          <PlayerStatus name={myName} ready={isLockedIn} tone="text-primary" />
+          <span className="text-muted-foreground/50 shrink-0" aria-hidden>VS</span>
+          <PlayerStatus name={opponentName} ready={opponentReady} tone="text-secondary" />
         </div>
         {!isLockedIn && (
           <Countdown deadline={timer?.deadline}>
@@ -111,8 +100,13 @@ export const Selection: React.FC = () => {
               disabled={!localSelection || !isConnected}
               onClick={handleConfirm}
             >
-              Valider mon choix
+              <span className="truncate">{pickedName ? `Valider : ${pickedName}` : "Valider mon choix"}</span>
             </Button>
+            {!localSelection && (
+              <p className="mt-2 text-center text-xs text-muted-foreground">
+                Touche un personnage : c’est lui que ton adversaire devra deviner.
+              </p>
+            )}
           </div>
         </div>
       )}
@@ -131,3 +125,16 @@ export const Selection: React.FC = () => {
     </div>
   );
 };
+
+const PlayerStatus: React.FC<{ name: string; ready: boolean; tone: string }> = ({ name, ready, tone }) => (
+  <span className="flex items-center gap-1.5 min-w-0">
+    <span className={`truncate ${ready ? tone : "text-foreground"}`}>{name}</span>
+    <span
+      className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] ${
+        ready ? "bg-green-600/15 text-green-700" : "bg-muted text-muted-foreground"
+      }`}
+    >
+      {ready ? "prêt ✓" : "réfléchit"}
+    </span>
+  </span>
+);

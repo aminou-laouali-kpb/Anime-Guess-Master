@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { ATTRIBUTES, VerifiableAttribute, questionText, valueLabel, valuesOnBoard } from "@/lib/questions";
+import { ATTRIBUTES, VerifiableAttribute, hasTrait, questionText, valueLabel, valuesOnBoard } from "@/lib/questions";
 
 const ASK_MODES = ["verified", "free"] as const;
 
@@ -15,12 +15,14 @@ export const AskDialog: React.FC<{
   open: boolean;
   onOpenChange: (open: boolean) => void;
   characters: Character[];
+  // Cards I have crossed out: the counts next to each answer only cover the rest.
+  eliminatedIds: Set<string>;
   // The computer only understands verified questions.
   vsBot: boolean;
   offline: boolean;
   onAskVerified: (attribute: VerifiableAttribute, value: string) => void;
   onAskFree: (question: string) => void;
-}> = ({ open, onOpenChange, characters, vsBot, offline, onAskVerified, onAskFree }) => {
+}> = ({ open, onOpenChange, characters, eliminatedIds, vsBot, offline, onAskVerified, onAskFree }) => {
   const [askMode, setAskMode] = useState<"verified" | "free">("verified");
   const [freeQuestion, setFreeQuestion] = useState("");
   const [askAttribute, setAskAttribute] = useState<VerifiableAttribute>("hairColor");
@@ -113,21 +115,29 @@ export const AskDialog: React.FC<{
                   </Button>
                 ))}
               </div>
-              <div className="flex flex-wrap gap-1.5" role="group" aria-label="Réponse possible">
-                {valuesOnBoard(characters, askAttribute).map(value => (
-                  <Button
-                    key={value}
-                    type="button"
-                    size="sm"
-                    variant={askValue === value ? "secondary" : "ghost"}
-                    aria-pressed={askValue === value}
-                    className={cn("border", askValue === value && "ring-2 ring-secondary")}
-                    onClick={() => setAskValue(value)}
-                  >
-                    {valueLabel(askAttribute, value)}
-                  </Button>
-                ))}
+              {/* The count is how many of MY remaining cards have this trait:
+                  it shows at a glance which question splits the board best. */}
+              <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Réponse à tester</p>
+              <div className="flex flex-wrap gap-1.5 -mt-2" role="group" aria-label="Réponse possible">
+                {valuesOnBoard(characters, askAttribute).map(value => {
+                  const count = characters.filter(c => !eliminatedIds.has(c.id) && hasTrait(c, askAttribute, value)).length;
+                  return (
+                    <Button
+                      key={value}
+                      type="button"
+                      size="sm"
+                      variant={askValue === value ? "secondary" : "outline"}
+                      aria-pressed={askValue === value}
+                      className={cn(askValue === value && "ring-2 ring-secondary/40", count === 0 && askValue !== value && "opacity-60")}
+                      onClick={() => setAskValue(value)}
+                    >
+                      {valueLabel(askAttribute, value)}
+                      <span className="ml-1 tabular-nums opacity-70">({count})</span>
+                    </Button>
+                  );
+                })}
               </div>
+              <p className="text-[11px] text-muted-foreground -mt-2">Entre parenthèses : combien de tes personnages restants ont ce trait.</p>
               <p className="min-h-6 text-center font-bold italic" aria-live="polite">
                 {askValue ? `« ${questionText(askAttribute, askValue)} »` : "Choisis une réponse possible ci-dessus."}
               </p>
