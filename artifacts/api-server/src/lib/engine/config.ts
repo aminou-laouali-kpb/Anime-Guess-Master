@@ -22,6 +22,10 @@ export const DISCONNECT_BUDGET_MS = 90_000 * TIME_SCALE;
 export const SELECTION_TIME_MS = 90_000 * TIME_SCALE;
 export const TURN_TIME_MS = 60_000 * TIME_SCALE;
 export const ANSWER_TIME_MS = 45_000 * TIME_SCALE;
+// Both players found the character with equal lives: the faster one wins, but
+// only by a clear margin (a split second is noise, not skill) — else a draw.
+// Not scaled by TIME_SCALE: it's about human reaction time, not clock length.
+export const TIEBREAK_MIN_GAP_MS = 1_000;
 
 // Abuse limits. Rooms only exist while a session holds them, so capping
 // sessions caps rooms and the matchmaking queue too.

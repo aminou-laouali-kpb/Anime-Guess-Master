@@ -184,6 +184,7 @@ export function handleConnection(ctx: Engine, socket: GameSocket): void {
       isReady: false,
       awayMs: 0,
       awaySince: null,
+      turnMs: 0,
     });
     room.phase = "selection";
     room.characterIds = dealBoard();

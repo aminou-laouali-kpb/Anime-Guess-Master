@@ -249,6 +249,45 @@ describe("last chance (the first player's edge)", () => {
     await mover.until(() => mover.has("game_over") && other.has("game_over"));
     expect(mover.last("game_over")).toMatchObject({ winnerId: null, reason: "draw", opponentCharacterId: moverTarget });
     expect(other.last("game_over")).toMatchObject({ winnerId: null, reason: "draw", opponentCharacterId: otherTarget });
+    // Both found it: each side gets the turn times that settled the tie.
+    const turnMs = mover.last("game_over")!["turnMs"] as Record<string, number>;
+    expect(Object.keys(turnMs).sort()).toEqual([mover.playerId, other.playerId].sort());
+  });
+
+  it("breaks a double find by lives: the player who lost fewer wins", async () => {
+    const g = trackGame(await startPrivateGame(server));
+    const { mover, other } = whoseTurn(g);
+    const moverTarget = mover === g.a ? g.bChar : g.aChar;
+    const otherTarget = mover === g.a ? g.aChar : g.bChar;
+    const miss = g.board.map((c) => c["id"] as string).find((id) => id !== moverTarget && id !== otherTarget)!;
+
+    mover.emit("make_guess", { characterId: miss }); // the first player loses a life
+    await other.next("wrong_guess");
+    other.emit("ask_question", { attribute: "role", value: "main" });
+    await mover.next("question_answered");
+    mover.emit("make_guess", { characterId: moverTarget });
+    await other.next("last_chance");
+    other.emit("make_guess", { characterId: otherTarget });
+    await mover.until(() => mover.has("game_over") && other.has("game_over"));
+    expect(other.last("game_over")).toMatchObject({ winnerId: other.playerId, reason: "tiebreak_lives" });
+    expect(mover.last("game_over")).toMatchObject({ winnerId: other.playerId, reason: "tiebreak_lives" });
+  });
+
+  it("breaks a double find with equal lives by time: the faster player wins", async () => {
+    const g = trackGame(await startPrivateGame(server));
+    const { mover, other } = whoseTurn(g);
+    const moverTarget = mover === g.a ? g.bChar : g.aChar;
+    const otherTarget = mover === g.a ? g.aChar : g.bChar;
+
+    mover.emit("make_guess", { characterId: moverTarget }); // found at once
+    await other.next("last_chance");
+    await wait(1500); // the second player takes a while (the test turn clock is 3 s)
+    other.emit("make_guess", { characterId: otherTarget });
+    await mover.until(() => mover.has("game_over") && other.has("game_over"));
+    const over = mover.last("game_over")!;
+    expect(over).toMatchObject({ winnerId: mover.playerId, reason: "tiebreak_time" });
+    const turnMs = over["turnMs"] as Record<string, number>;
+    expect(turnMs[other.playerId]! - turnMs[mover.playerId]!).toBeGreaterThanOrEqual(1000);
   });
 
   it("ends the game at once when the second player is right first", async () => {

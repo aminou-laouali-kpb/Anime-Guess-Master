@@ -3,10 +3,13 @@ import { logger } from "../logger";
 import { networkKey } from "../rate-limit";
 import { recordGame, statsEnabled } from "../stats";
 import { botReact, cancelBot } from "./bot-driver";
-import { MAX_LIVES, MIN_MOVES_FOR_RANKED_FORFEIT } from "./config";
+import { MAX_LIVES, MIN_MOVES_FOR_RANKED_FORFEIT, TIEBREAK_MIN_GAP_MS } from "./config";
+
+// Endings where both players found the character (see breakTie).
+const TIE_REASONS = new Set<GameOverReason>(["draw", "tiebreak_lives", "tiebreak_time"]);
 import { allCharacters, boardOf, dealBoard, opponentOf, publicPlayers } from "./rooms";
 import { type Engine, type Player, type Room, type Session, emitToPlayer, roomOf, socketOf } from "./state";
-import { clearTimer, updateTimer } from "./timers";
+import { chargeTurnTime, clearTimer, updateTimer } from "./timers";
 
 // Game actions shared by human players (socket handlers) and the bot, and how
 // a game ends and gets recorded.
@@ -82,6 +85,9 @@ export function endGame(ctx: Engine, room: Room, winnerId: string | null, reason
       winnerId,
       reason,
       opponentCharacterId: opponentOf(room, player)?.selectedCharacterId ?? null,
+      ...(TIE_REASONS.has(reason)
+        ? { turnMs: Object.fromEntries(room.players.map((p) => [p.id, Math.round(p.turnMs)])) }
+        : {}),
     });
   }
 
@@ -181,16 +187,36 @@ function startLastChance(ctx: Engine, room: Room, guesser: Player): void {
   updateTimer(ctx, room);
 }
 
+// Both players found the character, each in the same number of turns. Fewer
+// lives lost wins; then less time spent on one's own turns (by a clear margin);
+// otherwise it's a draw. Questions asked can't decide it: every turn is either
+// a question or a lost life, so with equal lives the counts are equal too.
+export function breakTie(a: Player, b: Player): { winnerId: string | null; reason: GameOverReason } {
+  if (a.lives !== b.lives) {
+    return { winnerId: a.lives > b.lives ? a.id : b.id, reason: "tiebreak_lives" };
+  }
+  if (Math.abs(a.turnMs - b.turnMs) >= TIEBREAK_MIN_GAP_MS) {
+    return { winnerId: a.turnMs < b.turnMs ? a.id : b.id, reason: "tiebreak_time" };
+  }
+  return { winnerId: null, reason: "draw" };
+}
+
 export function makeGuess(ctx: Engine, room: Room, player: Player, characterId: string): void {
   const opponent = opponentOf(room, player);
   if (!opponent) return;
 
   const correct = opponent.selectedCharacterId === characterId;
 
-  // The second player's final guess settles it: a draw if they find the
-  // character too, otherwise the first player's win stands.
+  // The second player's final guess settles it: if they find the character
+  // too, the tiebreak decides; otherwise the first player's win stands.
   if (room.lastChanceFor === player.id) {
-    endGame(ctx, room, correct ? null : opponent.id, correct ? "draw" : "correct_guess");
+    if (!correct) {
+      endGame(ctx, room, opponent.id, "correct_guess");
+      return;
+    }
+    chargeTurnTime(room); // count this final turn before comparing
+    const { winnerId, reason } = breakTie(opponent, player);
+    endGame(ctx, room, winnerId, reason);
     return;
   }
 
@@ -243,6 +269,7 @@ export function startRematch(ctx: Engine, room: Room): void {
     p.lives = MAX_LIVES;
     p.isReady = false;
     p.awayMs = 0; // a fresh disconnection budget for the new game
+    p.turnMs = 0;
   }
 
   ctx.io.to(room.code).emit("rematch_started", {

@@ -36,6 +36,9 @@ export interface Player {
   // when the current disconnection started (null while connected).
   awayMs: number;
   awaySince: number | null;
+  // Time spent on this player's own turns this game (thinking before a move,
+  // answering a free question), used to break a tie after the last chance.
+  turnMs: number;
 }
 
 export interface Room {
@@ -69,6 +72,8 @@ export interface Room {
   // instead of granting a fresh full clock (which allowed stalling forever).
   pausedTimerKey: string | null;
   pausedTimerMs: number;
+  // When the running clock started counting for timerPlayerId (null: none).
+  timerStartedAt: number | null;
 }
 
 // A session outlives a single socket so a player can reload the page or lose

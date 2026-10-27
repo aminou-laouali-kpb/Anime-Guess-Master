@@ -12,6 +12,7 @@ export const Ended: React.FC = () => {
   const { 
     winnerId, 
     gameOverReason, 
+    turnMs,
     revealedOpponentCharacterId, 
     characters,
     rematchRequestedBy,
@@ -28,6 +29,11 @@ export const Ended: React.FC = () => {
 
   const isDraw = gameOverReason === "draw";
   const isWinner = !isDraw && winnerId === myPlayerId;
+  // Both players found the character: lives, then time, settled who won.
+  const bothFound = gameOverReason === "draw" || gameOverReason === "tiebreak_lives" || gameOverReason === "tiebreak_time";
+  const opponentId = players.find(p => p.id !== myPlayerId)?.id;
+  const mySeconds = turnMs && myPlayerId ? Math.round((turnMs[myPlayerId] ?? 0) / 1000) : null;
+  const opponentSeconds = turnMs && opponentId ? Math.round((turnMs[opponentId] ?? 0) / 1000) : null;
   const isDisconnect = gameOverReason === "opponent_left";
 
   const opponentCharacter = characters.find(c => c.id === revealedOpponentCharacterId);
@@ -61,10 +67,21 @@ export const Ended: React.FC = () => {
             {gameOverReason === "out_of_lives" && isWinner && "L’adversaire n’a plus de vies !"}
             {gameOverReason === "correct_guess" && isWinner && "Bien deviné !"}
             {gameOverReason === "correct_guess" && !isWinner && "L’adversaire a deviné ton personnage !"}
-            {isDraw && "Vous avez tous les deux trouvé ! Le premier joueur n’a pas l’avantage."}
+            {gameOverReason === "tiebreak_lives" && isWinner && "Vous avez tous les deux trouvé ! Tu as perdu moins de vies."}
+            {gameOverReason === "tiebreak_lives" && !isWinner && "Vous avez tous les deux trouvé ! L’adversaire a perdu moins de vies."}
+            {gameOverReason === "tiebreak_time" && isWinner && "Vous avez tous les deux trouvé ! Tu as été plus rapide."}
+            {gameOverReason === "tiebreak_time" && !isWinner && "Vous avez tous les deux trouvé ! L’adversaire a été plus rapide."}
+            {isDraw && "Vous avez tous les deux trouvé ! Autant de vies, presque le même temps."}
             {isDisconnect && "Ton adversaire a quitté la partie."}
           </p>
         </div>
+
+        {/* Why a double find went one way: only the time can look unclear, so show it. */}
+        {bothFound && gameOverReason !== "tiebreak_lives" && mySeconds !== null && opponentSeconds !== null && (
+          <p className="text-sm font-bold text-muted-foreground">
+            Temps de réflexion : toi {mySeconds} s · {opponentName ?? "adversaire"} {opponentSeconds} s
+          </p>
+        )}
 
         {/* Rating change (stats enabled only) */}
         {ratingUpdate && (

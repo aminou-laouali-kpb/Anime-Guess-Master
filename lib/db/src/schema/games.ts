@@ -9,7 +9,7 @@ export const gamesTable = pgTable(
     id: serial("id").primaryKey(),
     mode: text("mode").notNull(), // "quick" | "private"
     ranked: boolean("ranked").notNull(),
-    reason: text("reason").notNull(), // correct_guess | out_of_lives | forfeit | draw (a draw stores the two players as winner/loser, either order)
+    reason: text("reason").notNull(), // correct_guess | out_of_lives | forfeit | draw | tiebreak_lives | tiebreak_time (a draw stores the two players as winner/loser, either order)
     winnerId: text("winner_id").notNull().references(() => playersTable.id),
     loserId: text("loser_id").notNull().references(() => playersTable.id),
     ratingChange: integer("rating_change").notNull().default(0),

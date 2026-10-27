@@ -8,6 +8,7 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/).
 
 ### Joueurs
 
+- **Moins d’égalités** : quand les deux joueurs trouvent le personnage (dernière chance), celui qui a perdu le moins de vies gagne ; à vies égales, le plus rapide sur ses propres tours (au moins 1 s d’écart) ; sinon c’est un match nul. L’écran de fin explique pourquoi et affiche les temps.
 - **66 nouveaux personnages** issus des mangas les plus acclamés et les plus vendus (165 au total).
 - **Classement plus juste** : un abandon ne compte pour le classement que si les deux joueurs ont vraiment joué (au moins 2 coups chacun) ; deux comptes sur le même réseau (y compris IPv6) ne se font plus gagner de points.
 - **Fin des parties sans fin** : chaque joueur dispose de 90 s de déconnexion par partie ; au-delà, la déconnexion compte comme un abandon.
@@ -51,7 +52,7 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/).
 ### Développement
 
 - Paquet partagé `lib/game-protocol` : événements Socket.IO, payloads et constantes communs au client et au serveur (`Server<ClientToServerEvents, ServerToClientEvents>`).
-- Protocole : raison de fin `draw`, `winnerId` nullable, événement `last_chance`.
+- Protocole : raisons de fin `draw`, `tiebreak_lives` et `tiebreak_time`, `winnerId` nullable, `turnMs`, événement `last_chance`.
 - Suite de tests Vitest (intégration avec de vrais sockets, chronos accélérés via `GAME_TIME_SCALE`, sécurité, statistiques sur Postgres).
 - Serveur durci : code de sortie non nul au démarrage raté, noms de joueurs nettoyés, pool Postgres avec délai et gestion d’erreur.
 - CI GitHub Actions (types, tests avec Postgres, construction, audit), `replit.md` documenté.

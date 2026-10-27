@@ -47,6 +47,7 @@ export function createPlayer(session: Session): Player {
     isReady: false,
     awayMs: 0,
     awaySince: null,
+    turnMs: 0,
   };
 }
 
@@ -76,6 +77,7 @@ export function createRoom(code: string, mode: Room["mode"]): Room {
     timerPlayerId: null,
     pausedTimerKey: null,
     pausedTimerMs: 0,
+    timerStartedAt: null,
   };
 }
 

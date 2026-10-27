@@ -23,9 +23,18 @@ export type BotLevel = (typeof BOT_LEVELS)[number];
 
 export type RoomMode = "quick" | "private" | "bot";
 export type RoomPhase = "waiting" | "selection" | "playing" | "ended";
-// "draw": the player who moved first found the character, and the second
-// player then found theirs with their last-chance guess too.
-export type GameOverReason = "correct_guess" | "out_of_lives" | "opponent_left" | "draw";
+// When the player who moved first finds the character and the second player
+// then finds theirs with their last-chance guess too, the tie is broken:
+// "tiebreak_lives": the one who lost fewer lives wins;
+// "tiebreak_time": equal lives, the one who spent less time on their turns wins;
+// "draw": still level (lives and time within TIEBREAK_MIN_GAP_MS).
+export type GameOverReason =
+  | "correct_guess"
+  | "out_of_lives"
+  | "opponent_left"
+  | "draw"
+  | "tiebreak_lives"
+  | "tiebreak_time";
 
 export interface PlayerState {
   id: string;
@@ -171,6 +180,9 @@ export interface ServerToClientEvents {
   game_over: (payload: {
     winnerId: string | null; // null on a draw
     reason: GameOverReason;
+    // Time each player spent on their own turns (ms), by player id: sent when
+    // both players found the character, so the end screen can explain the tiebreak.
+    turnMs?: Record<string, number>;
     opponentCharacterId: string | null;
   }) => void;
   // The first player guessed right; this player gets one final guess.

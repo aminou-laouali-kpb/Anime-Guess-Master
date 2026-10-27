@@ -202,8 +202,8 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     });
 
-    socket.on("game_over", ({ winnerId, opponentCharacterId, reason }) => {
-      dispatch({ type: "game_over", winnerId, opponentCharacterId, reason });
+    socket.on("game_over", ({ winnerId, opponentCharacterId, reason, turnMs }) => {
+      dispatch({ type: "game_over", winnerId, opponentCharacterId, reason, turnMs });
     });
 
     socket.on("opponent_disconnected", ({ graceSeconds }) => {

@@ -45,6 +45,9 @@ export interface GameState {
   gameLog: GameLogEntry[];
   winnerId: string | null;
   gameOverReason: GameOverReason | null;
+  // When both players found the character: time each spent on their own turns
+  // (ms, by player id), which can decide the tiebreak.
+  turnMs: Record<string, number> | null;
   lastChanceFor: string | null;
   revealedOpponentCharacterId: string | null;
   rematchRequestedBy: string | null;
@@ -74,6 +77,7 @@ const EMPTY_GAME = {
   gameLog: [],
   winnerId: null,
   gameOverReason: null,
+  turnMs: null,
   lastChanceFor: null,
   revealedOpponentCharacterId: null,
   rematchRequestedBy: null,
@@ -129,7 +133,13 @@ export type GameAction =
     }
   | { type: "turn_timeout"; playerId: string; lives: number; currentTurnPlayerId: string; logId: string }
   | { type: "last_chance"; playerId: string }
-  | { type: "game_over"; winnerId: string | null; opponentCharacterId: string | null; reason: GameOverReason }
+  | {
+      type: "game_over";
+      winnerId: string | null;
+      opponentCharacterId: string | null;
+      reason: GameOverReason;
+      turnMs?: Record<string, number>;
+    }
   // Opponent
   | { type: "opponent_disconnected" }
   | { type: "opponent_reconnected" }
@@ -160,6 +170,7 @@ function startNewRound(state: GameState, players: PlayerState[], characters: Cha
     gameLog: [],
     winnerId: null,
     gameOverReason: null,
+    turnMs: null,
     lastChanceFor: null,
     revealedOpponentCharacterId: null,
     rematchRequestedBy: null,
@@ -283,6 +294,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         winnerId: action.winnerId,
         revealedOpponentCharacterId: action.opponentCharacterId,
         gameOverReason: action.reason,
+        turnMs: action.turnMs ?? null,
         pendingQuestion: null,
         awaitingAnswerFor: null,
         rematchRequestedBy: null,

@@ -282,7 +282,7 @@ export const Home: React.FC = () => {
             <p><strong>1. Choix :</strong> chaque joueur choisit en secret un personnage parmi les 24 de la grille (90 s).</p>
             <p><strong>2. Questions :</strong> à ton tour (60 s), pose une question fermée sur le personnage de l’adversaire. Une <em>question vérifiée</em> (cheveux, yeux, anime…) reçoit sa réponse directement du jeu : impossible de mentir. Une <em>question libre</em> (« Se bat-il avec une épée ? ») est posée à ton adversaire, et ses réponses sont révélées à la fin.</p>
             <p><strong>3. Élimination :</strong> touche les personnages de ta grille pour les écarter, touche-les à nouveau pour les remettre. Après une question vérifiée, le bouton « Les écarter » le fait pour toi.</p>
-            <p><strong>4. Victoire :</strong> quand tu penses avoir trouvé, utilise ton tour pour deviner. Une mauvaise réponse ou un temps écoulé coûte une vie ; à 3 vies perdues, la partie est perdue. <em>Dernière chance</em> : si le joueur qui a commencé trouve le premier, son adversaire a droit à une dernière devinette (sans question). S’il trouve aussi, c’est l’égalité.</p>
+            <p><strong>4. Victoire :</strong> quand tu penses avoir trouvé, utilise ton tour pour deviner. Une mauvaise réponse ou un temps écoulé coûte une vie ; à 3 vies perdues, la partie est perdue. <em>Dernière chance</em> : si le joueur qui a commencé trouve le premier, son adversaire a droit à une dernière devinette (sans question). S’il trouve aussi, les vies perdues puis le temps de réflexion départagent les deux joueurs ; à égalité, c’est un match nul.</p>
           </div>
           <DialogFooter>
             <Button onClick={() => setShowHowToPlay(false)}>Compris</Button>

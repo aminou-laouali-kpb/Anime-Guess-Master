@@ -8,12 +8,22 @@ import { type Engine, type Player, type Room, emitToPlayer, isPlayerConnected } 
 // Selection/turn/answer clocks, and the disconnection budget that keeps a
 // player from stalling a game by dropping out.
 
+// Adds the time the acting player has spent since their clock started to
+// their turn total (used by the tiebreak), and restarts the count from now.
+export function chargeTurnTime(room: Room): void {
+  if (room.timerStartedAt === null || room.timerPlayerId === null) return;
+  const player = room.players.find((p) => p.id === room.timerPlayerId);
+  if (player) player.turnMs += Date.now() - room.timerStartedAt;
+  room.timerStartedAt = Date.now();
+}
+
 export function clearTimer(room: Room): void {
   if (room.timer) clearTimeout(room.timer);
   room.timer = null;
   room.timerKey = null;
   room.timerDeadline = null;
   room.timerPlayerId = null;
+  room.timerStartedAt = null;
 }
 
 // Works out who has to act next and (re)arms the deadline. Call it after
@@ -44,6 +54,9 @@ export function updateTimer(ctx: Engine, room: Room): void {
     return;
   }
   const hadTimer = room.timerKey !== null;
+  // The step changed (or the clock paused): the acting player's time so far
+  // counts towards their turn total; paused time never does.
+  chargeTurnTime(room);
   if (key === null && room.timer && room.timerKey && room.timerDeadline !== null) {
     room.pausedTimerKey = room.timerKey;
     room.pausedTimerMs = Math.max(0, room.timerDeadline - Date.now());
@@ -56,6 +69,7 @@ export function updateTimer(ctx: Engine, room: Room): void {
     room.timerKey = key;
     room.timerDeadline = Date.now() + duration;
     room.timerPlayerId = actingPlayerId;
+    room.timerStartedAt = actingPlayerId ? Date.now() : null;
     room.timer = setTimeout(() => {
       try {
         onTimeout(ctx, room);

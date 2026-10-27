@@ -260,6 +260,33 @@ describe('last chance and game over', () => {
     });
   });
 
+  it('keeps the turn times that settled a double find, and clears them for the next game', () => {
+    const over = run(
+      [
+        { type: 'last_chance', playerId: ME },
+        {
+          type: 'game_over',
+          winnerId: OPP,
+          opponentCharacterId: 'c',
+          reason: 'tiebreak_time',
+          turnMs: { [ME]: 9000, [OPP]: 4000 },
+        },
+      ],
+      playing,
+    );
+    expect(over).toMatchObject({
+      gameOverReason: 'tiebreak_time',
+      winnerId: OPP,
+      turnMs: { [ME]: 9000, [OPP]: 4000 },
+    });
+    expect(run([{ type: 'reset' }], over).turnMs).toBeNull();
+  });
+
+  it('has no turn times for an ordinary ending', () => {
+    const s = run([{ type: 'game_over', winnerId: ME, opponentCharacterId: 'b', reason: 'correct_guess' }], playing);
+    expect(s.turnMs).toBeNull();
+  });
+
   it('last chance missed: the first player’s win is confirmed', () => {
     const s = run(
       [
