@@ -2,6 +2,7 @@ import express, { type Express } from "express";
 import cors from "cors";
 import pinoHttp from "pino-http";
 import router from "./routes";
+import webhooksRouter from "./routes/webhooks";
 import { logger } from "./lib/logger";
 import { httpRateLimit } from "./lib/rate-limit";
 
@@ -43,7 +44,9 @@ app.use((_req, res, next) => {
   next();
 });
 app.use(cors({ origin: allowedOrigins.length > 0 ? allowedOrigins : false }));
-app.use(httpRateLimit(120));
+app.use(httpRateLimit());
+// Before the JSON parser below: webhooks parse their own (larger) bodies.
+app.use("/api", webhooksRouter);
 app.use(express.json({ limit: "10kb" }));
 app.use(express.urlencoded({ extended: true, limit: "10kb" }));
 

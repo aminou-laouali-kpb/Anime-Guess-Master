@@ -4,6 +4,16 @@ import characters from "../data/characters.json" with { type: "json" };
 import { imageUrlFor } from "./character-images";
 import { logger } from "./logger";
 import { TokenBucket, clientIp } from "./rate-limit";
+import { type ClientInfo, OutdatedClientError, readClientInfo } from "./client-info";
+import { socketLimits } from "./limits";
+import {
+  BLOCK_KEY_RE,
+  MAX_BLOCKED,
+  REPORT_REASONS,
+  blockKeyOf,
+  isObjectionable,
+} from "./moderation";
+import { saveReport } from "./reports";
 import { BOT_LEVELS, BOT_NAMES, type BotLevel, type BotMemory, chooseBotMove } from "./bot";
 import {
   MIN_RANKED_GAMES,
@@ -71,6 +81,8 @@ export interface Player {
   token: string; // secret session token, never sent to anyone but its owner
   profileToken: string; // secret, long-lived: links results to stats
   ip: string;
+  client: ClientInfo["kind"];
+  deviceKey: string | null; // hashed install id (mobile app), memory only
   isBot: boolean;
   name: string;
   selectedCharacterId: string | null;
@@ -108,6 +120,8 @@ export interface Room {
   // instead of granting a fresh full clock (which allowed stalling forever).
   pausedTimerKey: string | null;
   pausedTimerMs: number;
+  // The opponent who left, kept so the remaining player can still report them.
+  departed: Player | null;
 }
 
 // A session outlives a single socket so a player can reload the page or lose
@@ -117,6 +131,14 @@ interface Session {
   playerId: string;
   profileToken: string;
   ip: string;
+  client: ClientInfo;
+  // Public key other players use to block this profile (see moderation.ts).
+  blockKey: string;
+  // Profiles this player blocked: never matched together again.
+  blocked: Set<string>;
+  // Refuses free (unverified) questions from opponents (default for minors in the app).
+  verifiedOnly: boolean;
+  reportsSent: number;
   name: string;
   socketId: string | null;
   roomCode: string | null;
@@ -145,9 +167,9 @@ const TURN_TIME_MS = 60_000 * TIME_SCALE;
 const ANSWER_TIME_MS = 45_000 * TIME_SCALE;
 
 // Abuse limits. Rooms only exist while a session holds them, so capping
-// sessions caps rooms and the matchmaking queue too.
-const MAX_SESSIONS = 2_000;
-const MAX_CONNECTIONS_PER_IP = 20;
+// sessions caps rooms and the matchmaking queue too. Session and connection
+// caps are configurable: see limits.ts (MAX_SESSIONS, MAX_CONNECTIONS_PER_IP…).
+const MAX_REPORTS_PER_SESSION = 5;
 const EVENT_BURST = 20;
 const EVENTS_PER_SECOND = 5;
 const MAX_DROPPED_EVENTS = 100;
@@ -195,6 +217,8 @@ const UNSAFE_NAME_CHARS = /[\p{C}\p{Zl}\p{Zp}\u200B-\u200F\u202A-\u202E\u2060-\u
 export function cleanName(raw: unknown): string {
   if (typeof raw !== "string") return "Joueur";
   const name = raw.normalize("NFC").replace(/\s+/g, " ").replace(UNSAFE_NAME_CHARS, "").trim().slice(0, 24).trim();
+  // Names are seen by strangers and on the leaderboard: same word filter as free questions.
+  if (isObjectionable(name)) return "Joueur";
   return name || "Joueur";
 }
 
@@ -212,6 +236,8 @@ function createPlayer(session: Session): Player {
     token: session.token,
     profileToken: session.profileToken,
     ip: session.ip,
+    client: session.client.kind,
+    deviceKey: session.client.deviceKey,
     isBot: false,
     name: session.name,
     selectedCharacterId: null,
@@ -245,6 +271,7 @@ function createRoom(code: string, mode: Room["mode"]): Room {
     timerPlayerId: null,
     pausedTimerKey: null,
     pausedTimerMs: 0,
+    departed: null,
   };
 }
 
@@ -354,6 +381,17 @@ export function setupGameEngine(io: SocketIOServer): void {
     const room = rooms.get(session.roomCode);
     if (!room) session.roomCode = null;
     return room;
+  }
+
+  function blockedBetween(a: Session, b: Session): boolean {
+    return a.blocked.has(b.blockKey) || b.blocked.has(a.blockKey);
+  }
+
+  function humanOpponentBlocked(room: Room, player: Player): boolean {
+    const me = sessions.get(player.token);
+    const opponent = opponentOf(room, player);
+    const them = opponent && !opponent.isBot ? sessions.get(opponent.token) : undefined;
+    return Boolean(me && them && blockedBetween(me, them));
   }
 
   function removeFromQueue(token: string): void {
@@ -508,11 +546,20 @@ export function setupGameEngine(io: SocketIOServer): void {
     if (!statsEnabled || room.mode === "bot") return;
     // Two players on the same network could be one person farming wins, and
     // endless rematches between two accounts would farm Elo too.
-    const ranked = room.mode === "quick" && room.round === 1 && winner.ip !== loser.ip;
+    // Mobile carriers share one IP between many subscribers (CGNAT): two
+    // mobile-app players on the same IP may still be ranked, under the
+    // stricter conditions checked in recordGame (established profiles, daily cap).
+    // The same install on both sides is never ranked.
+    const sameDevice = winner.deviceKey !== null && winner.deviceKey === loser.deviceKey;
+    const sameIp = winner.ip === loser.ip;
+    const sharedNetwork = sameIp && winner.client === "mobile" && loser.client === "mobile";
+    const ranked =
+      room.mode === "quick" && room.round === 1 && !sameDevice && (!sameIp || sharedNetwork);
     recordGame({
       winner: { profileToken: winner.profileToken, name: winner.name },
       loser: { profileToken: loser.profileToken, name: loser.name },
       ranked,
+      sharedNetwork,
       mode: room.mode,
       reason,
     })
@@ -556,6 +603,7 @@ export function setupGameEngine(io: SocketIOServer): void {
     socketOf(session)?.leave(room.code);
     const leaver = room.players.find((p) => p.token === session.token);
     room.players = room.players.filter((p) => p.token !== session.token);
+    if (leaver && !leaver.isBot) room.departed = leaver;
 
     const remaining = room.players[0];
     if (!remaining || remaining.isBot) {
@@ -787,6 +835,11 @@ export function setupGameEngine(io: SocketIOServer): void {
         playerId: randomId(12),
         profileToken: "",
         ip: "",
+        client: socket.data.client as ClientInfo,
+        blockKey: "",
+        blocked: new Set(),
+        verifiedOnly: false,
+        reportsSent: 0,
         name: "Joueur",
         socketId: socket.id,
         roomCode: null,
@@ -801,27 +854,71 @@ export function setupGameEngine(io: SocketIOServer): void {
     session.profileToken =
       typeof profile === "string" && TOKEN_RE.test(profile) ? profile : newProfileToken();
     session.ip = (socket.data.ip as string | undefined) ?? "unknown";
+    session.client = socket.data.client as ClientInfo;
+    session.blockKey = blockKeyOf(session.profileToken);
+    // The app keeps its block list and sends it back on every connection.
+    if (Array.isArray(auth["blocked"])) {
+      session.blocked = new Set(
+        auth["blocked"]
+          .filter((k): k is string => typeof k === "string" && BLOCK_KEY_RE.test(k))
+          .slice(0, MAX_BLOCKED),
+      );
+    }
+    if (typeof auth["verifiedOnly"] === "boolean") session.verifiedOnly = auth["verifiedOnly"];
 
     return session;
   }
 
-  // Caps how many sockets one IP and the whole server can hold.
-  const connectionsPerIp = new Map<string, number>();
+  // Caps how many sockets one IP and the whole server can hold. Browsers and
+  // mobile apps are counted separately: the app gets a higher cap per IP
+  // (carrier CGNAT) combined with a cap per profile.
+  const limits = socketLimits();
+  const connectionsPerIp = new Map<string, number>(); // "web:<ip>" | "mobile:<ip>"
+  const connectionsPerProfile = new Map<string, number>(); // mobile only
+
+  const decrement = (map: Map<string, number>, key: string) => {
+    const count = (map.get(key) ?? 1) - 1;
+    if (count > 0) map.set(key, count);
+    else map.delete(key);
+  };
 
   io.use((socket, next) => {
     const ip = clientIp(socket.request);
-    if ((connectionsPerIp.get(ip) ?? 0) >= MAX_CONNECTIONS_PER_IP) {
+    const auth = payloadOf(socket.handshake.auth);
+    let client: ClientInfo;
+    try {
+      client = readClientInfo(socket.request, auth);
+    } catch (err) {
+      if (err instanceof OutdatedClientError) {
+        next(err);
+        return;
+      }
+      throw err;
+    }
+
+    const ipKey = `${client.kind}:${ip}`;
+    const ipCap = client.kind === "mobile" ? limits.maxConnectionsPerIpMobile : limits.maxConnectionsPerIp;
+    if ((connectionsPerIp.get(ipKey) ?? 0) >= ipCap) {
       next(new Error("too_many_connections"));
       return;
     }
-    const auth = payloadOf(socket.handshake.auth);
+    const profile = typeof auth["profile"] === "string" && TOKEN_RE.test(auth["profile"]) ? auth["profile"] : null;
+    const profileKey = client.kind === "mobile" && profile ? profile : null;
+    if (profileKey && (connectionsPerProfile.get(profileKey) ?? 0) >= limits.maxConnectionsPerProfile) {
+      next(new Error("too_many_connections"));
+      return;
+    }
     const resuming = typeof auth["token"] === "string" && sessions.has(auth["token"]);
-    if (!resuming && sessions.size >= MAX_SESSIONS) {
+    if (!resuming && sessions.size >= limits.maxSessions) {
       next(new Error("server_full"));
       return;
     }
     socket.data.ip = ip;
-    connectionsPerIp.set(ip, (connectionsPerIp.get(ip) ?? 0) + 1);
+    socket.data.client = client;
+    socket.data.ipKey = ipKey;
+    socket.data.profileKey = profileKey;
+    connectionsPerIp.set(ipKey, (connectionsPerIp.get(ipKey) ?? 0) + 1);
+    if (profileKey) connectionsPerProfile.set(profileKey, (connectionsPerProfile.get(profileKey) ?? 0) + 1);
     next();
   });
 
@@ -870,7 +967,7 @@ export function setupGameEngine(io: SocketIOServer): void {
     }
 
     try {
-      socket.emit("session", { token: session.token, playerId: session.playerId });
+      socket.emit("session", { token: session.token, playerId: session.playerId, client: session.client.kind });
       socket.emit("profile", { token: session.profileToken });
 
       const restored = currentRoomAndPlayer();
@@ -900,11 +997,19 @@ export function setupGameEngine(io: SocketIOServer): void {
         return;
       }
 
-      // Skip anyone who disconnected while waiting.
+      // Skip anyone who disconnected while waiting, and never pair two
+      // players when one blocked the other (they stay in the queue).
       let waiting: Session | undefined;
-      while (!waiting && matchmakingQueue.length > 0) {
-        const candidate = sessions.get(matchmakingQueue.shift()!);
-        if (candidate?.socketId) waiting = candidate;
+      for (let i = 0; i < matchmakingQueue.length && !waiting; ) {
+        const candidate = sessions.get(matchmakingQueue[i]!);
+        if (!candidate?.socketId) {
+          matchmakingQueue.splice(i, 1);
+        } else if (blockedBetween(candidate, session)) {
+          i += 1;
+        } else {
+          waiting = candidate;
+          matchmakingQueue.splice(i, 1);
+        }
       }
 
       if (!waiting) {
@@ -939,6 +1044,8 @@ export function setupGameEngine(io: SocketIOServer): void {
         token: `bot:${randomId(12)}`, // never matches a session
         profileToken: "",
         ip: "",
+        client: "web",
+        deviceKey: null,
         isBot: true,
         name: BOT_NAMES[botLevel],
         selectedCharacterId: null,
@@ -980,6 +1087,12 @@ export function setupGameEngine(io: SocketIOServer): void {
       }
       if (room.phase !== "waiting") {
         socket.emit("error", { message: "La partie a déjà commencé." });
+        return;
+      }
+      const host = sessions.get(room.players[0]!.token);
+      if (host && blockedBetween(host, session)) {
+        // Same answer as a wrong code: says nothing about the block.
+        socket.emit("error", { message: "Partie introuvable. Vérifie le code et réessaie." });
         return;
       }
 
@@ -1065,8 +1178,17 @@ export function setupGameEngine(io: SocketIOServer): void {
         return;
       }
 
+      if (sessions.get(opponent.token)?.verifiedOnly) {
+        socket.emit("error", { message: "Ton adversaire n’accepte que les questions vérifiées." });
+        return;
+      }
+
       const q = readString(question, 200);
       if (!q) return;
+      if (isObjectionable(q)) {
+        socket.emit("error", { message: "Cette question ne peut pas être envoyée. Reformule-la." });
+        return;
+      }
 
       room.pendingQuestion = q;
       room.pendingAskerId = player.id;
@@ -1150,10 +1272,60 @@ export function setupGameEngine(io: SocketIOServer): void {
       ];
     });
 
+    // ── Moderation: report and block the opponent (Apple guideline 1.2) ──────
+    function reportableOpponent(): { room: Room; opponent: Player } | null {
+      const ctx = currentRoomAndPlayer();
+      if (!ctx) return null;
+      const opponent = opponentOf(ctx.room, ctx.player) ?? ctx.room.departed ?? undefined;
+      return opponent && !opponent.isBot && opponent.id !== ctx.player.id
+        ? { room: ctx.room, opponent }
+        : null;
+    }
+
+    on("report_player", ({ reason }) => {
+      const target = reportableOpponent();
+      if (!target) return;
+      if (session.reportsSent >= MAX_REPORTS_PER_SESSION) {
+        socket.emit("player_reported", { ok: false });
+        return;
+      }
+      session.reportsSent += 1;
+      const { room, opponent } = target;
+      const why = REPORT_REASONS.find((r) => r === reason) ?? "other";
+      // The evidence: every free question this opponent sent in this room.
+      const questions = room.log
+        .filter((e) => e.type === "qna" && !e.verified && e.askerId === opponent.id)
+        .map((e) => (e.type === "qna" ? e.question : null))
+        .filter((q): q is string => q !== null);
+      if (room.pendingQuestion && room.pendingAskerId === opponent.id) questions.push(room.pendingQuestion);
+      saveReport({
+        reporterToken: session.profileToken,
+        reportedToken: opponent.profileToken,
+        reason: why,
+        roomCode: room.code,
+        questions,
+      });
+      socket.emit("player_reported", { ok: true });
+    });
+
+    on("block_player", () => {
+      const target = reportableOpponent();
+      if (!target) return;
+      const key = blockKeyOf(target.opponent.profileToken);
+      if (session.blocked.size < MAX_BLOCKED) session.blocked.add(key);
+      // The app stores the key and sends it back in the handshake (`blocked`).
+      socket.emit("player_blocked", { blockKey: key, name: target.opponent.name });
+    });
+
+    on("set_verified_only", ({ enabled }) => {
+      if (typeof enabled === "boolean") session.verifiedOnly = enabled;
+    });
+
     // ── Rematch ──────────────────────────────────────────────────────────────
     on("request_rematch", () => {
       const ctx = currentRoomAndPlayer();
       if (!ctx || ctx.room.phase !== "ended" || ctx.room.players.length < 2) return;
+      if (humanOpponentBlocked(ctx.room, ctx.player)) return;
 
       ctx.room.rematchRequestedBy = ctx.player.id;
       io.to(ctx.room.code).emit("rematch_requested", { byPlayerId: ctx.player.id });
@@ -1165,6 +1337,7 @@ export function setupGameEngine(io: SocketIOServer): void {
       if (!ctx) return;
       const { room, player } = ctx;
       if (room.phase !== "ended" || room.players.length < 2) return;
+      if (humanOpponentBlocked(room, player)) return;
       // Only the player who did *not* ask can accept.
       if (!room.rematchRequestedBy || room.rematchRequestedBy === player.id) return;
       startRematch(room);
@@ -1172,10 +1345,8 @@ export function setupGameEngine(io: SocketIOServer): void {
 
     // ── Disconnect ───────────────────────────────────────────────────────────
     socket.on("disconnect", () => {
-      const ip = socket.data.ip as string;
-      const count = (connectionsPerIp.get(ip) ?? 1) - 1;
-      if (count > 0) connectionsPerIp.set(ip, count);
-      else connectionsPerIp.delete(ip);
+      decrement(connectionsPerIp, socket.data.ipKey as string);
+      if (socket.data.profileKey) decrement(connectionsPerProfile, socket.data.profileKey as string);
 
       try {
         // A newer tab took over this session: nothing to clean up.

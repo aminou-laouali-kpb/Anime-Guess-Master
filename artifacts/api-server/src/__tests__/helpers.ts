@@ -29,6 +29,13 @@ export interface ClientOptions {
   profile?: string;
   origin?: string;
   reconnection?: boolean;
+  /** Extra handshake fields (mobile app: client, appVersion, platform, device, blocked, verifiedOnly). */
+  auth?: Record<string, unknown>;
+}
+
+/** Handshake of the mobile app, as documented in docs/mobile/SERVER_CHANGES.md. */
+export function mobileAuth(extra: Record<string, unknown> = {}): Record<string, unknown> {
+  return { client: "mobile", appVersion: "1.0.0", platform: "android", ...extra };
 }
 
 let nextIp = 1;
@@ -50,7 +57,7 @@ export class TestClient {
       transports: ["websocket"],
       forceNew: true,
       reconnection: opts.reconnection ?? false,
-      auth: { token: opts.token, profile: opts.profile },
+      auth: { token: opts.token, profile: opts.profile, ...opts.auth },
       extraHeaders: headers,
     });
     this.socket.onAny((event: string, payload: Payload) => {
@@ -61,7 +68,9 @@ export class TestClient {
       }
       if (event === "profile") this.profile = payload.token;
     });
-    this.socket.on("connect_error", (err) => this.events.push(["connect_error", { message: err.message }]));
+    this.socket.on("connect_error", (err) =>
+      this.events.push(["connect_error", { message: err.message, data: (err as { data?: unknown }).data }]),
+    );
   }
 
   get connected() {
@@ -145,4 +154,28 @@ export async function startPrivateGame(server: TestServer): Promise<Game> {
 export function whoseTurn(game: Game): { mover: TestClient; other: TestClient } {
   const turn = game.a.last("game_start")!["currentTurnPlayerId"];
   return turn === game.a.playerId ? { mover: game.a, other: game.b } : { mover: game.b, other: game.a };
+}
+
+/** JSON request against the test server, from a given client address. */
+export async function api(
+  server: TestServer,
+  path: string,
+  opts: { method?: string; body?: unknown; token?: string; headers?: Record<string, string>; ip?: string } = {},
+): Promise<{ status: number; body: any }> {
+  const headers: Record<string, string> = { "X-Forwarded-For": opts.ip ?? "203.0.113.240", ...opts.headers };
+  if (opts.token) headers["Authorization"] = `Bearer ${opts.token}`;
+  if (opts.body !== undefined) headers["Content-Type"] = "application/json";
+  const res = await fetch(`${server.url}/api${path}`, {
+    method: opts.method ?? "GET",
+    headers,
+    body: opts.body === undefined ? undefined : JSON.stringify(opts.body),
+  });
+  const text = await res.text();
+  let body: unknown = text;
+  try {
+    body = JSON.parse(text);
+  } catch {
+    // not JSON
+  }
+  return { status: res.status, body };
 }

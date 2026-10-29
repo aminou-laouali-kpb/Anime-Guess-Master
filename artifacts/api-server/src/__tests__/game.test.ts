@@ -188,7 +188,8 @@ describe("a full game", () => {
     expect(snapshot["myCharacterId"]).toBe(g.aChar);
     // The board lists every character; nothing else in the snapshot may name the opponent's.
     const { characters: _board, ...rest } = snapshot;
-    expect(JSON.stringify(rest)).not.toContain(g.bChar);
+    // Quoted: a short id (e.g. "rem") can be part of a key name such as "rematchRequestedBy".
+    expect(JSON.stringify(rest)).not.toContain(`"${g.bChar}"`);
   });
 });
 

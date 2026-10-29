@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { type TestServer, TestClient, connectClient, startServer, wait } from "./helpers";
+import { type TestServer, TestClient, connectClient, mobileAuth, startServer, wait } from "./helpers";
 
 // Needs a Postgres database: set DATABASE_URL to run these (CI provides one).
 const hasDatabase = Boolean(process.env["DATABASE_URL"]);
@@ -11,8 +11,8 @@ const track = <T extends { close: () => void }>(c: T): T => (open.push(c), c);
 
 // Distinct public-looking addresses (TEST-NET-3), one per player.
 let ipCounter = 1;
-const newPlayer = async (opts: { ip?: string; profile?: string } = {}) =>
-  track(await connectClient(server, { ip: opts.ip ?? `203.0.113.${ipCounter++}`, profile: opts.profile }));
+const newPlayer = async (opts: { ip?: string; profile?: string; auth?: Record<string, unknown> } = {}) =>
+  track(await connectClient(server, { ip: opts.ip ?? `203.0.113.${ipCounter++}`, profile: opts.profile, auth: opts.auth }));
 
 async function myStats(client: TestClient) {
   client.emit("get_my_stats");
@@ -192,5 +192,70 @@ describe.skipIf(!hasDatabase)("player stats and leaderboard (Postgres)", () => {
     a.close();
     const again = await newPlayer({ profile });
     expect(await myStats(again)).toMatchObject({ wins: 1, gamesPlayed: 1 });
+  });
+
+  describe("mobile players behind one carrier IP (CGNAT)", () => {
+    const CGNAT_IP = "203.0.113.222";
+    const saved = { min: process.env["SHARED_NETWORK_MIN_RANKED_GAMES"], perDay: process.env["SHARED_NETWORK_RANKED_PER_DAY"] };
+
+    beforeAll(() => {
+      process.env["SHARED_NETWORK_MIN_RANKED_GAMES"] = "1";
+      process.env["SHARED_NETWORK_RANKED_PER_DAY"] = "1";
+    });
+    afterAll(() => {
+      for (const [k, v] of [["SHARED_NETWORK_MIN_RANKED_GAMES", saved.min], ["SHARED_NETWORK_RANKED_PER_DAY", saved.perDay]] as const) {
+        if (v === undefined) delete process.env[k];
+        else process.env[k] = v;
+      }
+    });
+
+    const app = (device: string) => mobileAuth({ device });
+
+    /** A mobile profile with one ranked game behind it, now connected from the carrier IP. */
+    async function establishedMobile(device: string) {
+      const p = await newPlayer({ auth: app(device) });
+      const opponent = await newPlayer();
+      await playQuickGame(p, opponent);
+      await leave(p, opponent);
+      p.close();
+      return newPlayer({ ip: CGNAT_IP, profile: p.profile, auth: app(device) });
+    }
+
+    it("never ranks fresh profiles on a shared IP (the cheap way to farm)", async () => {
+      const a = await newPlayer({ ip: CGNAT_IP, auth: app("device-aaaaaaaa") });
+      const b = await newPlayer({ ip: CGNAT_IP, auth: app("device-bbbbbbbb") });
+      expect(await playQuickGame(a, b)).toMatchObject({ ranked: false });
+    });
+
+    it("ranks established profiles on a shared IP, a limited number of times per day", async () => {
+      const a = await establishedMobile("device-a1111111");
+      const b = await establishedMobile("device-b2222222");
+      const c = await establishedMobile("device-c3333333");
+      expect(await playQuickGame(a, b)).toMatchObject({ ranked: true });
+      await leave(a, b);
+      // SHARED_NETWORK_RANKED_PER_DAY = 1: a's shared-network quota is used up.
+      expect(await playQuickGame(a, c)).toMatchObject({ ranked: false });
+      const { rows } = await query("SELECT ranked, shared_network FROM games WHERE shared_network ORDER BY id");
+      expect(rows).toEqual([{ ranked: true, shared_network: true }, { ranked: false, shared_network: true }]);
+    });
+
+    it("still never ranks two browsers on the same IP, even established ones", async () => {
+      const a = await newPlayer();
+      const b = await newPlayer();
+      for (const p of [a, b]) {
+        const o = await newPlayer();
+        await playQuickGame(p, o);
+        await leave(p, o);
+      }
+      const a2 = await newPlayer({ ip: CGNAT_IP, profile: a.profile });
+      const b2 = await newPlayer({ ip: CGNAT_IP, profile: b.profile });
+      expect(await playQuickGame(a2, b2)).toMatchObject({ ranked: false });
+    });
+
+    it("never ranks the same install on both sides, whatever the IPs", async () => {
+      const a = await newPlayer({ auth: app("same-device-123") });
+      const b = await newPlayer({ auth: app("same-device-123") });
+      expect(await playQuickGame(a, b)).toMatchObject({ ranked: false });
+    });
   });
 });

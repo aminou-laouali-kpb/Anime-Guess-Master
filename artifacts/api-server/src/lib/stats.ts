@@ -1,11 +1,13 @@
-import { createHash, randomBytes } from "crypto";
+import { randomBytes } from "crypto";
 import { logger } from "./logger";
+import { databaseEnabled, hashToken, loadDb } from "./database";
+import { rankingLimits } from "./limits";
 
 // Player statistics and the leaderboard, stored in Postgres. Everything here
 // is optional: without DATABASE_URL the game runs exactly as before and the
 // stats features report themselves as disabled.
 
-export const statsEnabled = Boolean(process.env["DATABASE_URL"]);
+export const statsEnabled = databaseEnabled;
 
 const START_RATING = 1000;
 const MIN_RATING = 100;
@@ -52,25 +54,6 @@ export interface LeaderboardEntry {
   rankedGames: number;
 }
 
-// The db package throws at import time without DATABASE_URL, so load it only
-// when stats are enabled.
-type DbModule = typeof import("@workspace/db");
-let dbModule: Promise<DbModule> | null = null;
-
-function loadDb(): Promise<DbModule> {
-  dbModule ??= import("@workspace/db")
-    .then(async (m) => {
-      await m.ensureSchema(m.pool);
-      return m;
-    })
-    .catch((err) => {
-      // Database down: retry on the next request instead of caching the failure.
-      dbModule = null;
-      throw err;
-    });
-  return dbModule;
-}
-
 export async function initStats(): Promise<void> {
   if (!statsEnabled) {
     logger.info("DATABASE_URL not set: player stats and leaderboard are disabled");
@@ -78,10 +61,6 @@ export async function initStats(): Promise<void> {
   }
   await loadDb();
   logger.info("Player stats enabled");
-}
-
-function hashToken(token: string): string {
-  return createHash("sha256").update(token).digest("hex");
 }
 
 export function newProfileToken(): string {
@@ -98,12 +77,16 @@ export async function recordGame(params: {
   winner: Participant;
   loser: Participant;
   ranked: boolean;
+  // Both players came from the same public IP, both on the mobile app
+  // (carrier CGNAT). Ranked only for established profiles, a few times a day.
+  sharedNetwork?: boolean;
   mode: "quick" | "private";
   reason: string;
 }): Promise<{ winner: RatingUpdate; loser: RatingUpdate } | null> {
   if (!statsEnabled) return null;
   const { db, playersTable, gamesTable } = await loadDb();
   const { sql, eq, and, or, gt, count } = await import("drizzle-orm");
+  const sharedNetwork = params.sharedNetwork ?? false;
 
   return db.transaction(async (tx) => {
     // Creates the profile on its first finished game; the upsert also locks
@@ -151,6 +134,34 @@ export async function recordGame(params: {
         );
       if (Number(value) >= MAX_RANKED_PER_PAIR_PER_DAY) ranked = false;
     }
+    // Same public IP: the "two different addresses" rule can't tell two
+    // strangers behind a carrier's CGNAT from one person with two phones.
+    // Fresh profiles (the cheap way to farm) never rank on a shared network,
+    // and established ones only a few times a day.
+    if (ranked && sharedNetwork) {
+      const limits = rankingLimits();
+      if (
+        winner.rankedGames < limits.sharedNetworkMinRankedGames ||
+        loser.rankedGames < limits.sharedNetworkMinRankedGames
+      ) {
+        ranked = false;
+      } else {
+        for (const id of [winner.id, loser.id]) {
+          const [{ value }] = await tx
+            .select({ value: count() })
+            .from(gamesTable)
+            .where(
+              and(
+                eq(gamesTable.ranked, true),
+                eq(gamesTable.sharedNetwork, true),
+                gt(gamesTable.createdAt, sql`now() - interval '24 hours'`),
+                or(eq(gamesTable.winnerId, id), eq(gamesTable.loserId, id)),
+              ),
+            );
+          if (Number(value) >= limits.sharedNetworkRankedPerDay) ranked = false;
+        }
+      }
+    }
     const delta = ranked ? eloDelta(winner.rating, loser.rating) : 0;
     const loserRating = Math.max(MIN_RATING, loser.rating - delta);
     const rankedInc = ranked ? 1 : 0;
@@ -189,6 +200,7 @@ export async function recordGame(params: {
       winnerId: winner.id,
       loserId: loser.id,
       ratingChange: delta,
+      sharedNetwork,
     });
 
     leaderboardCache = null;
@@ -202,7 +214,7 @@ export async function recordGame(params: {
 export async function getPlayerStats(profileToken: string): Promise<PlayerStats | null> {
   if (!statsEnabled) return null;
   const { db, playersTable } = await loadDb();
-  const { eq, and, gt, gte, count } = await import("drizzle-orm");
+  const { eq, and, gt, gte, count, isNull } = await import("drizzle-orm");
 
   const [row] = await db
     .select()
@@ -219,6 +231,7 @@ export async function getPlayerStats(profileToken: string): Promise<PlayerStats 
         and(
           gte(playersTable.rankedGames, MIN_RANKED_GAMES),
           gt(playersTable.rating, row.rating),
+          isNull(playersTable.deletedAt),
         ),
       );
     rank = Number(value) + 1;
@@ -240,18 +253,23 @@ export async function getPlayerStats(profileToken: string): Promise<PlayerStats 
 
 let leaderboardCache: { at: number; entries: LeaderboardEntry[] } | null = null;
 
+/** Forget the cached leaderboard (after an account deletion). */
+export function invalidateLeaderboard(): void {
+  leaderboardCache = null;
+}
+
 export async function getLeaderboard(): Promise<LeaderboardEntry[]> {
   if (!statsEnabled) return [];
   if (leaderboardCache && Date.now() - leaderboardCache.at < LEADERBOARD_CACHE_MS) {
     return leaderboardCache.entries;
   }
   const { db, playersTable } = await loadDb();
-  const { gte, desc, asc } = await import("drizzle-orm");
+  const { gte, desc, asc, and, isNull } = await import("drizzle-orm");
 
   const rows = await db
     .select()
     .from(playersTable)
-    .where(gte(playersTable.rankedGames, MIN_RANKED_GAMES))
+    .where(and(gte(playersTable.rankedGames, MIN_RANKED_GAMES), isNull(playersTable.deletedAt)))
     // Ties: whoever reached the rating first (wins also count unranked games, so not used).
     .orderBy(desc(playersTable.rating), asc(playersTable.createdAt))
     .limit(LEADERBOARD_SIZE);

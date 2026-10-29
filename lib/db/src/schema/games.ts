@@ -10,6 +10,9 @@ export const gamesTable = pgTable("games", {
   winnerId: text("winner_id").notNull().references(() => playersTable.id),
   loserId: text("loser_id").notNull().references(() => playersTable.id),
   ratingChange: integer("rating_change").notNull().default(0),
+  // Both players shared one public IP (mobile carrier CGNAT): such games are
+  // only ranked under extra conditions, see stats.ts.
+  sharedNetwork: boolean("shared_network").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

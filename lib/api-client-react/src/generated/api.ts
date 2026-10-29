@@ -6,24 +6,49 @@
  * OpenAPI spec version: 0.1.0
  */
 import {
+  useMutation,
   useQuery
 } from '@tanstack/react-query';
 import type {
+  MutationFunction,
   QueryFunction,
   QueryKey,
+  UseMutationOptions,
+  UseMutationResult,
   UseQueryOptions,
   UseQueryResult
 } from '@tanstack/react-query';
 
 import type {
+  Account,
+  AdOffer,
+  AdOfferRequest,
+  AdmobSsvCallbackParams,
+  BuyItemRequest,
+  BuyItemResult,
   Character,
+  ClaimAdRewardRequest,
+  ClaimAdRewardResult,
+  DeletedProfile,
+  EquipRequest,
   ErrorResponse,
   HealthStatus,
-  Leaderboard
+  Leaderboard,
+  RegisterProfileRequest,
+  RegisteredProfile,
+  RemoteConfigResponse,
+  RevenueCatWebhookPayload,
+  ShopCatalog,
+  SsvResult,
+  SyncPurchasesResult,
+  UnauthorizedResponse,
+  UnavailableResponse,
+  UnknownProfileResponse,
+  WebhookResult
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
-import type { ErrorType } from '../custom-fetch';
+import type { ErrorType , BodyType } from '../custom-fetch';
 
 type AwaitedInput<T> = PromiseLike<T> | T;
 
@@ -271,6 +296,899 @@ export function useGetLeaderboard<TData = Awaited<ReturnType<typeof getLeaderboa
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetLeaderboardQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetRemoteConfigUrl = () => {
+
+
+
+
+  return `/api/config`
+}
+
+/**
+ * Minimum supported mobile app version, enabled server features, and ad / economy caps (enforced server-side with the same values).
+ * @summary Remote configuration
+ */
+export const getRemoteConfig = async ( options?: Parameters<typeof customFetch>[1]): Promise<RemoteConfigResponse> => {
+
+  return customFetch<RemoteConfigResponse>(getGetRemoteConfigUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetRemoteConfigQueryKey = () => {
+    return [
+    `/api/config`
+    ] as const;
+    }
+
+
+export const getGetRemoteConfigQueryOptions = <TData = Awaited<ReturnType<typeof getRemoteConfig>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRemoteConfig>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetRemoteConfigQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getRemoteConfig>>> = ({ signal }) => getRemoteConfig({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getRemoteConfig>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetRemoteConfigQueryResult = NonNullable<Awaited<ReturnType<typeof getRemoteConfig>>>
+export type GetRemoteConfigQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Remote configuration
+ */
+
+export function useGetRemoteConfig<TData = Awaited<ReturnType<typeof getRemoteConfig>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRemoteConfig>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetRemoteConfigQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetShopCatalogUrl = () => {
+
+
+
+
+  return `/api/shop/catalog`
+}
+
+/**
+ * Static catalogue served by the server; works without a database.
+ * @summary Cosmetic catalogue and store products
+ */
+export const getShopCatalog = async ( options?: Parameters<typeof customFetch>[1]): Promise<ShopCatalog> => {
+
+  return customFetch<ShopCatalog>(getGetShopCatalogUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetShopCatalogQueryKey = () => {
+    return [
+    `/api/shop/catalog`
+    ] as const;
+    }
+
+
+export const getGetShopCatalogQueryOptions = <TData = Awaited<ReturnType<typeof getShopCatalog>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getShopCatalog>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetShopCatalogQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getShopCatalog>>> = ({ signal }) => getShopCatalog({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getShopCatalog>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetShopCatalogQueryResult = NonNullable<Awaited<ReturnType<typeof getShopCatalog>>>
+export type GetShopCatalogQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Cosmetic catalogue and store products
+ */
+
+export function useGetShopCatalog<TData = Awaited<ReturnType<typeof getShopCatalog>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getShopCatalog>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetShopCatalogQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getRegisterProfileUrl = () => {
+
+
+
+
+  return `/api/me`
+}
+
+/**
+ * Creates the player row for this profile token (or a new token when no Authorization header is sent) and returns the public player id, which is also the RevenueCat app user id and the AdMob SSV user id.
+ * @summary Register the profile
+ */
+export const registerProfile = async (registerProfileRequest?: RegisterProfileRequest, options?: Parameters<typeof customFetch>[1]): Promise<RegisteredProfile> => {
+
+  return customFetch<RegisteredProfile>(getRegisterProfileUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(registerProfileRequest)
+  }
+);}
+
+
+
+
+
+export const getRegisterProfileMutationOptions = <TError = ErrorType<UnavailableResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof registerProfile>>, TError,{data?: BodyType<RegisterProfileRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof registerProfile>>, TError,{data?: BodyType<RegisterProfileRequest>}, TContext> => {
+
+const mutationKey = ['registerProfile'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof registerProfile>>, {data?: BodyType<RegisterProfileRequest>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  registerProfile(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RegisterProfileMutationResult = NonNullable<Awaited<ReturnType<typeof registerProfile>>>
+    export type RegisterProfileMutationBody = BodyType<RegisterProfileRequest> | undefined
+    export type RegisterProfileMutationError = ErrorType<UnavailableResponse>
+
+    /**
+ * @summary Register the profile
+ */
+export const useRegisterProfile = <TError = ErrorType<UnavailableResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof registerProfile>>, TError,{data?: BodyType<RegisterProfileRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof registerProfile>>,
+        TError,
+        {data?: BodyType<RegisterProfileRequest>},
+        TContext
+      > => {
+      return useMutation(getRegisterProfileMutationOptions(options));
+    }
+
+export const getDeleteProfileUrl = () => {
+
+
+
+
+  return `/api/me`
+}
+
+/**
+ * Deletes personal data (wallet, entitlements, inventory, ad rewards) and anonymises the player row. Purchases are not refunded.
+ * @summary Delete the account
+ */
+export const deleteProfile = async ( options?: Parameters<typeof customFetch>[1]): Promise<DeletedProfile> => {
+
+  return customFetch<DeletedProfile>(getDeleteProfileUrl(),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeleteProfileMutationOptions = <TError = ErrorType<UnauthorizedResponse | UnknownProfileResponse | UnavailableResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteProfile>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteProfile>>, TError,void, TContext> => {
+
+const mutationKey = ['deleteProfile'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteProfile>>, void> = () => {
+
+
+          return  deleteProfile(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteProfileMutationResult = NonNullable<Awaited<ReturnType<typeof deleteProfile>>>
+
+    export type DeleteProfileMutationError = ErrorType<UnauthorizedResponse | UnknownProfileResponse | UnavailableResponse>
+
+    /**
+ * @summary Delete the account
+ */
+export const useDeleteProfile = <TError = ErrorType<UnauthorizedResponse | UnknownProfileResponse | UnavailableResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteProfile>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteProfile>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getDeleteProfileMutationOptions(options));
+    }
+
+export const getGetMyAccountUrl = () => {
+
+
+
+
+  return `/api/me/entitlements`
+}
+
+/**
+ * Call at app start, after a purchase and after "Restore purchases". Also credits rewarded videos verified by AdMob but not yet claimed.
+ * @summary Balance, entitlements, inventory and equipped cosmetics
+ */
+export const getMyAccount = async ( options?: Parameters<typeof customFetch>[1]): Promise<Account> => {
+
+  return customFetch<Account>(getGetMyAccountUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMyAccountQueryKey = () => {
+    return [
+    `/api/me/entitlements`
+    ] as const;
+    }
+
+
+export const getGetMyAccountQueryOptions = <TData = Awaited<ReturnType<typeof getMyAccount>>, TError = ErrorType<UnauthorizedResponse | UnknownProfileResponse | UnavailableResponse>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMyAccount>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMyAccountQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMyAccount>>> = ({ signal }) => getMyAccount({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMyAccount>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetMyAccountQueryResult = NonNullable<Awaited<ReturnType<typeof getMyAccount>>>
+export type GetMyAccountQueryError = ErrorType<UnauthorizedResponse | UnknownProfileResponse | UnavailableResponse>
+
+
+/**
+ * @summary Balance, entitlements, inventory and equipped cosmetics
+ */
+
+export function useGetMyAccount<TData = Awaited<ReturnType<typeof getMyAccount>>, TError = ErrorType<UnauthorizedResponse | UnknownProfileResponse | UnavailableResponse>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMyAccount>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetMyAccountQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getSyncPurchasesUrl = () => {
+
+
+
+
+  return `/api/me/sync-purchases`
+}
+
+/**
+ * Fallback when a webhook is late. Requires REVENUECAT_API_KEY on the server.
+ * @summary Re-read purchases from RevenueCat
+ */
+export const syncPurchases = async ( options?: Parameters<typeof customFetch>[1]): Promise<SyncPurchasesResult> => {
+
+  return customFetch<SyncPurchasesResult>(getSyncPurchasesUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getSyncPurchasesMutationOptions = <TError = ErrorType<UnauthorizedResponse | UnknownProfileResponse | UnavailableResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof syncPurchases>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof syncPurchases>>, TError,void, TContext> => {
+
+const mutationKey = ['syncPurchases'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof syncPurchases>>, void> = () => {
+
+
+          return  syncPurchases(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SyncPurchasesMutationResult = NonNullable<Awaited<ReturnType<typeof syncPurchases>>>
+
+    export type SyncPurchasesMutationError = ErrorType<UnauthorizedResponse | UnknownProfileResponse | UnavailableResponse>
+
+    /**
+ * @summary Re-read purchases from RevenueCat
+ */
+export const useSyncPurchases = <TError = ErrorType<UnauthorizedResponse | UnknownProfileResponse | UnavailableResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof syncPurchases>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof syncPurchases>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getSyncPurchasesMutationOptions(options));
+    }
+
+export const getCreateAdOfferUrl = () => {
+
+
+
+
+  return `/api/me/ad-offers`
+}
+
+/**
+ * Checks the daily caps. Pass `ssv.userId` and `ssv.customData` to AdMob's server-side verification options.
+ * @summary Get a nonce before showing a rewarded video
+ */
+export const createAdOffer = async (adOfferRequest: AdOfferRequest, options?: Parameters<typeof customFetch>[1]): Promise<AdOffer> => {
+
+  return customFetch<AdOffer>(getCreateAdOfferUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(adOfferRequest)
+  }
+);}
+
+
+
+
+
+export const getCreateAdOfferMutationOptions = <TError = ErrorType<ErrorResponse | UnauthorizedResponse | UnknownProfileResponse | UnavailableResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createAdOffer>>, TError,{data: BodyType<AdOfferRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createAdOffer>>, TError,{data: BodyType<AdOfferRequest>}, TContext> => {
+
+const mutationKey = ['createAdOffer'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createAdOffer>>, {data: BodyType<AdOfferRequest>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createAdOffer(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateAdOfferMutationResult = NonNullable<Awaited<ReturnType<typeof createAdOffer>>>
+    export type CreateAdOfferMutationBody = BodyType<AdOfferRequest>
+    export type CreateAdOfferMutationError = ErrorType<ErrorResponse | UnauthorizedResponse | UnknownProfileResponse | UnavailableResponse>
+
+    /**
+ * @summary Get a nonce before showing a rewarded video
+ */
+export const useCreateAdOffer = <TError = ErrorType<ErrorResponse | UnauthorizedResponse | UnknownProfileResponse | UnavailableResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createAdOffer>>, TError,{data: BodyType<AdOfferRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createAdOffer>>,
+        TError,
+        {data: BodyType<AdOfferRequest>},
+        TContext
+      > => {
+      return useMutation(getCreateAdOfferMutationOptions(options));
+    }
+
+export const getClaimAdRewardUrl = () => {
+
+
+
+
+  return `/api/me/ad-rewards/claim`
+}
+
+/**
+ * Credits only once AdMob's signed callback has arrived. 202 = not yet, retry for up to 30 s; the reward is otherwise credited on the next account read.
+ * @summary Claim the reward of a watched video
+ */
+export const claimAdReward = async (claimAdRewardRequest: ClaimAdRewardRequest, options?: Parameters<typeof customFetch>[1]): Promise<ClaimAdRewardResult> => {
+
+  return customFetch<ClaimAdRewardResult>(getClaimAdRewardUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(claimAdRewardRequest)
+  }
+);}
+
+
+
+
+
+export const getClaimAdRewardMutationOptions = <TError = ErrorType<ErrorResponse | UnauthorizedResponse | ClaimAdRewardResult | UnavailableResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof claimAdReward>>, TError,{data: BodyType<ClaimAdRewardRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof claimAdReward>>, TError,{data: BodyType<ClaimAdRewardRequest>}, TContext> => {
+
+const mutationKey = ['claimAdReward'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof claimAdReward>>, {data: BodyType<ClaimAdRewardRequest>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  claimAdReward(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ClaimAdRewardMutationResult = NonNullable<Awaited<ReturnType<typeof claimAdReward>>>
+    export type ClaimAdRewardMutationBody = BodyType<ClaimAdRewardRequest>
+    export type ClaimAdRewardMutationError = ErrorType<ErrorResponse | UnauthorizedResponse | ClaimAdRewardResult | UnavailableResponse>
+
+    /**
+ * @summary Claim the reward of a watched video
+ */
+export const useClaimAdReward = <TError = ErrorType<ErrorResponse | UnauthorizedResponse | ClaimAdRewardResult | UnavailableResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof claimAdReward>>, TError,{data: BodyType<ClaimAdRewardRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof claimAdReward>>,
+        TError,
+        {data: BodyType<ClaimAdRewardRequest>},
+        TContext
+      > => {
+      return useMutation(getClaimAdRewardMutationOptions(options));
+    }
+
+export const getBuyShopItemUrl = () => {
+
+
+
+
+  return `/api/shop/buy`
+}
+
+/**
+ * @summary Buy a cosmetic with Éclats
+ */
+export const buyShopItem = async (buyItemRequest: BuyItemRequest, options?: Parameters<typeof customFetch>[1]): Promise<BuyItemResult> => {
+
+  return customFetch<BuyItemResult>(getBuyShopItemUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(buyItemRequest)
+  }
+);}
+
+
+
+
+
+export const getBuyShopItemMutationOptions = <TError = ErrorType<ErrorResponse | UnauthorizedResponse | UnknownProfileResponse | UnavailableResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof buyShopItem>>, TError,{data: BodyType<BuyItemRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof buyShopItem>>, TError,{data: BodyType<BuyItemRequest>}, TContext> => {
+
+const mutationKey = ['buyShopItem'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof buyShopItem>>, {data: BodyType<BuyItemRequest>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  buyShopItem(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type BuyShopItemMutationResult = NonNullable<Awaited<ReturnType<typeof buyShopItem>>>
+    export type BuyShopItemMutationBody = BodyType<BuyItemRequest>
+    export type BuyShopItemMutationError = ErrorType<ErrorResponse | UnauthorizedResponse | UnknownProfileResponse | UnavailableResponse>
+
+    /**
+ * @summary Buy a cosmetic with Éclats
+ */
+export const useBuyShopItem = <TError = ErrorType<ErrorResponse | UnauthorizedResponse | UnknownProfileResponse | UnavailableResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof buyShopItem>>, TError,{data: BodyType<BuyItemRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof buyShopItem>>,
+        TError,
+        {data: BodyType<BuyItemRequest>},
+        TContext
+      > => {
+      return useMutation(getBuyShopItemMutationOptions(options));
+    }
+
+export const getEquipItemUrl = () => {
+
+
+
+
+  return `/api/me/equip`
+}
+
+/**
+ * @summary Equip (or unequip with null) a cosmetic the player owns
+ */
+export const equipItem = async (equipRequest: EquipRequest, options?: Parameters<typeof customFetch>[1]): Promise<Account> => {
+
+  return customFetch<Account>(getEquipItemUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(equipRequest)
+  }
+);}
+
+
+
+
+
+export const getEquipItemMutationOptions = <TError = ErrorType<ErrorResponse | UnauthorizedResponse | UnknownProfileResponse | UnavailableResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof equipItem>>, TError,{data: BodyType<EquipRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof equipItem>>, TError,{data: BodyType<EquipRequest>}, TContext> => {
+
+const mutationKey = ['equipItem'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof equipItem>>, {data: BodyType<EquipRequest>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  equipItem(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type EquipItemMutationResult = NonNullable<Awaited<ReturnType<typeof equipItem>>>
+    export type EquipItemMutationBody = BodyType<EquipRequest>
+    export type EquipItemMutationError = ErrorType<ErrorResponse | UnauthorizedResponse | UnknownProfileResponse | UnavailableResponse>
+
+    /**
+ * @summary Equip (or unequip with null) a cosmetic the player owns
+ */
+export const useEquipItem = <TError = ErrorType<ErrorResponse | UnauthorizedResponse | UnknownProfileResponse | UnavailableResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof equipItem>>, TError,{data: BodyType<EquipRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof equipItem>>,
+        TError,
+        {data: BodyType<EquipRequest>},
+        TContext
+      > => {
+      return useMutation(getEquipItemMutationOptions(options));
+    }
+
+export const getRevenueCatWebhookUrl = () => {
+
+
+
+
+  return `/api/webhooks/revenuecat`
+}
+
+/**
+ * Authorization header must equal REVENUECAT_WEBHOOK_AUTH (404 when unset). Idempotent by event id: a replayed event answers `duplicate` and changes nothing.
+ * @summary RevenueCat webhook
+ */
+export const revenueCatWebhook = async (revenueCatWebhookPayload: RevenueCatWebhookPayload, options?: Parameters<typeof customFetch>[1]): Promise<WebhookResult> => {
+
+  return customFetch<WebhookResult>(getRevenueCatWebhookUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(revenueCatWebhookPayload)
+  }
+);}
+
+
+
+
+
+export const getRevenueCatWebhookMutationOptions = <TError = ErrorType<ErrorResponse | UnavailableResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof revenueCatWebhook>>, TError,{data: BodyType<RevenueCatWebhookPayload>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof revenueCatWebhook>>, TError,{data: BodyType<RevenueCatWebhookPayload>}, TContext> => {
+
+const mutationKey = ['revenueCatWebhook'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof revenueCatWebhook>>, {data: BodyType<RevenueCatWebhookPayload>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  revenueCatWebhook(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RevenueCatWebhookMutationResult = NonNullable<Awaited<ReturnType<typeof revenueCatWebhook>>>
+    export type RevenueCatWebhookMutationBody = BodyType<RevenueCatWebhookPayload>
+    export type RevenueCatWebhookMutationError = ErrorType<ErrorResponse | UnavailableResponse>
+
+    /**
+ * @summary RevenueCat webhook
+ */
+export const useRevenueCatWebhook = <TError = ErrorType<ErrorResponse | UnavailableResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof revenueCatWebhook>>, TError,{data: BodyType<RevenueCatWebhookPayload>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof revenueCatWebhook>>,
+        TError,
+        {data: BodyType<RevenueCatWebhookPayload>},
+        TContext
+      > => {
+      return useMutation(getRevenueCatWebhookMutationOptions(options));
+    }
+
+export const getAdmobSsvCallbackUrl = (params: AdmobSsvCallbackParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/admob/ssv?${stringifiedParams}` : `/api/admob/ssv`
+}
+
+/**
+ * Called by AdMob. The ECDSA signature is verified with Google's published keys (cached 24 h). `user_id` must be the player id and `custom_data` the nonce from POST /me/ad-offers.
+ * @summary AdMob rewarded-ad server-side verification callback
+ */
+export const admobSsvCallback = async (params: AdmobSsvCallbackParams, options?: Parameters<typeof customFetch>[1]): Promise<SsvResult> => {
+
+  return customFetch<SsvResult>(getAdmobSsvCallbackUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getAdmobSsvCallbackQueryKey = (params?: AdmobSsvCallbackParams,) => {
+    return [
+    `/api/admob/ssv`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getAdmobSsvCallbackQueryOptions = <TData = Awaited<ReturnType<typeof admobSsvCallback>>, TError = ErrorType<ErrorResponse | UnavailableResponse>>(params: AdmobSsvCallbackParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof admobSsvCallback>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getAdmobSsvCallbackQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof admobSsvCallback>>> = ({ signal }) => admobSsvCallback(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof admobSsvCallback>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type AdmobSsvCallbackQueryResult = NonNullable<Awaited<ReturnType<typeof admobSsvCallback>>>
+export type AdmobSsvCallbackQueryError = ErrorType<ErrorResponse | UnavailableResponse>
+
+
+/**
+ * @summary AdMob rewarded-ad server-side verification callback
+ */
+
+export function useAdmobSsvCallback<TData = Awaited<ReturnType<typeof admobSsvCallback>>, TError = ErrorType<ErrorResponse | UnavailableResponse>>(
+ params: AdmobSsvCallbackParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof admobSsvCallback>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getAdmobSsvCallbackQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

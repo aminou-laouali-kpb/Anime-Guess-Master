@@ -57,3 +57,248 @@ export const GetLeaderboardResponse = zod.object({
 })
 
 
+/**
+ * Minimum supported mobile app version, enabled server features, and ad / economy caps (enforced server-side with the same values).
+ * @summary Remote configuration
+ */
+export const GetRemoteConfigResponse = zod.object({
+  "minMobileVersion": zod.string().nullable().describe('Oldest app version allowed to connect (null = any)'),
+  "features": zod.object({
+  "stats": zod.boolean(),
+  "wallet": zod.boolean(),
+  "purchases": zod.boolean(),
+  "purchaseSync": zod.boolean(),
+  "adRewards": zod.boolean()
+}),
+  "remoteConfig": zod.record(zod.string(), zod.union([zod.number(),zod.boolean()])).describe('Keys of MONETISATION_SPEC §8 (numbers and booleans)')
+})
+
+
+/**
+ * Static catalogue served by the server; works without a database.
+ * @summary Cosmetic catalogue and store products
+ */
+export const GetShopCatalogResponse = zod.object({
+  "currency": zod.enum(['shards']),
+  "items": zod.array(zod.object({
+  "id": zod.string(),
+  "slot": zod.enum(['card_back', 'frame', 'reaction_pack', 'victory_fx', 'board']),
+  "name": zod.object({
+  "fr": zod.string(),
+  "en": zod.string()
+}),
+  "priceShards": zod.number().nullable().describe('Null = not sold for Éclats (pack, event or subscription exclusive)'),
+  "visibleToOpponent": zod.boolean(),
+  "featured": zod.boolean()
+})),
+  "products": zod.array(zod.object({
+  "productId": zod.string(),
+  "kind": zod.enum(['non_consumable', 'consumable', 'subscription']),
+  "entitlement": zod.string().nullable(),
+  "shards": zod.number(),
+  "items": zod.array(zod.string())
+}))
+})
+
+
+/**
+ * Creates the player row for this profile token (or a new token when no Authorization header is sent) and returns the public player id, which is also the RevenueCat app user id and the AdMob SSV user id.
+ * @summary Register the profile
+ */
+export const registerProfileBodyNameMax = 64;
+
+
+
+export const RegisterProfileBody = zod.object({
+  "name": zod.string().max(registerProfileBodyNameMax).optional()
+})
+
+export const RegisterProfileResponse = zod.object({
+  "playerId": zod.string().describe('Public id; RevenueCat app user id and AdMob SSV user id'),
+  "name": zod.string(),
+  "shardsBalance": zod.number(),
+  "profileToken": zod.string().nullable().describe('New secret token when the server created it, otherwise null')
+})
+
+
+/**
+ * Deletes personal data (wallet, entitlements, inventory, ad rewards) and anonymises the player row. Purchases are not refunded.
+ * @summary Delete the account
+ */
+export const DeleteProfileResponse = zod.object({
+  "deleted": zod.boolean()
+})
+
+
+/**
+ * Call at app start, after a purchase and after "Restore purchases". Also credits rewarded videos verified by AdMob but not yet claimed.
+ * @summary Balance, entitlements, inventory and equipped cosmetics
+ */
+export const GetMyAccountResponse = zod.object({
+  "playerId": zod.string(),
+  "name": zod.string(),
+  "shardsBalance": zod.number().describe('Can be negative after a refund clawback (shop closed until back to 0)'),
+  "noAds": zod.boolean().describe('True with no_ads or plus — no interstitials or banners'),
+  "entitlements": zod.array(zod.object({
+  "entitlement": zod.string().describe('no_ads, plus, theme_<slug>, pass_sNN'),
+  "productId": zod.string().nullable(),
+  "expiresAt": zod.string().nullable().describe('ISO date; null = lifetime')
+})),
+  "inventory": zod.array(zod.string()),
+  "equipped": zod.object({
+  "card_back": zod.string().optional(),
+  "frame": zod.string().optional(),
+  "reaction_pack": zod.string().optional(),
+  "victory_fx": zod.string().optional(),
+  "board": zod.string().optional()
+})
+})
+
+
+/**
+ * Fallback when a webhook is late. Requires REVENUECAT_API_KEY on the server.
+ * @summary Re-read purchases from RevenueCat
+ */
+export const SyncPurchasesResponse = zod.object({
+  "entitlements": zod.number(),
+  "purchases": zod.number(),
+  "account": zod.object({
+  "playerId": zod.string(),
+  "name": zod.string(),
+  "shardsBalance": zod.number().describe('Can be negative after a refund clawback (shop closed until back to 0)'),
+  "noAds": zod.boolean().describe('True with no_ads or plus — no interstitials or banners'),
+  "entitlements": zod.array(zod.object({
+  "entitlement": zod.string().describe('no_ads, plus, theme_<slug>, pass_sNN'),
+  "productId": zod.string().nullable(),
+  "expiresAt": zod.string().nullable().describe('ISO date; null = lifetime')
+})),
+  "inventory": zod.array(zod.string()),
+  "equipped": zod.object({
+  "card_back": zod.string().optional(),
+  "frame": zod.string().optional(),
+  "reaction_pack": zod.string().optional(),
+  "victory_fx": zod.string().optional(),
+  "board": zod.string().optional()
+})
+})
+})
+
+
+/**
+ * Checks the daily caps. Pass `ssv.userId` and `ssv.customData` to AdMob's server-side verification options.
+ * @summary Get a nonce before showing a rewarded video
+ */
+export const CreateAdOfferBody = zod.object({
+  "adUnit": zod.string().describe('Internal placement name, e.g. rw_free_shards'),
+  "rewardKey": zod.enum(['free_shards', 'daily_chest'])
+})
+
+export const CreateAdOfferResponse = zod.object({
+  "nonce": zod.string(),
+  "rewardKey": zod.string(),
+  "amount": zod.number(),
+  "expiresAt": zod.string(),
+  "ssv": zod.object({
+  "userId": zod.string(),
+  "customData": zod.string()
+})
+})
+
+
+/**
+ * Credits only once AdMob's signed callback has arrived. 202 = not yet, retry for up to 30 s; the reward is otherwise credited on the next account read.
+ * @summary Claim the reward of a watched video
+ */
+export const ClaimAdRewardBody = zod.object({
+  "nonce": zod.string()
+})
+
+export const ClaimAdRewardResponse = zod.object({
+  "status": zod.enum(['credited', 'already_claimed', 'pending', 'unknown_offer']),
+  "amount": zod.number().optional(),
+  "shardsBalance": zod.number().optional()
+})
+
+
+/**
+ * @summary Buy a cosmetic with Éclats
+ */
+export const BuyShopItemBody = zod.object({
+  "itemId": zod.string()
+})
+
+export const BuyShopItemResponse = zod.object({
+  "ok": zod.boolean(),
+  "shardsBalance": zod.number()
+})
+
+
+/**
+ * @summary Equip (or unequip with null) a cosmetic the player owns
+ */
+export const EquipItemBody = zod.object({
+  "slot": zod.enum(['card_back', 'frame', 'reaction_pack', 'victory_fx', 'board']),
+  "itemId": zod.string().nullable()
+})
+
+export const EquipItemResponse = zod.object({
+  "playerId": zod.string(),
+  "name": zod.string(),
+  "shardsBalance": zod.number().describe('Can be negative after a refund clawback (shop closed until back to 0)'),
+  "noAds": zod.boolean().describe('True with no_ads or plus — no interstitials or banners'),
+  "entitlements": zod.array(zod.object({
+  "entitlement": zod.string().describe('no_ads, plus, theme_<slug>, pass_sNN'),
+  "productId": zod.string().nullable(),
+  "expiresAt": zod.string().nullable().describe('ISO date; null = lifetime')
+})),
+  "inventory": zod.array(zod.string()),
+  "equipped": zod.object({
+  "card_back": zod.string().optional(),
+  "frame": zod.string().optional(),
+  "reaction_pack": zod.string().optional(),
+  "victory_fx": zod.string().optional(),
+  "board": zod.string().optional()
+})
+})
+
+
+/**
+ * Authorization header must equal REVENUECAT_WEBHOOK_AUTH (404 when unset). Idempotent by event id: a replayed event answers `duplicate` and changes nothing.
+ * @summary RevenueCat webhook
+ */
+export const RevenueCatWebhookBody = zod.object({
+  "api_version": zod.string().optional(),
+  "event": zod.object({
+  "id": zod.string(),
+  "type": zod.string(),
+  "app_user_id": zod.string().optional()
+})
+})
+
+export const RevenueCatWebhookResponse = zod.object({
+  "outcome": zod.enum(['granted', 'refunded', 'expired', 'transferred', 'updated', 'noted', 'unknown_user', 'unknown_product', 'duplicate'])
+})
+
+
+/**
+ * Called by AdMob. The ECDSA signature is verified with Google's published keys (cached 24 h). `user_id` must be the player id and `custom_data` the nonce from POST /me/ad-offers.
+ * @summary AdMob rewarded-ad server-side verification callback
+ */
+export const AdmobSsvCallbackQueryParams = zod.object({
+  "ad_network": zod.coerce.string().optional(),
+  "ad_unit": zod.coerce.string().optional(),
+  "custom_data": zod.coerce.string().optional(),
+  "reward_amount": zod.coerce.string().optional(),
+  "reward_item": zod.coerce.string().optional(),
+  "timestamp": zod.coerce.string().optional(),
+  "transaction_id": zod.coerce.string().optional(),
+  "user_id": zod.coerce.string().optional(),
+  "signature": zod.coerce.string(),
+  "key_id": zod.coerce.string()
+})
+
+export const AdmobSsvCallbackResponse = zod.object({
+  "status": zod.enum(['recorded', 'duplicate', 'unknown_offer', 'user_mismatch', 'expired_offer', 'missing_fields'])
+})
+
+

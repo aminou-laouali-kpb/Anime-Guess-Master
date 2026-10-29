@@ -49,3 +49,294 @@ export interface ErrorResponse {
   error: string;
 }
 
+export type RemoteConfigResponseFeatures = {
+  stats: boolean;
+  wallet: boolean;
+  purchases: boolean;
+  purchaseSync: boolean;
+  adRewards: boolean;
+};
+
+/**
+ * Keys of MONETISATION_SPEC §8 (numbers and booleans)
+ */
+export type RemoteConfigResponseRemoteConfig = {[key: string]: number | boolean};
+
+export interface RemoteConfigResponse {
+  /**
+     * Oldest app version allowed to connect (null = any)
+     * @nullable
+     */
+  minMobileVersion: string | null;
+  features: RemoteConfigResponseFeatures;
+  /** Keys of MONETISATION_SPEC §8 (numbers and booleans) */
+  remoteConfig: RemoteConfigResponseRemoteConfig;
+}
+
+export interface LocalizedName {
+  fr: string;
+  en: string;
+}
+
+export type CatalogItemSlot = typeof CatalogItemSlot[keyof typeof CatalogItemSlot];
+
+
+export const CatalogItemSlot = {
+  card_back: 'card_back',
+  frame: 'frame',
+  reaction_pack: 'reaction_pack',
+  victory_fx: 'victory_fx',
+  board: 'board',
+} as const;
+
+export interface CatalogItem {
+  id: string;
+  slot: CatalogItemSlot;
+  name: LocalizedName;
+  /**
+     * Null = not sold for Éclats (pack, event or subscription exclusive)
+     * @nullable
+     */
+  priceShards: number | null;
+  visibleToOpponent: boolean;
+  featured: boolean;
+}
+
+export type StoreProductKind = typeof StoreProductKind[keyof typeof StoreProductKind];
+
+
+export const StoreProductKind = {
+  non_consumable: 'non_consumable',
+  consumable: 'consumable',
+  subscription: 'subscription',
+} as const;
+
+export interface StoreProduct {
+  productId: string;
+  kind: StoreProductKind;
+  /** @nullable */
+  entitlement: string | null;
+  shards: number;
+  items: string[];
+}
+
+export type ShopCatalogCurrency = typeof ShopCatalogCurrency[keyof typeof ShopCatalogCurrency];
+
+
+export const ShopCatalogCurrency = {
+  shards: 'shards',
+} as const;
+
+export interface ShopCatalog {
+  currency: ShopCatalogCurrency;
+  items: CatalogItem[];
+  products: StoreProduct[];
+}
+
+export interface RegisterProfileRequest {
+  /** @maxLength 64 */
+  name?: string;
+}
+
+export interface RegisteredProfile {
+  /** Public id; RevenueCat app user id and AdMob SSV user id */
+  playerId: string;
+  name: string;
+  shardsBalance: number;
+  /**
+     * New secret token when the server created it, otherwise null
+     * @nullable
+     */
+  profileToken: string | null;
+}
+
+export interface DeletedProfile {
+  deleted: boolean;
+}
+
+export interface Entitlement {
+  /** no_ads, plus, theme_<slug>, pass_sNN */
+  entitlement: string;
+  /** @nullable */
+  productId: string | null;
+  /**
+     * ISO date; null = lifetime
+     * @nullable
+     */
+  expiresAt: string | null;
+}
+
+export interface EquippedCosmetics {
+  card_back?: string;
+  frame?: string;
+  reaction_pack?: string;
+  victory_fx?: string;
+  board?: string;
+}
+
+export interface Account {
+  playerId: string;
+  name: string;
+  /** Can be negative after a refund clawback (shop closed until back to 0) */
+  shardsBalance: number;
+  /** True with no_ads or plus — no interstitials or banners */
+  noAds: boolean;
+  entitlements: Entitlement[];
+  inventory: string[];
+  equipped: EquippedCosmetics;
+}
+
+export interface SyncPurchasesResult {
+  entitlements: number;
+  purchases: number;
+  account: Account;
+}
+
+export type AdOfferRequestRewardKey = typeof AdOfferRequestRewardKey[keyof typeof AdOfferRequestRewardKey];
+
+
+export const AdOfferRequestRewardKey = {
+  free_shards: 'free_shards',
+  daily_chest: 'daily_chest',
+} as const;
+
+export interface AdOfferRequest {
+  /** Internal placement name, e.g. rw_free_shards */
+  adUnit: string;
+  rewardKey: AdOfferRequestRewardKey;
+}
+
+export type AdOfferSsv = {
+  userId: string;
+  customData: string;
+};
+
+export interface AdOffer {
+  nonce: string;
+  rewardKey: string;
+  amount: number;
+  expiresAt: string;
+  ssv: AdOfferSsv;
+}
+
+export interface ClaimAdRewardRequest {
+  nonce: string;
+}
+
+export type ClaimAdRewardResultStatus = typeof ClaimAdRewardResultStatus[keyof typeof ClaimAdRewardResultStatus];
+
+
+export const ClaimAdRewardResultStatus = {
+  credited: 'credited',
+  already_claimed: 'already_claimed',
+  pending: 'pending',
+  unknown_offer: 'unknown_offer',
+} as const;
+
+export interface ClaimAdRewardResult {
+  status: ClaimAdRewardResultStatus;
+  amount?: number;
+  shardsBalance?: number;
+}
+
+export interface BuyItemRequest {
+  itemId: string;
+}
+
+export interface BuyItemResult {
+  ok: boolean;
+  shardsBalance: number;
+}
+
+export type EquipRequestSlot = typeof EquipRequestSlot[keyof typeof EquipRequestSlot];
+
+
+export const EquipRequestSlot = {
+  card_back: 'card_back',
+  frame: 'frame',
+  reaction_pack: 'reaction_pack',
+  victory_fx: 'victory_fx',
+  board: 'board',
+} as const;
+
+export interface EquipRequest {
+  slot: EquipRequestSlot;
+  /** @nullable */
+  itemId: string | null;
+}
+
+export type RevenueCatWebhookPayloadEvent = {
+  id: string;
+  type: string;
+  app_user_id?: string;
+  [key: string]: unknown;
+ };
+
+export interface RevenueCatWebhookPayload {
+  api_version?: string;
+  event: RevenueCatWebhookPayloadEvent;
+}
+
+export type WebhookResultOutcome = typeof WebhookResultOutcome[keyof typeof WebhookResultOutcome];
+
+
+export const WebhookResultOutcome = {
+  granted: 'granted',
+  refunded: 'refunded',
+  expired: 'expired',
+  transferred: 'transferred',
+  updated: 'updated',
+  noted: 'noted',
+  unknown_user: 'unknown_user',
+  unknown_product: 'unknown_product',
+  duplicate: 'duplicate',
+} as const;
+
+export interface WebhookResult {
+  outcome: WebhookResultOutcome;
+}
+
+export type SsvResultStatus = typeof SsvResultStatus[keyof typeof SsvResultStatus];
+
+
+export const SsvResultStatus = {
+  recorded: 'recorded',
+  duplicate: 'duplicate',
+  unknown_offer: 'unknown_offer',
+  user_mismatch: 'user_mismatch',
+  expired_offer: 'expired_offer',
+  missing_fields: 'missing_fields',
+} as const;
+
+export interface SsvResult {
+  status: SsvResultStatus;
+}
+
+/**
+ * Missing profile token (`missing_profile_token`)
+ */
+export type UnauthorizedResponse = ErrorResponse;
+
+/**
+ * Unknown or deleted profile (`unknown_profile`) — call POST /me
+ */
+export type UnknownProfileResponse = ErrorResponse;
+
+/**
+ * No database on this server (`monetisation_disabled`) or database trouble (`unavailable`)
+ */
+export type UnavailableResponse = ErrorResponse;
+
+export type AdmobSsvCallbackParams = {
+ad_network?: string;
+ad_unit?: string;
+custom_data?: string;
+reward_amount?: string;
+reward_item?: string;
+timestamp?: string;
+transaction_id?: string;
+user_id?: string;
+signature: string;
+key_id: string;
+};
+

@@ -16,11 +16,20 @@ Jeu en ligne à deux joueurs, en français : chacun choisit en secret un personn
 
 | Variable | Rôle |
 |---|---|
-| `DATABASE_URL` | Connexion Postgres. Active les statistiques et le classement (les tables sont créées au démarrage). Sans elle, le jeu fonctionne et ces fonctions sont masquées. |
+| `DATABASE_URL` | Connexion Postgres. Active les statistiques, le classement et la monétisation (portefeuille d'Éclats, droits, récompenses publicitaires) ; les tables sont créées au démarrage. Sans elle, le jeu fonctionne et ces fonctions sont masquées (`503 monetisation_disabled`). |
 | `SITE_URL` | Adresse publique du site (ex. `https://anime-guess-master.replit.app`). Sert, à la **construction**, à rendre absolue l'URL de l'image d'aperçu et à ajouter l'adresse canonique. |
 | `ALLOWED_ORIGINS` | Origines supplémentaires autorisées (CORS et WebSocket), séparées par des virgules. Par défaut : même site uniquement. |
 | `TRUSTED_PROXY_HOPS` | Nombre de proxys devant l'API qui complètent `X-Forwarded-For` (défaut 1 = proxy de Replit). L'adresse du joueur est lue **à droite** de cet en-tête, jamais à gauche (falsifiable). Au démarrage, le serveur logge `Client IP taken from X-Forwarded-For` avec le nombre d'entrées, pour vérifier ce réglage. |
 | `GAME_TIME_SCALE` | **Tests uniquement** : accélère tous les chronos (0.05 = 20 fois plus vite). Toujours 1 en production. |
+| `MAX_SESSIONS` | Sessions simultanées (défaut 2000). Au-delà, `server_full`. Voir `docs/mobile/SCALING.md` avant de le relever. |
+| `MAX_CONNECTIONS_PER_IP` / `MAX_CONNECTIONS_PER_IP_MOBILE` / `MAX_CONNECTIONS_PER_PROFILE` | Connexions temps réel : 20 par IP (navigateurs), 100 par IP pour l'app mobile (IP partagées des opérateurs, CGNAT), 3 par profil pour l'app. |
+| `HTTP_RATE_LIMIT_PER_IP` / `HTTP_RATE_LIMIT_PER_IP_AUTHENTICATED` / `HTTP_RATE_LIMIT_PER_PROFILE` | Requêtes HTTP par minute : 120 par IP ; 600 par IP et 60 par profil pour les requêtes avec jeton de profil (app). |
+| `SHARED_NETWORK_MIN_RANKED_GAMES` / `SHARED_NETWORK_RANKED_PER_DAY` | Classement entre deux apps mobiles sur la même IP : profils avec au moins 5 parties classées, 3 parties « même réseau » par jour au plus. |
+| `MIN_MOBILE_VERSION` | Version minimale de l'app mobile (ex. `1.2.0`) ; plus ancienne → connexion refusée avec `app_outdated`. Sans valeur : toutes acceptées. |
+| `REVENUECAT_WEBHOOK_AUTH` | Secret de l'en-tête *Authorization* du webhook RevenueCat (`POST /api/webhooks/revenuecat`). Sans lui, le webhook répond 404. |
+| `REVENUECAT_API_KEY` | Clé secrète API RevenueCat, pour `POST /api/me/sync-purchases` (facultatif). |
+| `REMOTE_CONFIG_JSON` | Surcharge des plafonds publicitaires et de l'économie servis par `GET /api/config` et appliqués par le serveur (ex. `{"rw_free_shards_daily_cap":2}`). |
+| `ADMOB_SSV_KEYS_URL`, `REVENUECAT_API_URL` | **Tests uniquement** (clés publiques AdMob et API RevenueCat simulées). |
 
 ## Pile technique
 
@@ -40,6 +49,14 @@ Jeu en ligne à deux joueurs, en français : chacun choisit en secret un personn
 | Statistiques, Elo, classement | `artifacts/api-server/src/lib/stats.ts` |
 | Limites de débit, adresse IP du client | `artifacts/api-server/src/lib/rate-limit.ts` |
 | Contrôle d'origine des WebSocket | `artifacts/api-server/src/lib/origin.ts` |
+| Client web ou app mobile (handshake, version minimale) | `artifacts/api-server/src/lib/client-info.ts` |
+| Limites configurables (sessions, connexions, HTTP, classement « même réseau ») | `artifacts/api-server/src/lib/limits.ts` |
+| Filtre de mots, signalement, blocage | `artifacts/api-server/src/lib/moderation.ts`, `lib/reports.ts`, événements dans `game-engine.ts` |
+| Monétisation : config distante, catalogue, portefeuille, webhook RevenueCat, SSV AdMob | `artifacts/api-server/src/lib/monetisation/` et routes `src/routes/me.ts`, `shop.ts`, `webhooks.ts` |
+| Contrat pour l'app mobile (handshake, endpoints, variables) | `docs/mobile/SERVER_CHANGES.md` |
+| Montée en charge | `docs/mobile/SCALING.md` |
+| Préparation App Store / Google Play (fiches, confidentialité, CGU, checklist) | `docs/store/` |
+| App mobile Flutter | `mobile/` (CI : `.github/workflows/mobile.yml`) |
 | Portraits (AniList) | `artifacts/api-server/src/lib/character-images.ts` |
 | Personnages (165) | `artifacts/api-server/src/data/characters.json` |
 | Création du serveur (réutilisée par les tests) | `artifacts/api-server/src/server.ts` |
@@ -58,15 +75,18 @@ Jeu en ligne à deux joueurs, en français : chacun choisit en secret un personn
 - **Questions vérifiées** : le joueur choisit un trait et une valeur, le serveur répond à partir de `characters.json` (liste blanche de 8 traits). Impossible de mentir. Les questions libres existent aussi (marquées « non vérifiée », récapitulatif en fin de partie).
 - **Chronos** : 90 s pour choisir, 60 s par tour, 45 s pour répondre ; le dépassement coûte une vie.
 - **L'ordinateur est un joueur ordinaire** côté serveur : mêmes règles, mêmes chronos. Il ne connaît que la grille et les réponses à ses propres questions. Ses parties ne comptent ni dans les statistiques ni dans le classement.
-- **Classement** : Elo (départ 1000, K = 32), uniquement pour les parties rapides entre deux adresses et deux profils différents, première manche seulement (jamais les revanches), 2 parties classées par paire et par jour au maximum. Pas de comptes : le navigateur garde un jeton de profil dont seule l'empreinte SHA-256 est stockée.
+- **Classement** : Elo (départ 1000, K = 32), uniquement pour les parties rapides entre deux adresses et deux profils différents, première manche seulement (jamais les revanches), 2 parties classées par paire et par jour au maximum. Exception pour les IP partagées des opérateurs mobiles : deux **apps** sur la même IP sont classées si les deux profils ont déjà 5 parties classées, 3 fois par jour au plus ; jamais la même installation des deux côtés. Pas de comptes : le client garde un jeton de profil dont seule l'empreinte SHA-256 est stockée.
+- **Web et app mobile** : l'app est reconnue par `auth.client = "mobile"` **et** l'absence d'en-tête `Origin` (un navigateur en envoie toujours un). Le contrôle d'origine reste inchangé : un autre site ne peut toujours pas ouvrir de connexion de jeu.
+- **Monétisation (squelette)** : le serveur est la seule source de vérité (droits, Éclats, inventaire). Achats validés par RevenueCat (webhook idempotent), vidéos récompensées vérifiées par la signature AdMob (SSV). Rien n'est actif sans `DATABASE_URL` et les secrets.
 - **Statistiques facultatives** : sans `DATABASE_URL`, tout le reste fonctionne.
 
 ## Tests
 
 `pnpm run test` lance Vitest dans chaque paquet.
 
-- `api-server` : tests unitaires (adresse IP, Elo, force de l'ordinateur, données des personnages) et tests d'intégration avec de vrais sockets (partie complète, secrets, reconnexion, chronos, réactions, ordinateur, sécurité).
-- Les tests du classement (`stats.test.ts`) ont besoin d'une base : ils sont **sautés** sans `DATABASE_URL`. La CI en fournit une.
+- `api-server` : tests unitaires (adresse IP, Elo, force de l'ordinateur, données des personnages, versions d'app, filtre de mots, signature SSV AdMob avec des clés générées pour le test) et tests d'intégration avec de vrais sockets (partie complète, secrets, reconnexion, chronos, réactions, ordinateur, sécurité, clients mobiles, limites, modération, `MAX_SESSIONS`).
+- Les tests du classement et de la monétisation (`stats.test.ts`, `monetisation.test.ts`) ont besoin d'une base : ils sont **sautés** sans `DATABASE_URL`. La CI en fournit une. En local : `DATABASE_URL=postgresql://… pnpm run test`.
+- `mobile/` (Flutter) : `flutter analyze` et `flutter test` dans `.github/workflows/mobile.yml`, seulement quand `mobile/**` change.
 - `anime-guess-who` : chaque valeur des fiches a une traduction française, chaque question est bien formée.
 - La CI GitHub (`.github/workflows/ci.yml`) lance types, tests et construction à chaque PR, plus un audit des dépendances (informatif).
 
@@ -74,7 +94,8 @@ Jeu en ligne à deux joueurs, en français : chacun choisit en secret un personn
 
 - **Ajouter un personnage** : renseigner tous les champs dans `characters.json` avec des valeurs en minuscules déjà connues, et vérifier la traduction dans `fr.ts` (le test web le rappelle). Deux personnages qui ne diffèrent sur aucun des 8 traits rendent la partie indevinable : le test de données refuse tout nouveau cas (seuls Edward et Alphonse Elric sont connus).
 - **Les images** viennent d'AniList à chaque démarrage. Si l'une est fausse ou manque, ajouter `"image": "https://…"` sur le personnage.
-- **Schéma de base** : les tables sont créées automatiquement, mais un *changement* de schéma se fait à la main avec `db push`. `ensure-schema.ts` doit rester identique à ce que produit Drizzle (mêmes noms de contraintes).
+- **Schéma de base** : les tables sont créées automatiquement, mais un *changement* de schéma se fait à la main avec `db push`. `ensure-schema.ts` doit rester identique à ce que produit Drizzle (mêmes noms de contraintes) ; une colonne ajoutée à une table existante s'y écrit en `ALTER TABLE … ADD COLUMN IF NOT EXISTS`. Vérification : `drizzle-kit push` sur une base créée par `ensureSchema` doit répondre « No changes detected ».
+- **Protocole mobile** : l'app ne doit **pas** envoyer d'en-tête `Origin`. Les événements de modération (`report_player`, `block_player`, `set_verified_only`) n'existent que côté serveur et app mobile pour l'instant.
 - **Protocole temps réel** : les types des événements sont écrits à la main dans `socket.ts` (client) et dans `game-engine.ts` (serveur). Les modifier ensemble.
 - `artifacts/mockup-sandbox` sert à la maquette Replit : il n'est pas déployé et est exclu des commandes `typecheck`, `build` et `test` de la racine.
 

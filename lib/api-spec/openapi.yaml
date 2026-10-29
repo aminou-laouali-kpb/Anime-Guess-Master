@@ -14,6 +14,14 @@ tags:
     description: Anime character operations
   - name: stats
     description: Player statistics and leaderboard
+  - name: config
+    description: Remote configuration for the apps
+  - name: account
+    description: Mobile profile, wallet (Éclats), entitlements and cosmetics. Bearer = secret profile token.
+  - name: shop
+    description: Cosmetic catalogue and purchases with Éclats
+  - name: webhooks
+    description: Calls from RevenueCat and AdMob (not from the apps)
 paths:
   /healthz:
     get:
@@ -65,7 +73,410 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /config:
+    get:
+      operationId: getRemoteConfig
+      tags: [config]
+      summary: Remote configuration
+      description: Minimum supported mobile app version, enabled server features, and ad / economy caps (enforced server-side with the same values).
+      responses:
+        "200":
+          description: Configuration
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RemoteConfigResponse"
+
+  /shop/catalog:
+    get:
+      operationId: getShopCatalog
+      tags: [shop]
+      summary: Cosmetic catalogue and store products
+      description: Static catalogue served by the server; works without a database.
+      responses:
+        "200":
+          description: Catalogue
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ShopCatalog"
+
+  /me:
+    post:
+      operationId: registerProfile
+      tags: [account]
+      summary: Register the profile
+      description: >-
+        Creates the player row for this profile token (or a new token when no Authorization header is sent)
+        and returns the public player id, which is also the RevenueCat app user id and the AdMob SSV user id.
+      security:
+        - {}
+        - profileToken: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterProfileRequest"
+      responses:
+        "200":
+          description: Existing profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RegisteredProfile"
+        "201":
+          description: Profile created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RegisteredProfile"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+    delete:
+      operationId: deleteProfile
+      tags: [account]
+      summary: Delete the account
+      description: Deletes personal data (wallet, entitlements, inventory, ad rewards) and anonymises the player row. Purchases are not refunded.
+      security:
+        - profileToken: []
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeletedProfile"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/UnknownProfile"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+
+  /me/entitlements:
+    get:
+      operationId: getMyAccount
+      tags: [account]
+      summary: Balance, entitlements, inventory and equipped cosmetics
+      description: Call at app start, after a purchase and after "Restore purchases". Also credits rewarded videos verified by AdMob but not yet claimed.
+      security:
+        - profileToken: []
+      responses:
+        "200":
+          description: Account
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Account"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/UnknownProfile"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+
+  /me/sync-purchases:
+    post:
+      operationId: syncPurchases
+      tags: [account]
+      summary: Re-read purchases from RevenueCat
+      description: Fallback when a webhook is late. Requires REVENUECAT_API_KEY on the server.
+      security:
+        - profileToken: []
+      responses:
+        "200":
+          description: Synced
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SyncPurchasesResult"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/UnknownProfile"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+
+  /me/ad-offers:
+    post:
+      operationId: createAdOffer
+      tags: [account]
+      summary: Get a nonce before showing a rewarded video
+      description: Checks the daily caps. Pass `ssv.userId` and `ssv.customData` to AdMob's server-side verification options.
+      security:
+        - profileToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdOfferRequest"
+      responses:
+        "201":
+          description: Offer created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdOffer"
+        "400":
+          description: Unknown reward
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/UnknownProfile"
+        "429":
+          description: Daily cap reached (`daily_cap_reached`) or too many offers (`too_many_offers`)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+
+  /me/ad-rewards/claim:
+    post:
+      operationId: claimAdReward
+      tags: [account]
+      summary: Claim the reward of a watched video
+      description: Credits only once AdMob's signed callback has arrived. 202 = not yet, retry for up to 30 s; the reward is otherwise credited on the next account read.
+      security:
+        - profileToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ClaimAdRewardRequest"
+      responses:
+        "200":
+          description: Credited (or already claimed)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClaimAdRewardResult"
+        "202":
+          description: Video not verified by AdMob yet
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClaimAdRewardResult"
+        "400":
+          description: Invalid nonce
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Unknown or expired offer (or unknown profile)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClaimAdRewardResult"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+
+  /shop/buy:
+    post:
+      operationId: buyShopItem
+      tags: [shop]
+      summary: Buy a cosmetic with Éclats
+      security:
+        - profileToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BuyItemRequest"
+      responses:
+        "200":
+          description: Bought
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BuyItemResult"
+        "400":
+          description: "`unknown_item` or `not_for_sale`"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/UnknownProfile"
+        "409":
+          description: "`insufficient_shards` or `already_owned`"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+
+  /me/equip:
+    post:
+      operationId: equipItem
+      tags: [shop]
+      summary: Equip (or unequip with null) a cosmetic the player owns
+      security:
+        - profileToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EquipRequest"
+      responses:
+        "200":
+          description: Updated account
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Account"
+        "400":
+          description: "`invalid_request`, `unknown_item` or `wrong_slot`"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/UnknownProfile"
+        "409":
+          description: "`not_owned`"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+
+  /webhooks/revenuecat:
+    post:
+      operationId: revenueCatWebhook
+      tags: [webhooks]
+      summary: RevenueCat webhook
+      description: >-
+        Authorization header must equal REVENUECAT_WEBHOOK_AUTH (404 when unset). Idempotent by event id:
+        a replayed event answers `duplicate` and changes nothing.
+      security:
+        - webhookSecret: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RevenueCatWebhookPayload"
+      responses:
+        "200":
+          description: Processed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookResult"
+        "400":
+          description: Invalid event
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Wrong secret
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not configured
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+
+  /admob/ssv:
+    get:
+      operationId: admobSsvCallback
+      tags: [webhooks]
+      summary: AdMob rewarded-ad server-side verification callback
+      description: >-
+        Called by AdMob. The ECDSA signature is verified with Google's published keys (cached 24 h).
+        `user_id` must be the player id and `custom_data` the nonce from POST /me/ad-offers.
+      parameters:
+        - { name: ad_network, in: query, schema: { type: string } }
+        - { name: ad_unit, in: query, schema: { type: string } }
+        - { name: custom_data, in: query, schema: { type: string } }
+        - { name: reward_amount, in: query, schema: { type: string } }
+        - { name: reward_item, in: query, schema: { type: string } }
+        - { name: timestamp, in: query, schema: { type: string } }
+        - { name: transaction_id, in: query, schema: { type: string } }
+        - { name: user_id, in: query, schema: { type: string } }
+        - { name: signature, in: query, required: true, schema: { type: string } }
+        - { name: key_id, in: query, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: Signature valid (status says whether it was recorded)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SsvResult"
+        "400":
+          description: Malformed callback
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Bad signature or unknown key
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+
 components:
+  securitySchemes:
+    profileToken:
+      type: http
+      scheme: bearer
+      description: The secret profile token (same as the game socket's `auth.profile`).
+    webhookSecret:
+      type: apiKey
+      in: header
+      name: Authorization
+      description: Shared secret configured in RevenueCat (REVENUECAT_WEBHOOK_AUTH).
+
+  responses:
+    Unauthorized:
+      description: Missing profile token (`missing_profile_token`)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    UnknownProfile:
+      description: Unknown or deleted profile (`unknown_profile`) — call POST /me
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Unavailable:
+      description: No database on this server (`monetisation_disabled`) or database trouble (`unavailable`)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
   schemas:
     HealthStatus:
       type: object
@@ -159,3 +570,251 @@ components:
       properties:
         error:
           type: string
+
+    RemoteConfigResponse:
+      type: object
+      required: [minMobileVersion, features, remoteConfig]
+      properties:
+        minMobileVersion:
+          type: ["string", "null"]
+          description: Oldest app version allowed to connect (null = any)
+        features:
+          type: object
+          required: [stats, wallet, purchases, purchaseSync, adRewards]
+          properties:
+            stats: { type: boolean }
+            wallet: { type: boolean }
+            purchases: { type: boolean }
+            purchaseSync: { type: boolean }
+            adRewards: { type: boolean }
+        remoteConfig:
+          type: object
+          description: Keys of MONETISATION_SPEC §8 (numbers and booleans)
+          additionalProperties:
+            type: ["number", "boolean"]
+
+    LocalizedName:
+      type: object
+      required: [fr, en]
+      properties:
+        fr: { type: string }
+        en: { type: string }
+
+    CatalogItem:
+      type: object
+      required: [id, slot, name, priceShards, visibleToOpponent, featured]
+      properties:
+        id: { type: string }
+        slot:
+          type: string
+          enum: [card_back, frame, reaction_pack, victory_fx, board]
+        name:
+          $ref: "#/components/schemas/LocalizedName"
+        priceShards:
+          type: ["number", "null"]
+          description: Null = not sold for Éclats (pack, event or subscription exclusive)
+        visibleToOpponent: { type: boolean }
+        featured: { type: boolean }
+
+    StoreProduct:
+      type: object
+      required: [productId, kind, entitlement, shards, items]
+      properties:
+        productId: { type: string }
+        kind:
+          type: string
+          enum: [non_consumable, consumable, subscription]
+        entitlement: { type: ["string", "null"] }
+        shards: { type: number }
+        items:
+          type: array
+          items: { type: string }
+
+    ShopCatalog:
+      type: object
+      required: [currency, items, products]
+      properties:
+        currency:
+          type: string
+          enum: [shards]
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/CatalogItem"
+        products:
+          type: array
+          items:
+            $ref: "#/components/schemas/StoreProduct"
+
+    RegisterProfileRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 64
+
+    RegisteredProfile:
+      type: object
+      required: [playerId, name, shardsBalance, profileToken]
+      properties:
+        playerId:
+          type: string
+          description: Public id; RevenueCat app user id and AdMob SSV user id
+        name: { type: string }
+        shardsBalance: { type: number }
+        profileToken:
+          type: ["string", "null"]
+          description: New secret token when the server created it, otherwise null
+
+    DeletedProfile:
+      type: object
+      required: [deleted]
+      properties:
+        deleted: { type: boolean }
+
+    Entitlement:
+      type: object
+      required: [entitlement, productId, expiresAt]
+      properties:
+        entitlement:
+          type: string
+          description: no_ads, plus, theme_<slug>, pass_sNN
+        productId: { type: ["string", "null"] }
+        expiresAt:
+          type: ["string", "null"]
+          description: ISO date; null = lifetime
+
+    EquippedCosmetics:
+      type: object
+      properties:
+        card_back: { type: string }
+        frame: { type: string }
+        reaction_pack: { type: string }
+        victory_fx: { type: string }
+        board: { type: string }
+
+    Account:
+      type: object
+      required: [playerId, name, shardsBalance, noAds, entitlements, inventory, equipped]
+      properties:
+        playerId: { type: string }
+        name: { type: string }
+        shardsBalance:
+          type: number
+          description: Can be negative after a refund clawback (shop closed until back to 0)
+        noAds:
+          type: boolean
+          description: True with no_ads or plus — no interstitials or banners
+        entitlements:
+          type: array
+          items:
+            $ref: "#/components/schemas/Entitlement"
+        inventory:
+          type: array
+          items: { type: string }
+        equipped:
+          $ref: "#/components/schemas/EquippedCosmetics"
+
+    SyncPurchasesResult:
+      type: object
+      required: [entitlements, purchases, account]
+      properties:
+        entitlements: { type: number }
+        purchases: { type: number }
+        account:
+          $ref: "#/components/schemas/Account"
+
+    AdOfferRequest:
+      type: object
+      required: [adUnit, rewardKey]
+      properties:
+        adUnit:
+          type: string
+          description: Internal placement name, e.g. rw_free_shards
+        rewardKey:
+          type: string
+          enum: [free_shards, daily_chest]
+
+    AdOffer:
+      type: object
+      required: [nonce, rewardKey, amount, expiresAt, ssv]
+      properties:
+        nonce: { type: string }
+        rewardKey: { type: string }
+        amount: { type: number }
+        expiresAt: { type: string }
+        ssv:
+          type: object
+          required: [userId, customData]
+          properties:
+            userId: { type: string }
+            customData: { type: string }
+
+    ClaimAdRewardRequest:
+      type: object
+      required: [nonce]
+      properties:
+        nonce: { type: string }
+
+    ClaimAdRewardResult:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [credited, already_claimed, pending, unknown_offer]
+        amount: { type: number }
+        shardsBalance: { type: number }
+
+    BuyItemRequest:
+      type: object
+      required: [itemId]
+      properties:
+        itemId: { type: string }
+
+    BuyItemResult:
+      type: object
+      required: [ok, shardsBalance]
+      properties:
+        ok: { type: boolean }
+        shardsBalance: { type: number }
+
+    EquipRequest:
+      type: object
+      required: [slot, itemId]
+      properties:
+        slot:
+          type: string
+          enum: [card_back, frame, reaction_pack, victory_fx, board]
+        itemId:
+          type: ["string", "null"]
+
+    RevenueCatWebhookPayload:
+      type: object
+      required: [event]
+      properties:
+        api_version: { type: string }
+        event:
+          type: object
+          required: [id, type]
+          additionalProperties: true
+          properties:
+            id: { type: string }
+            type: { type: string }
+            app_user_id: { type: string }
+
+    WebhookResult:
+      type: object
+      required: [outcome]
+      properties:
+        outcome:
+          type: string
+          enum: [granted, refunded, expired, transferred, updated, noted, unknown_user, unknown_product, duplicate]
+
+    SsvResult:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [recorded, duplicate, unknown_offer, user_mismatch, expired_offer, missing_fields]

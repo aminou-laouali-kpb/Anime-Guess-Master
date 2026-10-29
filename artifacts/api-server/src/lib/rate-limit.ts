@@ -1,6 +1,8 @@
 import type { IncomingMessage } from "http";
 import type { RequestHandler } from "express";
 import { logger } from "./logger";
+import { httpLimits } from "./limits";
+import { hashToken } from "./database";
 
 // Token bucket: allows short bursts, then a steady rate.
 export class TokenBucket {
@@ -62,26 +64,63 @@ export function clientIp(req: IncomingMessage): string {
   return entries[entries.length - 1] || req.socket.remoteAddress || "unknown";
 }
 
-// Fixed-window limiter for the REST API, keyed by client IP.
-export function httpRateLimit(maxPerMinute: number): RequestHandler {
+// Fixed-window limiter for the REST API.
+//
+// Browsers: per client IP (HTTP_RATE_LIMIT_PER_IP, default 120/min).
+// Mobile app calls carry a profile token (Authorization: Bearer …). Many app
+// users can share one carrier IP (CGNAT), so these get a higher per-IP cap
+// (HTTP_RATE_LIMIT_PER_IP_AUTHENTICATED, 600/min) AND a cap per profile
+// (HTTP_RATE_LIMIT_PER_PROFILE, 60/min). Tokens are self-minted, so the
+// per-IP cap stays the real bound against a script rotating tokens.
+// Webhooks (RevenueCat, AdMob SSV) come from a few provider IPs and are
+// authenticated / signed: they use the higher per-IP cap, in their own bucket.
+export function bearerProfileToken(req: IncomingMessage): string | null {
+  const header = req.headers.authorization;
+  if (typeof header !== "string") return null;
+  const m = /^Bearer ([A-Za-z0-9_-]{32})$/.exec(header.trim());
+  return m ? m[1]! : null;
+}
+
+export function httpRateLimit(): RequestHandler {
   const windows = new Map<string, { count: number; resetAt: number }>();
 
   setInterval(() => {
     const now = Date.now();
-    for (const [ip, w] of windows) if (w.resetAt <= now) windows.delete(ip);
+    for (const [key, w] of windows) if (w.resetAt <= now) windows.delete(key);
   }, 60_000).unref();
 
-  return (req, res, next) => {
-    const ip = clientIp(req);
-    const now = Date.now();
-    let w = windows.get(ip);
+  // Counts one hit; returns the seconds to wait when over the limit.
+  const hit = (key: string, max: number, now: number): number | null => {
+    let w = windows.get(key);
     if (!w || w.resetAt <= now) {
       w = { count: 0, resetAt: now + 60_000 };
-      windows.set(ip, w);
+      windows.set(key, w);
     }
     w.count += 1;
-    if (w.count > maxPerMinute) {
-      res.setHeader("Retry-After", Math.ceil((w.resetAt - now) / 1000));
+    return w.count > max ? Math.ceil((w.resetAt - now) / 1000) : null;
+  };
+
+  return (req, res, next) => {
+    const limits = httpLimits();
+    const ip = clientIp(req);
+    const now = Date.now();
+    const profile = bearerProfileToken(req);
+    const path = req.path ?? req.url ?? "";
+    const isWebhook = path.startsWith("/api/webhooks/") || path.startsWith("/api/admob/ssv");
+
+    let retryAfter: number | null;
+    if (isWebhook) {
+      retryAfter = hit(`hook:${ip}`, limits.perIpAuthenticated, now);
+    } else if (profile) {
+      retryAfter =
+        hit(`auth:${ip}`, limits.perIpAuthenticated, now) ??
+        hit(`profile:${hashToken(profile)}`, limits.perProfile, now);
+    } else {
+      retryAfter = hit(ip, limits.perIp, now);
+    }
+
+    if (retryAfter !== null) {
+      res.setHeader("Retry-After", retryAfter);
       res.status(429).json({ error: "Too many requests" });
       return;
     }
