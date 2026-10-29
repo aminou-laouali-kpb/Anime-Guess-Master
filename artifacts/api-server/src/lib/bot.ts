@@ -2,9 +2,10 @@
 // sees the board and the answers to its own questions, never the human's
 // secret character, so it plays fair.
 
-export type BotLevel = "easy" | "normal" | "hard";
+import { BOT_LEVELS, VERIFIABLE_ATTRIBUTES, type BotLevel } from "@workspace/game-protocol";
 
-export const BOT_LEVELS: readonly BotLevel[] = ["easy", "normal", "hard"];
+export { BOT_LEVELS };
+export type { BotLevel };
 
 export const BOT_NAMES: Record<BotLevel, string> = {
   easy: "Ordinateur (facile)",
@@ -12,24 +13,16 @@ export const BOT_NAMES: Record<BotLevel, string> = {
   hard: "Ordinateur (difficile)",
 };
 
-// Traits the bot can ask about (same whitelist as verified questions).
-export const BOT_ATTRIBUTES = [
-  "hairColor",
-  "eyeColor",
-  "gender",
-  "ageRange",
-  "species",
-  "alignment",
-  "role",
-  "anime",
-] as const;
-type Attribute = (typeof BOT_ATTRIBUTES)[number];
+type Attribute = (typeof VERIFIABLE_ATTRIBUTES)[number];
 
 export type BotCharacter = { id: string } & Record<Attribute, string>;
 
 export interface BotMemory {
   answers: { attribute: Attribute; value: string; answer: "yes" | "no" }[];
   wrongGuesses: string[];
+  // The bot's lives left. The hard level uses it to know when guessing is
+  // safe; without it, it plays as if it couldn't afford a miss.
+  lives?: number;
 }
 
 export type BotMove =
@@ -56,10 +49,41 @@ interface Question {
   imbalance: number;
 }
 
+const asks = (c: BotCharacter, q: Question) => same(c[q.attribute], q.value);
+
+// Information (in bits) from a yes/no answer that splits n candidates into
+// `yes` and n - yes.
+function splitEntropy(yes: number, n: number): number {
+  if (yes <= 0 || yes >= n) return 0;
+  const p = yes / n;
+  return -(p * Math.log2(p) + (1 - p) * Math.log2(1 - p));
+}
+
+// Best information the next question could bring among `candidates`.
+function bestNextEntropy(candidates: BotCharacter[]): number {
+  const questions = usefulQuestions(candidates);
+  if (questions.length === 0) return 0;
+  const best = Math.min(...questions.map((q) => q.imbalance));
+  return splitEntropy(candidates.length / 2 - best, candidates.length);
+}
+
+// Expected information of asking `q` now and then the best follow-up: two
+// questions that both split 50/50 can still differ in what they set up.
+function twoStepInformation(candidates: BotCharacter[], q: Question): number {
+  const yes = candidates.filter((c) => asks(c, q));
+  const no = candidates.filter((c) => !asks(c, q));
+  const n = candidates.length;
+  return (
+    splitEntropy(yes.length, n) +
+    (yes.length / n) * bestNextEntropy(yes) +
+    (no.length / n) * bestNextEntropy(no)
+  );
+}
+
 // Every question that would actually tell the bot something.
 function usefulQuestions(candidates: BotCharacter[]): Question[] {
   const questions: Question[] = [];
-  for (const attribute of BOT_ATTRIBUTES) {
+  for (const attribute of VERIFIABLE_ATTRIBUTES) {
     // Keyed case-insensitively, but keeps the original spelling for display.
     const counts = new Map<string, { value: string; yes: number }>();
     for (const c of candidates) {
@@ -107,12 +131,27 @@ export function chooseBotMove(
     return { type: "ask", attribute: q.attribute, value: q.value };
   }
 
-  // With two left, a guess wins half the time and a miss still leaves one.
-  if (candidates.length === 2) return guess();
+  if (level === "hard" && memory.lives !== undefined) {
+    // As many lives as candidates: guessing them one by one can't lose (each
+    // miss removes one of each), and a guess is never slower than a question.
+    // With fewer lives, keep asking: a miss could cost the game.
+    if (candidates.length <= memory.lives) return guess();
+  } else if (candidates.length === 2) {
+    // With two left, a guess wins half the time and a miss still leaves one.
+    return guess();
+  }
 
   const best = Math.min(...questions.map((q) => q.imbalance));
   const bestQuestions = questions.filter((q) => q.imbalance === best);
-  const q =
-    level === "normal" && random() < 0.7 ? pick(questions, random) : pick(bestQuestions, random);
+  if (level === "normal") {
+    const q = random() < 0.7 ? pick(questions, random) : pick(bestQuestions, random);
+    return { type: "ask", attribute: q.attribute, value: q.value };
+  }
+
+  // Hard: among the best-balanced questions, the one that sets up the most
+  // informative follow-up.
+  const scored = bestQuestions.map((q) => ({ q, info: twoStepInformation(candidates, q) }));
+  const top = Math.max(...scored.map((s) => s.info));
+  const q = pick(scored.filter((s) => s.info >= top - 1e-9), random).q;
   return { type: "ask", attribute: q.attribute, value: q.value };
 }

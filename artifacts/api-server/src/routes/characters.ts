@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { getCharacters } from "../lib/game-engine";
+import { getCharacters } from "../lib/engine";
 
 const router: IRouter = Router();
 

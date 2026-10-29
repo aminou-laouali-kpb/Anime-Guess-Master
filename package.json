@@ -2,16 +2,27 @@
   "name": "workspace",
   "version": "0.0.0",
   "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "preinstall": "sh -c 'rm -f package-lock.json yarn.lock; case \"$npm_config_user_agent\" in pnpm/*) ;; *) echo \"Use pnpm instead\" >&2; exit 1 ;; esac'",
     "build": "pnpm run typecheck && pnpm -r --if-present --filter \"!@workspace/mockup-sandbox\" run build",
     "typecheck:libs": "tsc --build",
-    "typecheck": "pnpm run typecheck:libs && pnpm -r --filter @workspace/api-server --filter @workspace/anime-guess-who --filter ./scripts --if-present run typecheck",
-    "test": "pnpm -r --if-present --filter \"!@workspace/mockup-sandbox\" run test"
+    "typecheck": "pnpm run typecheck:libs && pnpm -r --filter @workspace/api-server --filter @workspace/anime-guess-who --if-present run typecheck",
+    "test": "pnpm -r --if-present --filter \"!@workspace/mockup-sandbox\" run test",
+    "lint": "eslint .",
+    "format:check": "prettier --check ."
   },
   "private": true,
   "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "eslint": "^9.39.5",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.13.0",
     "prettier": "^3.9.6",
-    "typescript": "~5.9.3"
+    "typescript": "~5.9.3",
+    "typescript-eslint": "^8.71.2"
   }
 }

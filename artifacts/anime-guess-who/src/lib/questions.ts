@@ -1,17 +1,8 @@
 import { Character } from "@workspace/api-client-react";
+import type { VerifiableAttribute } from "@workspace/game-protocol";
 import { fr } from "./fr";
 
-// Questions the server answers itself from the character data (no lying).
-// Must match VERIFIABLE_ATTRIBUTES in the API server's game engine.
-export type VerifiableAttribute =
-  | "hairColor"
-  | "eyeColor"
-  | "gender"
-  | "ageRange"
-  | "species"
-  | "alignment"
-  | "role"
-  | "anime";
+export type { VerifiableAttribute };
 
 export const ATTRIBUTES: { key: VerifiableAttribute; label: string }[] = [
   { key: "hairColor", label: "Cheveux" },
@@ -47,15 +38,15 @@ export function questionText(attribute: VerifiableAttribute, value: string): str
   switch (attribute) {
     case "hairColor":
       return value === "none"
-        ? "Ton personnage est-il chauve ?"
-        : `Ton personnage a-t-il les cheveux ${fr.hair(value)} ?`;
-    case "eyeColor": return `Ton personnage a-t-il les yeux ${fr.eyes(value)} ?`;
-    case "gender": return value === "female" ? "Ton personnage est-il une femme ?" : "Ton personnage est-il un homme ?";
-    case "ageRange": return `Ton personnage est-il ${AGE_PHRASES[value] ?? value} ?`;
-    case "species": return `Ton personnage est-il de l’espèce « ${fr.species(value)} » ?`;
-    case "alignment": return `Ton personnage est-il ${ALIGNMENT_PHRASES[value] ?? value} ?`;
-    case "role": return `Ton personnage est-il un personnage ${fr.role(value)} ?`;
-    case "anime": return `Ton personnage vient-il de « ${value} » ?`;
+        ? "Ton personnage est-il chauve ?"
+        : `Ton personnage a-t-il les cheveux ${fr.hair(value)} ?`;
+    case "eyeColor": return `Ton personnage a-t-il les yeux ${fr.eyes(value)} ?`;
+    case "gender": return value === "female" ? "Ton personnage est-il une femme ?" : "Ton personnage est-il un homme ?";
+    case "ageRange": return `Ton personnage est-il ${AGE_PHRASES[value] ?? value} ?`;
+    case "species": return `Ton personnage est-il de l’espèce « ${fr.species(value)} » ?`;
+    case "alignment": return `Ton personnage est-il ${ALIGNMENT_PHRASES[value] ?? value} ?`;
+    case "role": return `Ton personnage est-il un personnage ${fr.role(value)} ?`;
+    case "anime": return `Ton personnage vient-il de « ${value} » ?`;
   }
 }
 

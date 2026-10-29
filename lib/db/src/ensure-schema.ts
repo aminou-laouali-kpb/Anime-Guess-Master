@@ -30,5 +30,6 @@ export async function ensureSchema(pool: Pool): Promise<void> {
       rating_change integer NOT NULL DEFAULT 0,
       created_at timestamptz NOT NULL DEFAULT now()
     );
+    CREATE INDEX IF NOT EXISTS games_pair_ranked_idx ON games (winner_id, loser_id, created_at) WHERE ranked;
   `);
 }

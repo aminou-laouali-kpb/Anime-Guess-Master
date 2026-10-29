@@ -1,50 +1,10 @@
-import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from "react";
-import { socket, saveSessionToken, saveProfileToken, MyStatsPayload, RatingUpdate, RoomMode, BotLevel, Reaction, GamePhase, GameOverReason, PlayerState, GameLogEntry, RoomSnapshot, TimerPayload } from "../lib/socket";
-import type { Character } from "@workspace/api-client-react";
+import React, { createContext, useContext, useEffect, useReducer, useState, useCallback, useMemo, useRef } from "react";
+import { socket, saveSessionToken, saveProfileToken, BotLevel, Reaction } from "../lib/socket";
 import type { VerifiableAttribute } from "../lib/questions";
 import { toast } from "sonner";
+import { gameReducer, initialGameState, type GameState } from "./gameReducer";
 
-interface GameState {
-  phase: GamePhase;
-  roomCode: string | null;
-  roomMode: RoomMode | null;
-  queuePosition: number | null;
-  players: PlayerState[];
-  characters: Character[];
-  myPlayerId: string | null;
-  myCharacterId: string | null; // For playing phase (secret selection)
-  myEliminatedIds: string[]; // Restored from the server after a reconnect
-  opponentReady: boolean;
-  opponentConnected: boolean;
-  opponentLeft: boolean;
-  currentTurnId: string | null;
-  pendingQuestion: string | null; // A question I need to answer
-  awaitingAnswerFor: string | null; // A question I asked, waiting for answer
-  gameLog: GameLogEntry[];
-  winnerId: string | null;
-  gameOverReason: GameOverReason | null;
-  revealedOpponentCharacterId: string | null;
-  rematchRequestedBy: string | null;
-  timer: TurnTimer | null;
-  reactions: LiveReaction[]; // currently floating on screen
-  reactionsMuted: boolean; // hide the opponent's reactions
-  myStats: MyStatsPayload | null;
-  ratingUpdate: RatingUpdate | null; // result of the game that just ended
-  isConnected: boolean;
-  hasConnectedOnce: boolean;
-  connectionReplaced: boolean; // the server closed our connection: a reload is needed
-  myName: string;
-}
-
-// Deadline converted to the local clock so client/server clock skew doesn't matter.
-export interface TurnTimer {
-  actingPlayerId: string | null;
-  deadline: number;
-}
-
-function toTurnTimer({ actingPlayerId, msLeft }: TimerPayload): TurnTimer | null {
-  return msLeft === null ? null : { actingPlayerId, deadline: Date.now() + msLeft };
-}
+export type { TurnTimer } from "./gameReducer";
 
 export interface LiveReaction {
   id: number;
@@ -56,6 +16,8 @@ const MUTE_KEY = "anime_who_mute_reactions";
 const REACTION_LIFETIME_MS = 2600;
 
 interface GameContextType extends GameState {
+  reactionsMuted: boolean; // hide the opponent's reactions
+  myName: string;
   setMyName: (name: string) => void;
   joinQueue: () => void;
   joinRoom: (code: string) => void;
@@ -77,6 +39,14 @@ interface GameContextType extends GameState {
 
 const GameContext = createContext<GameContextType | null>(null);
 
+// Floating reactions change several times a second during emoji spam; they get
+// their own context so a reaction only redraws the overlay, not the whole game.
+interface ReactionsContextType {
+  reactions: LiveReaction[]; // currently floating on screen
+}
+
+const ReactionsContext = createContext<ReactionsContextType | null>(null);
+
 const NAME_KEY = "anime_who_name";
 
 function readStoredName(): string {
@@ -87,39 +57,16 @@ function readStoredName(): string {
   }
 }
 
-const SNAPSHOT_PHASES: Record<RoomSnapshot["phase"], GamePhase> = {
-  waiting: "lobby",
-  selection: "selection",
-  playing: "playing",
-  ended: "ended",
-};
+// Log entries only need an id unique within the page (React keys, and telling
+// live entries from the "restored-" ones rebuilt after a reconnect).
+let logIdCounter = 0;
+const newLogId = () => `log-${++logIdCounter}`;
 
 export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  // Game state transitions live in gameReducer (pure); this component only
+  // wires the socket to it and runs the side effects (toasts, emits, storage).
+  const [state, dispatch] = useReducer(gameReducer, initialGameState);
   const [myName, setMyNameState] = useState(readStoredName);
-  const [isConnected, setIsConnected] = useState(false);
-  const [hasConnectedOnce, setHasConnectedOnce] = useState(false);
-  const [connectionReplaced, setConnectionReplaced] = useState(false);
-  const [phase, setPhase] = useState<GamePhase>("home");
-  const [roomCode, setRoomCode] = useState<string | null>(null);
-  const [roomMode, setRoomMode] = useState<RoomMode | null>(null);
-  const [queuePosition, setQueuePosition] = useState<number | null>(null);
-  const [players, setPlayers] = useState<PlayerState[]>([]);
-  const [characters, setCharacters] = useState<Character[]>([]);
-  const [myPlayerId, setMyPlayerId] = useState<string | null>(null);
-  const [myCharacterId, setMyCharacterId] = useState<string | null>(null);
-  const [myEliminatedIds, setMyEliminatedIds] = useState<string[]>([]);
-  const [opponentReady, setOpponentReady] = useState(false);
-  const [opponentConnected, setOpponentConnected] = useState(true);
-  const [opponentLeft, setOpponentLeft] = useState(false);
-  const [currentTurnId, setCurrentTurnId] = useState<string | null>(null);
-  const [pendingQuestion, setPendingQuestion] = useState<string | null>(null);
-  const [awaitingAnswerFor, setAwaitingAnswerFor] = useState<string | null>(null);
-  const [gameLog, setGameLog] = useState<GameLogEntry[]>([]);
-  const [winnerId, setWinnerId] = useState<string | null>(null);
-  const [gameOverReason, setGameOverReason] = useState<GameOverReason | null>(null);
-  const [revealedOpponentCharacterId, setRevealedOpponentCharacterId] = useState<string | null>(null);
-  const [rematchRequestedBy, setRematchRequestedBy] = useState<string | null>(null);
-  const [timer, setTimer] = useState<TurnTimer | null>(null);
   const [reactions, setReactions] = useState<LiveReaction[]>([]);
   const [reactionsMuted, setReactionsMutedState] = useState(() => {
     try { return localStorage.getItem(MUTE_KEY) === "1"; } catch { return false; }
@@ -127,110 +74,37 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const reactionsMutedRef = useRef(reactionsMuted);
   reactionsMutedRef.current = reactionsMuted;
   const reactionIdRef = useRef(0);
-  const [myStats, setMyStats] = useState<MyStatsPayload | null>(null);
-  const [ratingUpdate, setRatingUpdate] = useState<RatingUpdate | null>(null);
 
-  // Socket listeners are registered once; they read the live phase from here.
-  const phaseRef = useRef(phase);
-  phaseRef.current = phase;
-  const charactersRef = useRef(characters);
-  charactersRef.current = characters;
+  // Socket listeners are registered once; their side effects read the live
+  // state from here.
+  const stateRef = useRef(state);
+  stateRef.current = state;
   const myNameRef = useRef(myName);
   myNameRef.current = myName;
-  const myPlayerIdRef = useRef(myPlayerId);
-  myPlayerIdRef.current = myPlayerId;
 
-  const resetGameState = () => {
-    setRoomCode(null);
-    setRoomMode(null);
-    setQueuePosition(null);
-    setPlayers([]);
-    setCharacters([]);
-    setMyCharacterId(null);
-    setMyEliminatedIds([]);
-    setOpponentReady(false);
-    setOpponentConnected(true);
-    setOpponentLeft(false);
-    setCurrentTurnId(null);
-    setPendingQuestion(null);
-    setAwaitingAnswerFor(null);
-    setGameLog([]);
-    setWinnerId(null);
-    setGameOverReason(null);
-    setRevealedOpponentCharacterId(null);
-    setRematchRequestedBy(null);
-    setTimer(null);
-    setRatingUpdate(null);
-  };
-
-  const startNewRound = (players: PlayerState[], characters: Character[]) => {
-    setPhase("selection");
-    setRatingUpdate(null);
-    setPlayers(players);
-    setCharacters(characters);
-    setOpponentReady(false);
-    setOpponentConnected(true);
-    setOpponentLeft(false);
-    setMyCharacterId(null);
-    setMyEliminatedIds([]);
-    setCurrentTurnId(null);
-    setPendingQuestion(null);
-    setAwaitingAnswerFor(null);
-    setGameLog([]);
-    setWinnerId(null);
-    setGameOverReason(null);
-    setRevealedOpponentCharacterId(null);
-    setRematchRequestedBy(null);
-  };
-
-  const applySnapshot = (room: RoomSnapshot) => {
-    setPhase(SNAPSHOT_PHASES[room.phase]);
-    setRoomCode(room.code);
-    setRoomMode(room.mode);
-    setQueuePosition(null);
-    setPlayers(room.players);
-    setCharacters(room.characters);
-    setMyCharacterId(room.myCharacterId);
-    setMyEliminatedIds(room.myEliminatedIds);
-    setOpponentReady(room.opponentReady);
-    setOpponentConnected(room.opponentConnected);
-    setOpponentLeft(room.phase !== "waiting" && room.players.length < 2);
-    setCurrentTurnId(room.currentTurnPlayerId);
-    setPendingQuestion(room.pendingQuestion);
-    setAwaitingAnswerFor(room.awaitingAnswerFor);
-    setGameLog(room.log.map((entry, i) => ({ ...entry, id: `restored-${i}` })));
-    setWinnerId(room.winnerId);
-    setGameOverReason(room.gameOverReason);
-    setRevealedOpponentCharacterId(room.opponentCharacterId);
-    setRematchRequestedBy(room.rematchRequestedBy);
-    setTimer(toTurnTimer(room.timer));
-  };
-
-  const setMyName = (name: string) => {
+  const setMyName = useCallback((name: string) => {
     try {
       localStorage.setItem(NAME_KEY, name);
     } catch {
       // Storage blocked (private mode…): the name just won't be remembered.
     }
+    myNameRef.current = name;
     setMyNameState(name);
-  };
+  }, []);
 
   useEffect(() => {
-    socket.on("connect", () => {
-      setIsConnected(true);
-      setHasConnectedOnce(true);
-      setConnectionReplaced(false);
-    });
+    const isMe = (playerId: string) => playerId === stateRef.current.myPlayerId;
+
+    socket.on("connect", () => dispatch({ type: "connected" }));
     socket.on("disconnect", (reason) => {
-      setIsConnected(false);
       // "io server disconnect": the server hung up (e.g. the game was opened
       // in another tab). socket.io won't retry that one by itself.
-      if (reason === "io server disconnect") setConnectionReplaced(true);
+      dispatch({ type: "disconnected", replaced: reason === "io server disconnect" });
     });
 
     socket.on("session", ({ token, playerId }) => {
       saveSessionToken(token);
-      setMyPlayerId(playerId);
+      dispatch({ type: "session", playerId });
     });
 
     socket.on("profile", ({ token }) => {
@@ -238,78 +112,56 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       socket.emit("get_my_stats");
     });
 
-    socket.on("my_stats", (payload) => setMyStats(payload));
+    socket.on("my_stats", (stats) => dispatch({ type: "my_stats", stats }));
 
     socket.on("rating_update", (update) => {
-      setRatingUpdate(update);
+      dispatch({ type: "rating_update", update });
       socket.emit("get_my_stats");
     });
 
     // Sent on every (re)connection: either our seat in a game, or nothing.
     socket.on("state_sync", ({ room }) => {
-      if (room) {
-        applySnapshot(room);
-        return;
+      if (!room) {
+        const current = stateRef.current.phase;
+        if (current === "queue") {
+          // The server drops queued players on disconnect: get back in line.
+          socket.emit("join_lobby", { name: myNameRef.current });
+        } else if (current !== "home") {
+          toast.error("Connexion perdue. Ta partie n’a pas pu être récupérée.");
+        }
       }
-      const current = phaseRef.current;
-      if (current === "queue") {
-        // The server drops queued players on disconnect: get back in line.
-        socket.emit("join_lobby", { name: myNameRef.current });
-      } else if (current !== "home") {
-        toast.error("Connexion perdue. Ta partie n’a pas pu être récupérée.");
-        resetGameState();
-        setPhase("home");
-      }
+      dispatch({ type: "state_sync", room, now: Date.now() });
     });
 
-    socket.on("in_queue", ({ position }) => {
-      setPhase("queue");
-      setQueuePosition(position);
-    });
-
-    socket.on("room_created", ({ code }) => {
-      setPhase("lobby");
-      setRoomCode(code);
-    });
-
+    socket.on("in_queue", ({ position }) => dispatch({ type: "in_queue", position }));
+    socket.on("room_created", ({ code }) => dispatch({ type: "room_created", code }));
     socket.on("room_joined", ({ code, players, characters, mode }) => {
-      setRoomCode(code);
-      setRoomMode(mode);
-      startNewRound(players, characters);
+      dispatch({ type: "room_joined", code, players, characters, mode });
     });
-
-    socket.on("opponent_ready", () => {
-      setOpponentReady(true);
-    });
+    socket.on("opponent_ready", () => dispatch({ type: "opponent_ready" }));
 
     socket.on("reaction", ({ playerId, emoji }) => {
-      if (playerId !== myPlayerIdRef.current && reactionsMutedRef.current) return;
+      if (!isMe(playerId) && reactionsMutedRef.current) return;
       const id = ++reactionIdRef.current;
       // Keep only the last few on screen so spam can't flood it.
       setReactions(prev => [...prev.slice(-5), { id, playerId, emoji }]);
       setTimeout(() => setReactions(prev => prev.filter(r => r.id !== id)), REACTION_LIFETIME_MS);
     });
 
-    socket.on("timer", (payload) => {
-      setTimer(toTurnTimer(payload));
-    });
+    socket.on("timer", (timer) => dispatch({ type: "timer", timer, now: Date.now() }));
 
     socket.on("character_assigned", ({ characterId }) => {
-      setMyCharacterId(characterId);
-      const name = charactersRef.current.find(c => c.id === characterId)?.name;
-      toast.info(`Temps écoulé ! Ton personnage, choisi au hasard : ${name ?? "?"}.`, { duration: 6000 });
+      dispatch({ type: "character_assigned", characterId });
+      const name = stateRef.current.characters.find(c => c.id === characterId)?.name;
+      toast.info(`Temps écoulé ! Ton personnage, choisi au hasard : ${name ?? "?"}.`, { duration: 6000 });
     });
 
     socket.on("turn_timeout", ({ playerId, lives, currentTurnPlayerId, while: during }) => {
-      setPendingQuestion(null);
-      setAwaitingAnswerFor(null);
-      setGameLog(prev => [...prev, { id: Math.random().toString(), type: "timeout", playerId }]);
-      setPlayers(prev => prev.map(p => p.id === playerId ? { ...p, lives } : p));
-      setCurrentTurnId(currentTurnPlayerId);
-      if (playerId === myPlayerIdRef.current) {
+      dispatch({ type: "turn_timeout", playerId, lives, currentTurnPlayerId, logId: newLogId() });
+      if (isMe(playerId)) {
         toast.error(during === "answering"
-          ? "Pas de réponse à temps ! Tu perds une vie."
-          : "Temps écoulé ! Tu perds une vie et ton tour.");
+          ? "Pas de réponse à temps ! Tu perds une vie."
+          : "Temps écoulé ! Tu perds une vie et ton tour.");
       } else {
         toast.success("Ton adversaire a dépassé le temps et perd une vie.");
       }
@@ -324,99 +176,74 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
 
     socket.on("game_start", ({ currentTurnPlayerId, players }) => {
-      setPhase("playing");
-      setCurrentTurnId(currentTurnPlayerId);
-      setPlayers(players);
+      dispatch({ type: "game_start", currentTurnPlayerId, players });
     });
-
-    socket.on("question_asked", ({ question }) => {
-      setPendingQuestion(question);
-    });
-
-    socket.on("awaiting_answer", ({ question }) => {
-      setAwaitingAnswerFor(question);
-    });
-
+    socket.on("question_asked", ({ question }) => dispatch({ type: "question_asked", question }));
+    socket.on("awaiting_answer", ({ question }) => dispatch({ type: "awaiting_answer", question }));
     socket.on("question_answered", ({ currentTurnPlayerId, ...entry }) => {
-      setPendingQuestion(null);
-      setAwaitingAnswerFor(null);
-      setGameLog(prev => [...prev, { ...entry, id: Math.random().toString() }]);
-      setCurrentTurnId(currentTurnPlayerId);
+      dispatch({ type: "question_answered", entry, currentTurnPlayerId, logId: newLogId() });
     });
 
     socket.on("wrong_guess", ({ guesserId, guessedCharacterId, lives, currentTurnPlayerId }) => {
-      setGameLog(prev => [...prev, {
-        id: Math.random().toString(),
-        type: "guess",
-        guesserId,
-        guessedCharacterId
-      }]);
-      setPlayers(prev => prev.map(p =>
-        p.id === guesserId ? { ...p, lives } : p
-      ));
-      setCurrentTurnId(currentTurnPlayerId);
-      if (guesserId === myPlayerIdRef.current) {
-        toast.error("Raté ! Tu perds une vie.");
+      dispatch({ type: "wrong_guess", guesserId, guessedCharacterId, lives, currentTurnPlayerId, logId: newLogId() });
+      if (isMe(guesserId)) {
+        toast.error("Raté ! Tu perds une vie.");
       } else {
-        toast.success("L’adversaire s’est trompé !");
+        toast.success("L’adversaire s’est trompé !");
       }
     });
 
-    socket.on("game_over", ({ winnerId, opponentCharacterId, reason }) => {
-      setPhase("ended");
-      setWinnerId(winnerId);
-      setRevealedOpponentCharacterId(opponentCharacterId);
-      setGameOverReason(reason);
-      setPendingQuestion(null);
-      setAwaitingAnswerFor(null);
-      setRematchRequestedBy(null);
+    socket.on("last_chance", ({ playerId }) => {
+      dispatch({ type: "last_chance", playerId });
+      if (isMe(playerId)) {
+        toast.info("L’adversaire a trouvé ton personnage ! Dernière chance : devine le sien.", { duration: 6000 });
+      } else {
+        toast.success("Tu as trouvé ! L’adversaire a une dernière chance de deviner.", { duration: 6000 });
+      }
+    });
+
+    socket.on("game_over", ({ winnerId, opponentCharacterId, reason, turnMs }) => {
+      dispatch({ type: "game_over", winnerId, opponentCharacterId, reason, turnMs });
     });
 
     socket.on("opponent_disconnected", ({ graceSeconds }) => {
-      setOpponentConnected(false);
-      if (phaseRef.current !== "ended") {
-        toast.warning(`Ton adversaire a perdu la connexion. On l’attend jusqu’à ${graceSeconds} s…`);
+      dispatch({ type: "opponent_disconnected" });
+      if (stateRef.current.phase !== "ended") {
+        toast.warning(`Ton adversaire a perdu la connexion. On l’attend jusqu’à ${graceSeconds} s…`);
       }
     });
 
     socket.on("opponent_reconnected", () => {
-      setOpponentConnected(true);
-      if (phaseRef.current !== "ended") {
-        toast.success("Ton adversaire est de retour !");
+      dispatch({ type: "opponent_reconnected" });
+      if (stateRef.current.phase !== "ended") {
+        toast.success("Ton adversaire est de retour !");
       }
     });
 
     socket.on("opponent_left", () => {
-      setOpponentLeft(true);
-      setRematchRequestedBy(null);
-      const current = phaseRef.current;
+      const current = stateRef.current.phase;
       if (current === "selection" || current === "playing") {
         toast.error("Ton adversaire a quitté la partie.");
-        setPhase("ended");
-        setGameOverReason("opponent_left");
-        setWinnerId(myPlayerIdRef.current);
       } else if (current === "ended") {
         toast.info("Ton adversaire a quitté la salle.");
       }
+      dispatch({ type: "opponent_left" });
     });
 
     socket.on("rematch_requested", ({ byPlayerId }) => {
-      setRematchRequestedBy(byPlayerId);
-      if (byPlayerId !== myPlayerIdRef.current) {
-        toast.info("Ton adversaire veut une revanche !");
+      dispatch({ type: "rematch_requested", byPlayerId });
+      if (!isMe(byPlayerId)) {
+        toast.info("Ton adversaire veut une revanche !");
       }
     });
 
     socket.on("rematch_started", ({ players, characters, mode }) => {
-      setRoomMode(mode);
-      startNewRound(players, characters);
+      dispatch({ type: "rematch_started", players, characters, mode });
     });
 
     socket.on("error", ({ message }) => {
       toast.error(message);
-      if (phaseRef.current === "queue" || phaseRef.current === "lobby") {
-        setPhase("home");
-      }
+      dispatch({ type: "server_error" });
     });
 
     // After the error boundary's "Réessayer" this provider is mounted again
@@ -448,6 +275,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       socket.off("awaiting_answer");
       socket.off("question_answered");
       socket.off("wrong_guess");
+      socket.off("last_chance");
       socket.off("game_over");
       socket.off("opponent_disconnected");
       socket.off("opponent_reconnected");
@@ -458,34 +286,37 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, []);
 
+  // The actions read the name from a ref so they never change identity.
   const joinQueue = useCallback(() => {
-    if (!myName) return;
-    resetGameState();
-    setPhase("queue");
-    socket.emit("join_lobby", { name: myName });
-  }, [myName]);
+    const name = myNameRef.current;
+    if (!name) return;
+    dispatch({ type: "reset", phase: "queue" });
+    socket.emit("join_lobby", { name });
+  }, []);
 
   const joinRoom = useCallback((code: string) => {
-    if (!myName) return;
-    resetGameState();
-    socket.emit("join_room", { code, name: myName });
-  }, [myName]);
+    const name = myNameRef.current;
+    if (!name) return;
+    dispatch({ type: "reset" });
+    socket.emit("join_room", { code, name });
+  }, []);
 
   const createPrivateRoom = useCallback(() => {
-    if (!myName) return;
-    resetGameState();
-    setPhase("lobby");
-    socket.emit("create_room", { name: myName });
-  }, [myName]);
+    const name = myNameRef.current;
+    if (!name) return;
+    dispatch({ type: "reset", phase: "lobby" });
+    socket.emit("create_room", { name });
+  }, []);
 
   const playVsBot = useCallback((level: BotLevel) => {
-    if (!myName) return;
-    resetGameState();
-    socket.emit("play_vs_bot", { name: myName, level });
-  }, [myName]);
+    const name = myNameRef.current;
+    if (!name) return;
+    dispatch({ type: "reset" });
+    socket.emit("play_vs_bot", { name, level });
+  }, []);
 
   const selectCharacter = useCallback((id: string) => {
-    setMyCharacterId(id);
+    dispatch({ type: "select_character", characterId: id });
     socket.emit("select_character", { characterId: id });
   }, []);
 
@@ -524,7 +355,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const setReactionsMuted = useCallback((muted: boolean) => {
     try { localStorage.setItem(MUTE_KEY, muted ? "1" : "0"); } catch { /* storage blocked */ }
     setReactionsMutedState(muted);
-    if (muted) setReactions(prev => prev.filter(r => r.playerId === myPlayerIdRef.current));
+    if (muted) setReactions(prev => prev.filter(r => r.playerId === stateRef.current.myPlayerId));
   }, []);
 
   const refreshMyStats = useCallback(() => {
@@ -533,62 +364,63 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const leaveGame = useCallback(() => {
     socket.emit("leave_room");
-    resetGameState();
-    setPhase("home");
+    dispatch({ type: "reset", phase: "home" });
   }, []);
 
+  // The reducer returns the same state object when nothing changed, so the
+  // context value (and every consumer) only updates on real changes.
+  const value = useMemo<GameContextType>(
+    () => ({
+      ...state,
+      reactionsMuted,
+      myName,
+      setMyName,
+      joinQueue,
+      joinRoom,
+      createPrivateRoom,
+      playVsBot,
+      selectCharacter,
+      askQuestion,
+      askVerifiedQuestion,
+      answerQuestion,
+      makeGuess,
+      syncEliminations,
+      requestRematch,
+      acceptRematch,
+      leaveGame,
+      refreshMyStats,
+      sendReaction,
+      setReactionsMuted,
+    }),
+    [
+      state,
+      reactionsMuted,
+      myName,
+      setMyName,
+      joinQueue,
+      joinRoom,
+      createPrivateRoom,
+      playVsBot,
+      selectCharacter,
+      askQuestion,
+      askVerifiedQuestion,
+      answerQuestion,
+      makeGuess,
+      syncEliminations,
+      requestRematch,
+      acceptRematch,
+      leaveGame,
+      refreshMyStats,
+      sendReaction,
+      setReactionsMuted,
+    ],
+  );
+
+  const reactionsValue = useMemo<ReactionsContextType>(() => ({ reactions }), [reactions]);
+
   return (
-    <GameContext.Provider
-      value={{
-        phase,
-        roomCode,
-        roomMode,
-        queuePosition,
-        players,
-        characters,
-        myPlayerId,
-        myCharacterId,
-        myEliminatedIds,
-        opponentReady,
-        opponentConnected,
-        opponentLeft,
-        currentTurnId,
-        pendingQuestion,
-        awaitingAnswerFor,
-        gameLog,
-        winnerId,
-        gameOverReason,
-        revealedOpponentCharacterId,
-        rematchRequestedBy,
-        timer,
-        reactions,
-        reactionsMuted,
-        myStats,
-        ratingUpdate,
-        isConnected,
-        hasConnectedOnce,
-        connectionReplaced,
-        myName,
-        setMyName,
-        joinQueue,
-        joinRoom,
-        createPrivateRoom,
-        playVsBot,
-        selectCharacter,
-        askQuestion,
-        askVerifiedQuestion,
-        answerQuestion,
-        makeGuess,
-        syncEliminations,
-        requestRematch,
-        acceptRematch,
-        leaveGame,
-        refreshMyStats,
-        sendReaction,
-        setReactionsMuted,
-      }}
-    >
-      {children}
+    <GameContext.Provider value={value}>
+      <ReactionsContext.Provider value={reactionsValue}>{children}</ReactionsContext.Provider>
     </GameContext.Provider>
   );
 };
@@ -597,6 +429,16 @@ export const useGame = () => {
   const context = useContext(GameContext);
   if (!context) {
     throw new Error("useGame must be used within GameProvider");
+  }
+  return context;
+};
+
+
+// The emojis currently floating on screen (see ReactionsContext).
+export const useReactions = () => {
+  const context = useContext(ReactionsContext);
+  if (!context) {
+    throw new Error("useReactions must be used within GameProvider");
   }
   return context;
 };

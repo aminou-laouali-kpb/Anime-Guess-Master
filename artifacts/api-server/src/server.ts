@@ -1,15 +1,16 @@
 import { createServer, type Server } from "http";
 import { Server as SocketIOServer } from "socket.io";
+import type { ClientToServerEvents, ServerToClientEvents } from "@workspace/game-protocol";
 import app, { allowedOrigins } from "./app";
 import { makeOriginCheck } from "./lib/origin";
-import { setupGameEngine } from "./lib/game-engine";
+import { setupGameEngine } from "./lib/engine";
 
 // Builds the HTTP + Socket.IO server without listening, so tests can start it
 // on any port.
-export function createGameServer(): { httpServer: Server; io: SocketIOServer } {
+export function createGameServer(): { httpServer: Server; io: SocketIOServer<ClientToServerEvents, ServerToClientEvents> } {
   const httpServer = createServer(app);
 
-  const io = new SocketIOServer(httpServer, {
+  const io = new SocketIOServer<ClientToServerEvents, ServerToClientEvents>(httpServer, {
     // Same-origin only unless ALLOWED_ORIGINS lists more (see app.ts).
     ...(allowedOrigins.length > 0
       ? { cors: { origin: allowedOrigins, methods: ["GET", "POST"] } }

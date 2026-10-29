@@ -19,7 +19,7 @@ export async function startServer(): Promise<TestServer> {
   };
 }
 
-type Payload = Record<string, any>;
+type Payload = Record<string, unknown>;
 
 export interface ClientOptions {
   /** Fake client address, as a reverse proxy would put it in X-Forwarded-For. */
@@ -56,10 +56,10 @@ export class TestClient {
     this.socket.onAny((event: string, payload: Payload) => {
       this.events.push([event, payload]);
       if (event === "session") {
-        this.playerId = payload.playerId;
-        this.token = payload.token;
+        this.playerId = payload["playerId"] as string;
+        this.token = payload["token"] as string;
       }
-      if (event === "profile") this.profile = payload.token;
+      if (event === "profile") this.profile = payload["token"] as string;
     });
     this.socket.on("connect_error", (err) => this.events.push(["connect_error", { message: err.message }]));
   }
@@ -138,7 +138,33 @@ export async function startPrivateGame(server: TestServer): Promise<Game> {
   a.emit("select_character", { characterId: board[0]!["id"] });
   b.emit("select_character", { characterId: board[1]!["id"] });
   await a.until(() => a.has("game_start") && b.has("game_start"));
-  return { a, b, board, aChar: board[0]!["id"], bChar: board[1]!["id"] };
+  return { a, b, board, aChar: board[0]!["id"] as string, bChar: board[1]!["id"] as string };
+}
+
+/**
+ * The first player finds the character, which opens the other player's last
+ * chance; the other player then misses, so the first player's win stands.
+ */
+export async function winAsFirstPlayer(
+  winner: TestClient,
+  loser: TestClient,
+  winnerTarget: string,
+  loserMiss: string,
+): Promise<void> {
+  winner.emit("make_guess", { characterId: winnerTarget });
+  await loser.next("last_chance");
+  loser.emit("make_guess", { characterId: loserMiss });
+  await winner.until(() => winner.has("game_over") && loser.has("game_over"), 5000, "game_over");
+}
+
+/** Plays a game to its end: whoever moves first wins (the other player misses their last chance). */
+export async function playToFirstPlayerWin(game: Game): Promise<{ mover: TestClient; other: TestClient }> {
+  const { mover, other } = whoseTurn(game);
+  const moverTarget = mover === game.a ? game.bChar : game.aChar;
+  const otherTarget = mover === game.a ? game.aChar : game.bChar;
+  const miss = game.board.map((c) => c["id"] as string).find((id) => id !== otherTarget)!;
+  await winAsFirstPlayer(mover, other, moverTarget, miss);
+  return { mover, other };
 }
 
 /** The client whose turn it is, and the other one. */

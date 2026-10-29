@@ -14,6 +14,10 @@ interface CharacterCardProps {
   onPick?: (id: string) => void;
   className?: string;
   size?: "sm" | "md" | "lg";
+  // What tapping the card does, for screen readers. "select": choose this
+  // character (pressed = chosen). "eliminate": cross it out on the board
+  // (pressed = crossed out).
+  action?: "select" | "eliminate";
 }
 
 const alignmentColors: Record<string, string> = {
@@ -52,7 +56,9 @@ export const Portrait: React.FC<{ character: Character; size: "sm" | "md" | "lg"
       <img
         src={character.imageUrl}
         alt=""
-        loading="lazy"
+        // Eager: the 24 cards of a board are on screen (or one scroll away)
+        // as soon as it's dealt, and lazy loading waited for layout first.
+        loading="eager"
         decoding="async"
         referrerPolicy="no-referrer"
         draggable={false}
@@ -80,7 +86,8 @@ const CharacterCardView: React.FC<CharacterCardProps> = ({
   onClick,
   onPick,
   className,
-  size = "md"
+  size = "md",
+  action = "select",
 }) => {
   const interactive = Boolean(onClick || onPick);
   const handleClick = () => {
@@ -100,7 +107,7 @@ const CharacterCardView: React.FC<CharacterCardProps> = ({
           <h3 className={cn("font-display font-bold leading-tight text-white drop-shadow line-clamp-2 [overflow-wrap:anywhere]", compact ? "text-xs" : "text-base")}>
             {character.name}
           </h3>
-          <p className={cn("text-white/75 font-semibold uppercase tracking-wider truncate", compact ? "text-[10px]" : "text-[11px]")}>
+          <p className={cn("text-white/90 font-semibold uppercase tracking-wide truncate drop-shadow", compact ? "text-[11px]" : "text-xs")}>
             {character.anime}
           </p>
         </div>
@@ -151,8 +158,11 @@ const CharacterCardView: React.FC<CharacterCardProps> = ({
       type="button"
       onClick={handleClick}
       className={classes}
-      aria-label={`${character.name} (${character.anime})${eliminated ? ", éliminé" : ""}`}
-      aria-pressed={selected || eliminated}
+      // The state is given once, by aria-pressed; the label says what pressing means.
+      aria-label={action === "eliminate"
+        ? `Écarter ${character.name} (${character.anime})`
+        : `${character.name} (${character.anime})`}
+      aria-pressed={action === "eliminate" ? eliminated : selected}
     >
       {content}
     </button>

@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Trophy, Flame, Loader2 } from "lucide-react";
 import { useGame } from "@/context/GameContext";
 import { cn } from "@/lib/utils";
+import { plural } from "@/lib/fr";
 
 const MEDALS = ["🥇", "🥈", "🥉"];
 
@@ -38,6 +39,7 @@ const LeaderboardDialogContent: React.FC<LeaderboardDialogProps> = ({ open, onOp
   const minGames = myStats?.minRankedGames ?? leaderboard.data?.minRankedGames ?? 5;
   const winRate = stats && stats.gamesPlayed > 0 ? Math.round((stats.wins / stats.gamesPlayed) * 100) : 0;
   const entries = leaderboard.data?.entries ?? [];
+  const gamesToRank = stats ? Math.max(0, minGames - stats.rankedGames) : 0;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -63,19 +65,19 @@ const LeaderboardDialogContent: React.FC<LeaderboardDialogProps> = ({ open, onOp
               <div className="grid grid-cols-3 gap-2">
                 <Stat label="Score" value={stats.rating} />
                 <Stat label="Rang" value={stats.rank ? `#${stats.rank}` : "—"} />
-                <Stat label="Taux de victoire" value={`${winRate} %`} />
+                <Stat label="Taux de victoire" value={`${winRate} %`} />
                 <Stat label="Parties" value={stats.gamesPlayed} />
                 <Stat label="Gagnées" value={stats.wins} />
                 <Stat label="Meilleure série" value={stats.bestStreak} />
               </div>
               {stats.currentStreak >= 2 && (
                 <p className="text-sm font-bold text-orange-700 flex items-center gap-1">
-                  <Flame className="w-4 h-4" /> {stats.currentStreak} victoires d’affilée !
+                  <Flame className="w-4 h-4" /> {stats.currentStreak} victoires d’affilée !
                 </p>
               )}
               {!stats.rank && (
                 <p className="text-xs text-muted-foreground">
-                  Encore {Math.max(0, minGames - stats.rankedGames)} partie(s) rapide(s) pour apparaître au classement.
+                  Encore {gamesToRank} {plural(gamesToRank, "partie rapide", "parties rapides")} pour apparaître au classement.
                 </p>
               )}
             </>
@@ -91,7 +93,7 @@ const LeaderboardDialogContent: React.FC<LeaderboardDialogProps> = ({ open, onOp
             <p className="text-sm text-muted-foreground">Classement indisponible pour le moment.</p>
           ) : entries.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              Personne n’est encore classé. Joue {minGames} parties rapides pour être le premier nom ici !
+              Personne n’est encore classé. Joue {minGames} {plural(minGames, "partie rapide", "parties rapides")} pour être le premier nom ici !
             </p>
           ) : (
             <ol className="divide-y divide-border rounded-lg border border-border overflow-hidden">
@@ -106,7 +108,7 @@ const LeaderboardDialogContent: React.FC<LeaderboardDialogProps> = ({ open, onOp
                       {MEDALS[entry.rank - 1] ?? entry.rank}
                     </span>
                     <span className="flex-1 truncate">{entry.name}{isMe && " (toi)"}</span>
-                    <span className="text-xs text-muted-foreground tabular-nums">{entry.rankedGames} parties</span>
+                    <span className="text-xs text-muted-foreground tabular-nums">{entry.rankedGames} {plural(entry.rankedGames, "partie", "parties")}</span>
                     <span className="w-12 text-right font-display font-black tabular-nums">{entry.rating}</span>
                   </li>
                 );

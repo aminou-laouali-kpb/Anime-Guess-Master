@@ -27,7 +27,7 @@ export const LeaveGameButton: React.FC<{ countsAsLoss: boolean; className?: stri
       </AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Abandonner la partie ?</AlertDialogTitle>
+          <AlertDialogTitle>Abandonner la partie ?</AlertDialogTitle>
           <AlertDialogDescription>
             {countsAsLoss
               ? "Ton adversaire gagnera la partie et elle comptera comme une défaite dans tes statistiques."

@@ -32,7 +32,7 @@ export const ConnectionStatus: React.FC = () => {
   return (
     <div role="status" className="fixed top-0 inset-x-0 z-[80] bg-amber-100 text-amber-950 border-b-2 border-amber-300 px-4 py-2 text-sm font-bold flex items-center justify-center gap-2">
       <Loader2 className="w-4 h-4 animate-spin" aria-hidden />
-      Connexion perdue : reconnexion en cours…
+      Connexion perdue : reconnexion en cours…
     </div>
   );
 };

@@ -13,7 +13,7 @@ export const MyCharacterChip: React.FC<{ character: Character | undefined; class
       <button
         type="button"
         onClick={() => setOpen(true)}
-        aria-label={`Ton personnage secret : ${character.name}. Voir sa fiche`}
+        aria-label={`Ton personnage secret : ${character.name}. Voir sa fiche`}
         className={cn(
           "relative shrink-0 w-10 h-[52px] rounded-lg overflow-hidden border-2 border-primary shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
           className,

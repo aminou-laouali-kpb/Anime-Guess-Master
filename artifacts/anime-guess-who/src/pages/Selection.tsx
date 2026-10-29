@@ -5,9 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 import { Countdown } from "@/components/Countdown";
 import { LeaveGameButton } from "@/components/LeaveGameButton";
+import { usePageHeading } from "@/components/PageHeading";
 
 export const Selection: React.FC = () => {
-  const { characters, selectCharacter, myCharacterId, opponentReady, myName, timer, players, myPlayerId } = useGame();
+  const { characters, selectCharacter, myCharacterId, opponentReady, myName, timer, players, myPlayerId, isConnected } = useGame();
   const opponentName = players.find(p => p.id !== myPlayerId)?.name ?? "Adversaire";
   
   // Local state to hold choice before confirming
@@ -34,25 +35,38 @@ export const Selection: React.FC = () => {
     if (myCharacterId) setLocalSelection(null);
   }, [myCharacterId]);
 
+  const heading = isLockedIn ? "En attente de l’adversaire" : "Choisis ton personnage secret";
+  const headingRef = usePageHeading(heading);
+  // Confirming removes the button that had the focus: put it on the heading.
+  useEffect(() => {
+    if (isLockedIn && (!document.activeElement || document.activeElement === document.body)) {
+      headingRef.current?.focus({ preventScroll: true });
+    }
+  }, [isLockedIn, headingRef]);
+
   return (
-    <div className="min-h-[100dvh] w-full flex flex-col bg-background relative pb-32">
+    <div className="min-h-[100dvh] w-full flex flex-col bg-background relative pb-[calc(8rem+env(safe-area-inset-bottom))]">
       {/* Header Sticky */}
       <div className="sticky top-0 z-40 bg-background/80 backdrop-blur-md border-b border-border px-4 py-3 sm:py-4 flex flex-col items-center justify-center shadow-sm">
         <LeaveGameButton countsAsLoss={false} className="absolute top-2 right-2 text-muted-foreground" />
-        <h2 className="font-display font-black text-xl sm:text-2xl uppercase tracking-tight text-center px-10">
-          {isLockedIn ? "En attente de l’adversaire" : "Choisis ton personnage secret"}
-        </h2>
-        {/* Who has chosen: a clear status rather than "…", which read like a cut-off name. */}
-        <div className="flex items-center justify-center gap-2 mt-2 text-xs sm:text-sm font-bold w-full">
+        <h1
+          ref={headingRef}
+          tabIndex={-1}
+          className="font-display font-black text-xl sm:text-2xl uppercase tracking-tight text-center px-10 focus:outline-none"
+        >
+          {heading}
+        </h1>
+        {/* Who has chosen: a clear status, announced when the opponent (or the clock) locks a choice in. */}
+        <div className="flex items-center justify-center gap-2 mt-2 text-xs sm:text-sm font-bold w-full" role="status" aria-live="polite">
           <PlayerStatus name={myName} ready={isLockedIn} tone="text-primary" />
-          <span className="text-muted-foreground/50 shrink-0">VS</span>
+          <span className="text-muted-foreground/50 shrink-0" aria-hidden>VS</span>
           <PlayerStatus name={opponentName} ready={opponentReady} tone="text-secondary" />
         </div>
         {!isLockedIn && (
           <Countdown deadline={timer?.deadline}>
             {(seconds, urgent) => (
               <p className={`mt-1 text-xs font-bold uppercase tracking-widest tabular-nums ${urgent ? "text-red-600 animate-pulse" : "text-muted-foreground"}`}>
-                encore {seconds} s — sinon on choisit pour toi
+                encore {seconds} s — sinon on choisit pour toi
               </p>
             )}
           </Countdown>
@@ -75,19 +89,22 @@ export const Selection: React.FC = () => {
 
       {/* Action Bar Float */}
       {!isLockedIn && (
-        <div className="fixed bottom-0 left-0 right-0 p-4 bg-background/90 backdrop-blur-md border-t border-border z-50 animate-in slide-in-from-bottom">
+        <div
+          className="fixed bottom-0 left-0 right-0 px-4 pt-4 bg-background/90 backdrop-blur-md border-t border-border z-50 animate-in slide-in-from-bottom"
+          style={{ paddingBottom: "calc(1rem + env(safe-area-inset-bottom))" }}
+        >
           <div className="max-w-md mx-auto">
             <Button
               size="lg"
               className="w-full h-14 font-display font-bold text-lg"
-              disabled={!localSelection}
+              disabled={!localSelection || !isConnected}
               onClick={handleConfirm}
             >
-              <span className="truncate">{pickedName ? `Valider : ${pickedName}` : "Valider mon choix"}</span>
+              <span className="truncate">{pickedName ? `Valider : ${pickedName}` : "Valider mon choix"}</span>
             </Button>
             {!localSelection && (
               <p className="mt-2 text-center text-xs text-muted-foreground">
-                Touche un personnage : c’est lui que ton adversaire devra deviner.
+                Touche un personnage : c’est lui que ton adversaire devra deviner.
               </p>
             )}
           </div>
@@ -95,8 +112,11 @@ export const Selection: React.FC = () => {
       )}
 
       {isLockedIn && !opponentReady && (
-        <div className="fixed bottom-0 left-0 right-0 p-6 flex justify-center items-center gap-3 bg-background/90 backdrop-blur-md border-t border-border z-50">
-          <Loader2 className="w-6 h-6 animate-spin text-primary" />
+        <div
+          className="fixed bottom-0 left-0 right-0 px-6 pt-6 flex justify-center items-center gap-3 bg-background/90 backdrop-blur-md border-t border-border z-50"
+          style={{ paddingBottom: "calc(1.5rem + env(safe-area-inset-bottom))" }}
+        >
+          <Loader2 className="w-6 h-6 animate-spin text-primary" aria-hidden />
           <span className="font-bold uppercase tracking-widest text-sm text-muted-foreground">
             En attente de l’adversaire…
           </span>

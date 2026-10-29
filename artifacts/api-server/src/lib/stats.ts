@@ -8,8 +8,12 @@ import { logger } from "./logger";
 export const statsEnabled = Boolean(process.env["DATABASE_URL"]);
 
 const START_RATING = 1000;
-const MIN_RATING = 100;
-const K_FACTOR = 32;
+export const MIN_RATING = 100;
+// Provisional K: a new player's rating moves fast until it has found its
+// level, then settles. Each player's change uses their own K.
+export const K_PROVISIONAL = 40;
+export const K_ESTABLISHED = 20;
+export const PROVISIONAL_GAMES = 10;
 // Players only show up on the leaderboard after this many ranked games.
 export const MIN_RANKED_GAMES = 5;
 // The same two players can't farm each other: only this many ranked games
@@ -88,18 +92,75 @@ export function newProfileToken(): string {
   return randomBytes(24).toString("base64url");
 }
 
-// Standard Elo: an upset earns more points than an expected win.
-export function eloDelta(winnerRating: number, loserRating: number): number {
-  const expected = 1 / (1 + 10 ** ((loserRating - winnerRating) / 400));
-  return Math.max(1, Math.round(K_FACTOR * (1 - expected)));
+// K for a player who has played `rankedGames` ranked games before this one.
+export function kFactor(rankedGames: number): number {
+  return rankedGames < PROVISIONAL_GAMES ? K_PROVISIONAL : K_ESTABLISHED;
 }
 
+// Standard Elo: an upset earns more points than an expected win. The size of
+// the change for one player with factor `k` (at least 1 point).
+export function eloDelta(winnerRating: number, loserRating: number, k = K_ESTABLISHED): number {
+  const expected = 1 / (1 + 10 ** ((loserRating - winnerRating) / 400));
+  return Math.max(1, Math.round(k * (1 - expected)));
+}
+
+// A draw is worth half a win: the higher-rated player gives up a few points,
+// the lower-rated one gains them. Positive = points gained by `a` (with a's K).
+export function eloDrawDelta(ratingA: number, ratingB: number, k = K_ESTABLISHED): number {
+  const expected = 1 / (1 + 10 ** ((ratingB - ratingA) / 400));
+  const raw = k * (0.5 - expected);
+  // Rounded away from zero on .5 for both signs, so with the same K the two
+  // sides mirror exactly (Math.round alone would create a point on .5).
+  return (raw < 0 ? -Math.round(-raw) : Math.round(raw)) || 0;
+}
+
+export interface RatedPlayer {
+  rating: number;
+  rankedGames: number; // ranked games played before this one (sets the K)
+}
+
+// Rating changes for a ranked game. Each side uses its own K, so the two
+// changes may differ in size. Nobody drops below MIN_RATING, and when the
+// floor cuts a loss short, the other side gains no more than was actually
+// lost: the floor never creates points.
+export function ratingChanges(
+  winner: RatedPlayer,
+  loser: RatedPlayer,
+  draw = false,
+): { winner: number; loser: number } {
+  const changes = draw
+    ? {
+        winner: eloDrawDelta(winner.rating, loser.rating, kFactor(winner.rankedGames)),
+        loser: eloDrawDelta(loser.rating, winner.rating, kFactor(loser.rankedGames)),
+      }
+    : {
+        winner: eloDelta(winner.rating, loser.rating, kFactor(winner.rankedGames)),
+        loser: -eloDelta(winner.rating, loser.rating, kFactor(loser.rankedGames)),
+      };
+
+  // At most one side loses points: floor that loss, and if the floor cut
+  // it short, cap the other side's gain to what was really lost.
+  const players = { winner, loser };
+  for (const [down, up] of [["winner", "loser"], ["loser", "winner"]] as const) {
+    const change = changes[down];
+    if (change >= 0) continue;
+    const actual = Math.max(change, Math.min(0, MIN_RATING - players[down].rating));
+    if (actual !== change) {
+      changes[down] = actual;
+      changes[up] = Math.min(changes[up], 0 - actual);
+    }
+  }
+  return changes;
+}
+
+// For a draw, `winner` and `loser` are simply the two players (either order).
 export async function recordGame(params: {
   winner: Participant;
   loser: Participant;
   ranked: boolean;
   mode: "quick" | "private";
   reason: string;
+  draw?: boolean;
 }): Promise<{ winner: RatingUpdate; loser: RatingUpdate } | null> {
   if (!statsEnabled) return null;
   const { db, playersTable, gamesTable } = await loadDb();
@@ -151,19 +212,25 @@ export async function recordGame(params: {
         );
       if (Number(value) >= MAX_RANKED_PER_PAIR_PER_DAY) ranked = false;
     }
-    const delta = ranked ? eloDelta(winner.rating, loser.rating) : 0;
-    const loserRating = Math.max(MIN_RATING, loser.rating - delta);
+    const draw = params.draw === true;
+    const changes = ranked ? ratingChanges(winner, loser, draw) : { winner: 0, loser: 0 };
+    const winnerRating = winner.rating + changes.winner;
+    const loserRating = loser.rating + changes.loser;
     const rankedInc = ranked ? 1 : 0;
 
     await tx
       .update(playersTable)
       .set({
-        rating: winner.rating + delta,
+        rating: winnerRating,
         gamesPlayed: sql`${playersTable.gamesPlayed} + 1`,
         rankedGames: sql`${playersTable.rankedGames} + ${rankedInc}`,
-        wins: sql`${playersTable.wins} + 1`,
-        currentStreak: sql`${playersTable.currentStreak} + 1`,
-        bestStreak: sql`greatest(${playersTable.bestStreak}, ${playersTable.currentStreak} + 1)`,
+        ...(draw
+          ? { currentStreak: 0 }
+          : {
+              wins: sql`${playersTable.wins} + 1`,
+              currentStreak: sql`${playersTable.currentStreak} + 1`,
+              bestStreak: sql`greatest(${playersTable.bestStreak}, ${playersTable.currentStreak} + 1)`,
+            }),
         updatedAt: sql`now()`,
       })
       .where(eq(playersTable.id, winner.id));
@@ -175,7 +242,7 @@ export async function recordGame(params: {
           rating: loserRating,
           gamesPlayed: sql`${playersTable.gamesPlayed} + 1`,
           rankedGames: sql`${playersTable.rankedGames} + ${rankedInc}`,
-          losses: sql`${playersTable.losses} + 1`,
+          ...(draw ? {} : { losses: sql`${playersTable.losses} + 1` }),
           currentStreak: 0,
           updatedAt: sql`now()`,
         })
@@ -188,13 +255,14 @@ export async function recordGame(params: {
       reason: params.reason,
       winnerId: winner.id,
       loserId: loser.id,
-      ratingChange: delta,
+      // The (first) player's change; the other's may differ (own K, floor).
+      ratingChange: changes.winner,
     });
 
     leaderboardCache = null;
     return {
-      winner: { ranked, rating: winner.rating + delta, delta },
-      loser: { ranked, rating: loserRating, delta: -(loser.rating - loserRating) },
+      winner: { ranked, rating: winnerRating, delta: changes.winner },
+      loser: { ranked, rating: loserRating, delta: changes.loser },
     };
   });
 }
