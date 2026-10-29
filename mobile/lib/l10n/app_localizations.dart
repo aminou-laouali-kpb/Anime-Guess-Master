@@ -1665,6 +1665,90 @@ abstract class AppLocalizations {
   /// In fr, this message translates to:
   /// **'Cette version d’AnimeWho n’est plus prise en charge. Mets l’app à jour pour continuer à jouer.'**
   String get appOutdatedFallback;
+
+  /// No description provided for @deleteAccount.
+  ///
+  /// In fr, this message translates to:
+  /// **'Supprimer mon compte'**
+  String get deleteAccount;
+
+  /// No description provided for @deleteAccountTitle.
+  ///
+  /// In fr, this message translates to:
+  /// **'Supprimer ton compte ?'**
+  String get deleteAccountTitle;
+
+  /// No description provided for @deleteAccountBody.
+  ///
+  /// In fr, this message translates to:
+  /// **'Ton solde d’Éclats, tes droits (Sans pub…), tes cosmétiques et tes statistiques seront effacés définitivement. Les achats déjà effectués ne sont pas remboursés.'**
+  String get deleteAccountBody;
+
+  /// No description provided for @deleteAccountConfirm.
+  ///
+  /// In fr, this message translates to:
+  /// **'Supprimer définitivement'**
+  String get deleteAccountConfirm;
+
+  /// No description provided for @accountDeleted.
+  ///
+  /// In fr, this message translates to:
+  /// **'Compte supprimé.'**
+  String get accountDeleted;
+
+  /// No description provided for @accountDeleteFailed.
+  ///
+  /// In fr, this message translates to:
+  /// **'La suppression a échoué. Réessaie plus tard.'**
+  String get accountDeleteFailed;
+
+  /// No description provided for @cosmeticsTitle.
+  ///
+  /// In fr, this message translates to:
+  /// **'Cosmétiques'**
+  String get cosmeticsTitle;
+
+  /// No description provided for @itemPrice.
+  ///
+  /// In fr, this message translates to:
+  /// **'{count} Éclats'**
+  String itemPrice(int count);
+
+  /// No description provided for @equipLabel.
+  ///
+  /// In fr, this message translates to:
+  /// **'Équiper'**
+  String get equipLabel;
+
+  /// No description provided for @equippedLabel.
+  ///
+  /// In fr, this message translates to:
+  /// **'Équipé'**
+  String get equippedLabel;
+
+  /// No description provided for @notForSale.
+  ///
+  /// In fr, this message translates to:
+  /// **'Exclusif'**
+  String get notForSale;
+
+  /// No description provided for @buyItemFailed.
+  ///
+  /// In fr, this message translates to:
+  /// **'Achat impossible (solde insuffisant ?).'**
+  String get buyItemFailed;
+
+  /// No description provided for @rewardPending.
+  ///
+  /// In fr, this message translates to:
+  /// **'Récompense en cours de validation : elle arrivera dans ton solde.'**
+  String get rewardPending;
+
+  /// No description provided for @chestServerSoon.
+  ///
+  /// In fr, this message translates to:
+  /// **'Le coffre gratuit arrive bientôt. En attendant, ouvre un coffre bonus en vidéo.'**
+  String get chestServerSoon;
 }
 
 class _AppLocalizationsDelegate

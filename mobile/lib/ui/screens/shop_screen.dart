@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../application/monetization_controller.dart';
 import '../../application/providers.dart';
 import '../../data/monetization/purchases_service.dart';
+import '../../domain/models/account_models.dart';
 import '../../domain/monetization/ad_policy.dart';
 import '../../domain/monetization/products.dart';
 import '../../l10n/app_localizations.dart';
@@ -69,7 +70,7 @@ class _ShopScreenState extends ConsumerState<ShopScreen> {
       _busyProduct = null;
       _freeUnavailable = reward == null;
     });
-    if (reward != null) showToast(context, l.shardsCredited(reward));
+    if (reward != null) showToast(context, reward == 0 ? l.rewardPending : l.shardsCredited(reward));
   }
 
   @override
@@ -79,7 +80,7 @@ class _ShopScreenState extends ConsumerState<ShopScreen> {
     final controller = ref.read(monetizationControllerProvider.notifier);
     final demo = ref.watch(purchasesServiceProvider) is FakePurchasesService;
     final freeDecision = controller.rewardedDecision(AdPlacement.rwFreeShards, AdScreen.home);
-    final freeAmount = ref.watch(adConfigProvider).rwFreeShardsAmount;
+    final freeAmount = controller.adConfig.rwFreeShardsAmount;
 
     Widget buyButton(ShopProduct p, {bool owned = false}) => FilledButton(
           style: FilledButton.styleFrom(minimumSize: const Size(110, 44)),
@@ -139,6 +140,12 @@ class _ShopScreenState extends ConsumerState<ShopScreen> {
               body: null,
               trailing: buyButton(p),
             ),
+          if (m.capabilities.cosmetics && m.catalog.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            SectionLabel(l.cosmeticsTitle),
+            const SizedBox(height: 8),
+            for (final item in m.catalog) _CosmeticTile(item: item),
+          ],
           const SizedBox(height: 16),
           OutlinedButton.icon(
             onPressed: _busyProduct != null ? null : _restore,
@@ -189,6 +196,61 @@ class _ShopTile extends StatelessWidget {
           ]),
         ),
       ),
+    );
+  }
+}
+
+/// Objet cosmétique (serveur) : acheter en Éclats, équiper.
+class _CosmeticTile extends ConsumerStatefulWidget {
+  const _CosmeticTile({required this.item});
+  final CatalogItem item;
+
+  @override
+  ConsumerState<_CosmeticTile> createState() => _CosmeticTileState();
+}
+
+class _CosmeticTileState extends ConsumerState<_CosmeticTile> {
+  bool _busy = false;
+
+  Future<void> _run(Future<bool> Function() action, String failure) async {
+    setState(() => _busy = true);
+    final ok = await action();
+    if (!mounted) return;
+    setState(() => _busy = false);
+    if (!ok) showToast(context, failure);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    final wallet = ref.watch(monetizationControllerProvider.select((s) => s.wallet));
+    final controller = ref.read(monetizationControllerProvider.notifier);
+    final item = widget.item;
+    final owned = wallet.inventory.contains(item.id);
+    final equipped = wallet.equipped[item.slot] == item.id;
+    final Widget action;
+    if (equipped) {
+      action = OutlinedButton(onPressed: null, child: Text(l.equippedLabel));
+    } else if (owned) {
+      action = OutlinedButton(
+        onPressed: _busy ? null : () => _run(() => controller.equip(item.slot, item.id), l.purchaseFailed),
+        child: Text(l.equipLabel),
+      );
+    } else if (item.priceShards == null) {
+      action = OutlinedButton(onPressed: null, child: Text(l.notForSale));
+    } else {
+      action = FilledButton(
+        style: FilledButton.styleFrom(minimumSize: const Size(110, 44)),
+        onPressed: _busy || wallet.balance < item.priceShards! ? null : () => _run(() => controller.buyItem(item.id), l.buyItemFailed),
+        child: Text(l.itemPrice(item.priceShards!)),
+      );
+    }
+    return _ShopTile(
+      icon: item.featured ? Icons.auto_awesome : Icons.style_outlined,
+      color: AppColors.secondary,
+      title: item.nameFor(Localizations.localeOf(context).languageCode),
+      body: null,
+      trailing: action,
     );
   }
 }

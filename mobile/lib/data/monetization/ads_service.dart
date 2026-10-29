@@ -44,7 +44,9 @@ abstract class AdsService {
   /// 2 s un chargement (on ne bloque pas le jeu pour une pub).
   Future<bool> showInterstitial(AdPlacement placement);
 
-  Future<RewardedOutcome> showRewarded(AdPlacement placement);
+  /// [ssvUserId] / [ssvCustomData] : options de vérification côté serveur
+  /// (SSV AdMob) reçues de `POST /api/me/ad-offers`.
+  Future<RewardedOutcome> showRewarded(AdPlacement placement, {String? ssvUserId, String? ssvCustomData});
 
   /// Bannière adaptative ancrée. Les règles (écran, `no_ads`) sont appliquées
   /// par l'appelant via [AdPolicy.bannerAllowed].
@@ -67,6 +69,7 @@ class FakeAdsService implements AdsService {
 
   final List<AdPlacement> interstitialsShown = [];
   final List<AdPlacement> rewardedShown = [];
+  final List<String?> ssvCustomData = [];
   int trackingRequests = 0;
   bool initialized = false;
 
@@ -99,8 +102,11 @@ class FakeAdsService implements AdsService {
   }
 
   @override
-  Future<RewardedOutcome> showRewarded(AdPlacement placement) async {
-    if (rewardedOutcome != RewardedOutcome.unavailable) rewardedShown.add(placement);
+  Future<RewardedOutcome> showRewarded(AdPlacement placement, {String? ssvUserId, String? ssvCustomData}) async {
+    if (rewardedOutcome != RewardedOutcome.unavailable) {
+      rewardedShown.add(placement);
+      this.ssvCustomData.add(ssvCustomData);
+    }
     return rewardedOutcome;
   }
 

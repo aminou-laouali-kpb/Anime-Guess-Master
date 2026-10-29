@@ -319,6 +319,12 @@ class GameController extends Notifier<GameState> {
     }
   }
 
+  /// Après la suppression du compte : nouvelle identité au prochain handshake.
+  void onAccountDeleted() {
+    state = state.resetGame().copyWith(phase: GamePhase.home, myPlayerId: null, myStats: null);
+    _socket.reconnect();
+  }
+
   /// « Reprendre ici » après qu'un autre appareil a pris la session.
   void resumeHere() {
     state = state.copyWith(connectionReplaced: false);

@@ -435,6 +435,32 @@ Future<void> showSettingsSheet(BuildContext context) => showModalBottomSheet<voi
 class _SettingsSheet extends ConsumerWidget {
   const _SettingsSheet();
 
+  /// Suppression du compte (Apple 5.1.1(v)) : prévient que les achats ne sont
+  /// pas remboursés.
+  Future<void> _confirmDelete(BuildContext context, WidgetRef ref) async {
+    final l = AppLocalizations.of(context);
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l.deleteAccountTitle),
+        content: Text(l.deleteAccountBody),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(l.cancel)),
+          FilledButton(
+            key: const Key('confirm-delete-account'),
+            style: FilledButton.styleFrom(backgroundColor: AppColors.guessRed, minimumSize: const Size(0, 44)),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(l.deleteAccountConfirm),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    final deleted = await ref.read(monetizationControllerProvider.notifier).deleteAccount();
+    if (deleted) ref.read(gameControllerProvider.notifier).onAccountDeleted();
+    if (context.mounted) showToast(context, deleted ? l.accountDeleted : l.accountDeleteFailed);
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l = AppLocalizations.of(context);
@@ -472,6 +498,14 @@ class _SettingsSheet extends ConsumerWidget {
             onPressed: () => ref.read(monetizationControllerProvider.notifier).showPrivacyOptions(),
             icon: const Icon(Icons.privacy_tip_outlined),
             label: Text(l.privacyOptions),
+          ),
+          const Divider(),
+          TextButton.icon(
+            key: const Key('delete-account'),
+            style: TextButton.styleFrom(foregroundColor: AppColors.destructive),
+            onPressed: () => _confirmDelete(context, ref),
+            icon: const Icon(Icons.delete_forever_outlined),
+            label: Text(l.deleteAccount),
           ),
         ],
       ),

@@ -11,7 +11,9 @@ library;
 import 'dart:io';
 
 import 'package:animewho/application/game_controller.dart';
+import 'package:animewho/application/monetization_controller.dart';
 import 'package:animewho/application/providers.dart';
+import 'package:animewho/data/api/account_api.dart';
 import 'package:animewho/config/app_config.dart';
 import 'package:animewho/data/api/api_client.dart';
 import 'package:animewho/data/monetization/ads_service.dart';
@@ -84,6 +86,25 @@ void main() {
     final cast = await api.characters();
     expect(cast.length, greaterThanOrEqualTo(24));
     expect(cast.every((c) => c.id.isNotEmpty && c.name.isNotEmpty), isTrue);
+  }, skip: liveUrl == null ? 'ANIMEWHO_LIVE_URL non défini' : false);
+
+  test('routes compte : config publique ; sans base, le portefeuille reste local', () async {
+    final store = InMemoryStore();
+    final api = AccountApi(baseUrl: liveUrl!, profileToken: () => store.getString(StoreKeys.profileToken));
+    addTearDown(api.close);
+    final config = await api.config();
+    expect(config.values, isNotEmpty, reason: 'clés Remote Config de la spec');
+    // ignore: avoid_print
+    print('GET /api/config : features=${config.features}, minMobileVersion=${config.minMobileVersion}');
+    final c = liveContainer(store);
+    addTearDown(c.dispose);
+    c.read(gameControllerProvider);
+    await waitFor(c, (s) => s.isConnected && s.myPlayerId != null);
+    final m = c.read(monetizationControllerProvider.notifier);
+    await m.startup();
+    final state = c.read(monetizationControllerProvider);
+    expect(state.capabilities.serverBacked, config.feature('wallet'));
+    if (config.feature('wallet')) expect(state.playerId, isNotNull);
   }, skip: liveUrl == null ? 'ANIMEWHO_LIVE_URL non défini' : false);
 
   test('partie complète contre l’ordinateur, avec coupure/reconnexion et revanche', () async {
@@ -255,4 +276,31 @@ void main() {
       expect(sessionsA.first.client, 'mobile', reason: 'reconnu comme app mobile');
     }
   }, timeout: const Timeout(Duration(minutes: 2)), skip: liveUrl == null ? 'ANIMEWHO_LIVE_URL non défini' : false);
+
+  test('version trop ancienne : app_outdated, écran de mise à jour', () async {
+    final store = InMemoryStore();
+    final c = ProviderContainer(overrides: [
+      appConfigProvider.overrideWithValue(AppConfig(
+        apiBaseUrl: outdatedUrl!,
+        enableAdMob: false,
+        revenueCatAppleKey: '',
+        revenueCatGoogleKey: '',
+        verboseAnalytics: false,
+      )),
+      keyValueStoreProvider.overrideWithValue(store),
+      adsServiceProvider.overrideWithValue(FakeAdsService()),
+      purchasesServiceProvider.overrideWithValue(FakePurchasesService()),
+      analyticsProvider.overrideWithValue(RecordingAnalyticsService()),
+    ]);
+    addTearDown(c.dispose);
+    c.read(gameControllerProvider);
+    await waitFor(c, (s) => s.appOutdatedMessage != null, what: 'app_outdated');
+    expect(c.read(gameControllerProvider).appOutdatedMessage, isNotEmpty);
+    expect(c.read(gameControllerProvider).isConnected, isFalse);
+    // ignore: avoid_print
+    print('app_outdated : « ${c.read(gameControllerProvider).appOutdatedMessage} »');
+  }, skip: outdatedUrl == null ? 'ANIMEWHO_OUTDATED_URL non défini' : false);
 }
+
+/// Serveur lancé avec MIN_MOBILE_VERSION > version de l'app (facultatif).
+final String? outdatedUrl = Platform.environment['ANIMEWHO_OUTDATED_URL'];

@@ -597,5 +597,26 @@
   "noBlockedPlayers": "Aucun joueur bloqué.",
   "unblock": "Débloquer",
   "appOutdatedTitle": "Mise à jour nécessaire",
-  "appOutdatedFallback": "Cette version d’AnimeWho n’est plus prise en charge. Mets l’app à jour pour continuer à jouer."
+  "appOutdatedFallback": "Cette version d’AnimeWho n’est plus prise en charge. Mets l’app à jour pour continuer à jouer.",
+  "deleteAccount": "Supprimer mon compte",
+  "deleteAccountTitle": "Supprimer ton compte ?",
+  "deleteAccountBody": "Ton solde d’Éclats, tes droits (Sans pub…), tes cosmétiques et tes statistiques seront effacés définitivement. Les achats déjà effectués ne sont pas remboursés.",
+  "deleteAccountConfirm": "Supprimer définitivement",
+  "accountDeleted": "Compte supprimé.",
+  "accountDeleteFailed": "La suppression a échoué. Réessaie plus tard.",
+  "cosmeticsTitle": "Cosmétiques",
+  "itemPrice": "{count} Éclats",
+  "@itemPrice": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "equipLabel": "Équiper",
+  "equippedLabel": "Équipé",
+  "notForSale": "Exclusif",
+  "buyItemFailed": "Achat impossible (solde insuffisant ?).",
+  "rewardPending": "Récompense en cours de validation : elle arrivera dans ton solde.",
+  "chestServerSoon": "Le coffre gratuit arrive bientôt. En attendant, ouvre un coffre bonus en vidéo."
 }

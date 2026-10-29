@@ -182,8 +182,9 @@ class AdBannerSlot extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final hasNoAds = ref.watch(monetizationControllerProvider.select((s) => s.hasNoAds));
-    final allowed = ref.watch(adPolicyProvider).bannerAllowed(placement, screen: screen, hasNoAds: hasNoAds);
+    // Réévalué quand les droits ou la config distante changent.
+    ref.watch(monetizationControllerProvider.select((s) => (s.hasNoAds, s.remoteConfig)));
+    final allowed = ref.read(monetizationControllerProvider.notifier).bannerAllowed(placement, screen);
     if (!allowed) return const SizedBox.shrink();
     return ref.watch(adsServiceProvider).buildBanner(placement);
   }

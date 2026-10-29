@@ -931,4 +931,52 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get appOutdatedFallback =>
       'Cette version d’AnimeWho n’est plus prise en charge. Mets l’app à jour pour continuer à jouer.';
+
+  @override
+  String get deleteAccount => 'Supprimer mon compte';
+
+  @override
+  String get deleteAccountTitle => 'Supprimer ton compte ?';
+
+  @override
+  String get deleteAccountBody =>
+      'Ton solde d’Éclats, tes droits (Sans pub…), tes cosmétiques et tes statistiques seront effacés définitivement. Les achats déjà effectués ne sont pas remboursés.';
+
+  @override
+  String get deleteAccountConfirm => 'Supprimer définitivement';
+
+  @override
+  String get accountDeleted => 'Compte supprimé.';
+
+  @override
+  String get accountDeleteFailed =>
+      'La suppression a échoué. Réessaie plus tard.';
+
+  @override
+  String get cosmeticsTitle => 'Cosmétiques';
+
+  @override
+  String itemPrice(int count) {
+    return '$count Éclats';
+  }
+
+  @override
+  String get equipLabel => 'Équiper';
+
+  @override
+  String get equippedLabel => 'Équipé';
+
+  @override
+  String get notForSale => 'Exclusif';
+
+  @override
+  String get buyItemFailed => 'Achat impossible (solde insuffisant ?).';
+
+  @override
+  String get rewardPending =>
+      'Récompense en cours de validation : elle arrivera dans ton solde.';
+
+  @override
+  String get chestServerSoon =>
+      'Le coffre gratuit arrive bientôt. En attendant, ouvre un coffre bonus en vidéo.';
 }

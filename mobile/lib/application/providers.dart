@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../config/app_config.dart';
+import '../data/api/account_api.dart';
 import '../data/api/api_client.dart';
 import '../data/monetization/admob_ads_service.dart';
 import '../data/monetization/ads_service.dart';
@@ -104,11 +105,26 @@ final purchasesServiceProvider = Provider<PurchasesService>((ref) {
   return key.isEmpty ? FakePurchasesService() : RevenueCatPurchasesService(apiKey: key);
 });
 
+/// Portefeuille local (factice / hors-ligne / tests). Le contrôleur de
+/// monétisation bascule sur [ServerWalletRepository] au démarrage quand
+/// `GET /api/config` annonce `features.wallet` et que `POST /api/me` répond.
 final walletRepositoryProvider = Provider<WalletRepository>(
   (ref) => LocalWalletRepository(ref.watch(keyValueStoreProvider)),
 );
 
-/// TODO(remote-config) : valeurs Firebase Remote Config.
+/// Routes compte / boutique (Bearer = jeton de profil). null = désactivé (tests).
+final accountApiProvider = Provider<AccountApi?>((ref) {
+  final store = ref.watch(keyValueStoreProvider);
+  final api = AccountApi(
+    baseUrl: ref.watch(appConfigProvider).apiBaseUrl,
+    profileToken: () => store.getString(StoreKeys.profileToken),
+  );
+  ref.onDispose(api.close);
+  return api;
+});
+
+/// Valeurs par défaut ; le contrôleur de monétisation applique ensuite
+/// `GET /api/config` (TODO : Firebase Remote Config pour l'A/B testing).
 final adConfigProvider = Provider<AdConfig>((ref) => const AdConfig());
 
 final adPolicyProvider = Provider<AdPolicy>((ref) => AdPolicy(ref.watch(adConfigProvider)));

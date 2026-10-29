@@ -51,6 +51,9 @@ abstract class PurchasesService {
   Future<RestoreOutcome> restore();
 
   Future<Set<String>> activeEntitlements();
+
+  /// Après la suppression du compte : oublie l'utilisateur RevenueCat.
+  Future<void> logOut();
 }
 
 /// Boutique factice : achats instantanés, aucun paiement.
@@ -63,7 +66,7 @@ class FakePurchasesService implements PurchasesService {
   final List<String> purchased = [];
 
   @override
-  Future<void> initialize({String? appUserId}) async {}
+  Future<void> initialize({String? appUserId}) async => this.appUserId = appUserId;
 
   @override
   bool get isAvailable => true;
@@ -87,4 +90,13 @@ class FakePurchasesService implements PurchasesService {
 
   @override
   Future<Set<String>> activeEntitlements() async => {..._entitlements};
+
+  String? appUserId;
+
+  @override
+  Future<void> logOut() async {
+    appUserId = null;
+    _entitlements.clear();
+    _owned.clear();
+  }
 }

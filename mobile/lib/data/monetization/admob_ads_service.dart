@@ -166,7 +166,7 @@ class AdMobAdsService implements AdsService {
   }
 
   @override
-  Future<RewardedOutcome> showRewarded(AdPlacement placement) async {
+  Future<RewardedOutcome> showRewarded(AdPlacement placement, {String? ssvUserId, String? ssvCustomData}) async {
     if (!_canRequestAds) return RewardedOutcome.unavailable;
     final ad = _rewarded ?? await _loadRewarded().timeout(_rewardedLoadTimeout, onTimeout: () => null);
     _rewarded = null;
@@ -183,9 +183,11 @@ class AdMobAdsService implements AdsService {
         if (!closed.isCompleted) closed.complete();
       },
     );
-    // TODO(serveur, spec §5.3) : passer `ServerSideVerificationOptions(userId:
-    // players.id, customData: nonce)` obtenu via POST /api/me/ad-offers, puis
-    // réclamer la récompense par POST /api/me/ad-rewards/claim.
+    // SSV : AdMob appelle GET /api/admob/ssv avec ces valeurs ; le serveur ne
+    // crédite qu'après cette vérification (POST /api/me/ad-rewards/claim).
+    if (ssvUserId != null || ssvCustomData != null) {
+      await ad.setServerSideOptions(ServerSideVerificationOptions(userId: ssvUserId, customData: ssvCustomData));
+    }
     await ad.show(onUserEarnedReward: (_, _) => earned = true);
     await closed.future;
     unawaited(preload());

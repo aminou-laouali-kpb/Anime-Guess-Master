@@ -21,8 +21,13 @@ class RevenueCatPurchasesService implements PurchasesService {
   @override
   bool get isAvailable => _configured;
 
+  /// `appUserId` = `playerId` de `POST /api/me` (même identifiant côté webhook).
   @override
   Future<void> initialize({String? appUserId}) async {
+    if (_configured && appUserId != null) {
+      await Purchases.logIn(appUserId);
+      return;
+    }
     if (_configured || apiKey.isEmpty) return;
     if (kDebugMode) await Purchases.setLogLevel(LogLevel.debug);
     final config = PurchasesConfiguration(apiKey)..appUserID = appUserId;
@@ -91,6 +96,16 @@ class RevenueCatPurchasesService implements PurchasesService {
   }
 
   @override
+  Future<void> logOut() async {
+    if (!_configured) return;
+    try {
+      await Purchases.logOut();
+    } on PlatformException {
+      // Déjà anonyme.
+    }
+  }
+
+  @override
   Future<Set<String>> activeEntitlements() async {
     if (!_configured) return const {};
     try {
@@ -101,3 +116,4 @@ class RevenueCatPurchasesService implements PurchasesService {
     }
   }
 }
+

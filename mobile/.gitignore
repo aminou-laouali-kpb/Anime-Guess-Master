@@ -46,3 +46,12 @@ app.*.map.json
 
 # Widget Preview related
 .widget_preview/
+
+# AnimeWho
+/build/
+.dart_tool/
+**/Pods/
+**/.symlinks/
+*.keystore
+*.jks
+key.properties

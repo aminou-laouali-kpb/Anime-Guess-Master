@@ -17,6 +17,8 @@ class WalletState {
     this.bonusChestDay,
     this.botGamesRewardedDay,
     this.botGamesRewardedToday = 0,
+    this.inventory = const {},
+    this.equipped = const {},
   });
 
   final int balance;
@@ -32,6 +34,10 @@ class WalletState {
   final String? botGamesRewardedDay;
   final int botGamesRewardedToday;
 
+  /// Cosmétiques possédés et équipés (emplacement → objet), fournis par le serveur.
+  final Set<String> inventory;
+  final Map<String, String> equipped;
+
   WalletState copyWith({
     int? balance,
     Set<String>? entitlements,
@@ -41,6 +47,8 @@ class WalletState {
     String? bonusChestDay,
     String? botGamesRewardedDay,
     int? botGamesRewardedToday,
+    Set<String>? inventory,
+    Map<String, String>? equipped,
   }) =>
       WalletState(
         balance: balance ?? this.balance,
@@ -51,6 +59,8 @@ class WalletState {
         bonusChestDay: bonusChestDay ?? this.bonusChestDay,
         botGamesRewardedDay: botGamesRewardedDay ?? this.botGamesRewardedDay,
         botGamesRewardedToday: botGamesRewardedToday ?? this.botGamesRewardedToday,
+        inventory: inventory ?? this.inventory,
+        equipped: equipped ?? this.equipped,
       );
 
   Map<String, dynamic> toJson() => {

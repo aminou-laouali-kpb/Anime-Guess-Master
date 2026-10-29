@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:animewho/application/providers.dart';
+import 'package:animewho/data/api/account_api.dart';
 import 'package:animewho/data/monetization/ads_service.dart';
 import 'package:animewho/data/monetization/analytics_service.dart';
 import 'package:animewho/data/monetization/purchases_service.dart';
@@ -120,7 +121,12 @@ class TestHarness {
         purchasesServiceProvider.overrideWithValue(purchases),
         analyticsProvider.overrideWithValue(analytics),
         clockProvider.overrideWithValue(now),
+        accountApiProvider.overrideWithValue(accountApi),
       ];
+
+  /// null : aucune route compte (portefeuille local). Un test peut fournir une
+  /// `AccountApi` branchée sur un `MockClient`.
+  AccountApi? accountApi;
 
   ProviderContainer container() => ProviderContainer(overrides: overrides);
 }

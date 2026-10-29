@@ -51,7 +51,7 @@ class _DailyChestDialogState extends ConsumerState<DailyChestDialog> {
       if (reward == null) {
         _bonusUnavailable = true;
       } else {
-        _message = l.shardsCredited(reward);
+        _message = reward == 0 ? l.rewardPending : l.shardsCredited(reward);
       }
     });
   }
@@ -111,7 +111,7 @@ class _DailyChestDialogState extends ConsumerState<DailyChestDialog> {
               child: Text(_bonusUnavailable ? l.noVideo : l.chestBonus),
             )
           else if (_message == null)
-            Text(l.chestAlreadyOpened, textAlign: TextAlign.center),
+            Text(m.capabilities.freeDailyChest ? l.chestAlreadyOpened : l.chestServerSoon, textAlign: TextAlign.center),
         ],
       ),
       actions: [TextButton(onPressed: () => Navigator.pop(context), child: Text(l.close))],

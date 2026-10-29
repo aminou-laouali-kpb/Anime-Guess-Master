@@ -36,6 +36,9 @@ class AnalyticsEvents {
   static const iapFail = 'iap_fail';
   static const iapCancel = 'iap_cancel';
   static const restorePurchases = 'restore_purchases';
+  static const itemPurchase = 'item_purchase';
+  static const itemEquip = 'item_equip';
+  static const accountDelete = 'account_delete';
   static const upsellNoAdsShow = 'upsell_noads_show';
   static const upsellNoAdsClick = 'upsell_noads_click';
 }

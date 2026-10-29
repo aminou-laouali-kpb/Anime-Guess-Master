@@ -128,7 +128,8 @@ void main() {
       expect(chest!.reward, 20);
       expect(await repo.claimDailyChest(now), isNull);
       expect(DailyChest.canClaimBonus(chest.wallet, now), isTrue);
-      w = (await repo.claimAdReward(AdPlacement.rwDailyChest, amount: 30, now: now)).wallet;
+      final offer = (await repo.prepareAdReward(AdPlacement.rwDailyChest, amount: 30))!;
+      w = (await repo.claimAdReward(AdPlacement.rwDailyChest, offer, now: now)).wallet;
       expect(DailyChest.canClaimBonus(w, now), isFalse);
       w = await repo.applyPurchase(Products.noAds, entitlements: {});
       expect(Entitlements.removesAds(w.entitlements), isTrue);
