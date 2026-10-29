@@ -1,0 +1,8 @@
+# Traductions : le français est la langue de référence (modèle).
+# Pour ajouter l'anglais : créer lib/l10n/app_en.arb avec les mêmes clés,
+# puis ajouter les libellés des traits dans lib/l10n/trait_labels.dart.
+arb-dir: lib/l10n
+template-arb-file: app_fr.arb
+output-localization-file: app_localizations.dart
+output-class: AppLocalizations
+nullable-getter: false

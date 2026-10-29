@@ -1,0 +1,601 @@
+{
+  "@@locale": "fr",
+  "appTitle": "AnimeWho",
+  "@appTitle": {
+    "description": "Nom de l'app. Ne jamais utiliser le nom d'un jeu de société concurrent."
+  },
+  "homeTagline": "Duel de déduction anime",
+  "homeNicknameLabel": "Pseudo",
+  "homeEdit": "Modifier",
+  "homeQuickPlay": "Partie rapide",
+  "homeCreatePrivate": "Créer une partie privée",
+  "homeJoinWithCode": "Rejoindre avec un code",
+  "homeVsComputer": "Contre l’ordinateur",
+  "homeLeaderboard": "Classement",
+  "homeHowToPlay": "Comment jouer",
+  "homeShop": "Boutique",
+  "homeDailyChest": "Coffre du jour",
+  "nameDialogTitle": "Choisis ton nom de combat",
+  "nameDialogBody": "Quel nom veux-tu porter dans l’arène ?",
+  "nameHint": "ex. RôninDuSoir",
+  "saveAndContinue": "Enregistrer et continuer",
+  "joinDialogTitle": "Rejoindre une partie privée",
+  "joinDialogBody": "Saisis le code à 6 caractères donné par ton adversaire.",
+  "joinCodeLabel": "Code de la partie",
+  "joinSubmit": "Entrer dans l’arène",
+  "botDialogTitle": "Contre l’ordinateur",
+  "botDialogBody": "Entraîne-toi seul. Ces parties ne comptent pas dans le classement.",
+  "botEasy": "Facile",
+  "botEasyHint": "Pose des questions au hasard et devine trop vite.",
+  "botNormal": "Normal",
+  "botNormalHint": "Joue correctement, sans être parfait.",
+  "botHard": "Difficile",
+  "botHardHint": "Choisit toujours la meilleure question.",
+  "howToTitle": "Comment jouer",
+  "howTo1": "1. Choix : chaque joueur choisit en secret un personnage parmi les 24 de la grille.",
+  "howTo2": "2. Déduction : à tour de rôle, posez des questions fermées (oui / non) sur le personnage secret de l’adversaire (ex. « Ton personnage a-t-il les cheveux roses ? »).",
+  "howTo3": "3. Élimination : selon la réponse, touche les personnages de ta grille pour les écarter. Touche-les à nouveau pour les remettre.",
+  "howTo4": "4. Victoire : quand tu penses avoir trouvé, utilise ton tour pour deviner ! Une mauvaise réponse coûte une vie, et à 3 vies perdues tu as perdu. Chaque tour est chronométré : si le temps est écoulé, tu perds aussi une vie.",
+  "understood": "Compris",
+  "cancel": "Annuler",
+  "close": "Fermer",
+  "back": "Retour",
+  "continueLabel": "Continuer",
+  "notNow": "Plus tard",
+  "queueSearching": "Recherche d’un adversaire",
+  "lobbyWaiting": "En attente d’un adversaire",
+  "queuePosition": "Position dans la file : {position}",
+  "@queuePosition": {
+    "placeholders": {
+      "position": {
+        "type": "int"
+      }
+    }
+  },
+  "queuePositionUnknown": "Position dans la file : …",
+  "lobbySendCode": "Envoie ce code à la personne avec qui tu veux jouer.",
+  "queueNobodyYet": "Personne pour l’instant ? Entraîne-toi en attendant.",
+  "queuePlayBot": "Jouer contre l’ordinateur",
+  "lobbyCodeLabel": "Code de la partie",
+  "copyCode": "Copier le code",
+  "codeCopied": "Code copié !",
+  "selectionTitle": "Choisis ton personnage secret",
+  "selectionWaiting": "En attente de l’adversaire",
+  "selectionCountdown": "encore {seconds} s — sinon on choisit pour toi",
+  "@selectionCountdown": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "confirmChoice": "Valider mon choix",
+  "waitingOpponent": "En attente de l’adversaire…",
+  "versus": "VS",
+  "opponentDefault": "Adversaire",
+  "leaveTooltip": "Abandonner la partie",
+  "leaveTitle": "Abandonner la partie ?",
+  "leaveBodyLoss": "Ton adversaire gagnera la partie et elle comptera comme une défaite dans tes statistiques.",
+  "leaveBodyNoLoss": "Tu reviendras à l’accueil et ton adversaire sera prévenu.",
+  "keepPlaying": "Continuer à jouer",
+  "abandon": "Abandonner",
+  "yourTurn": "À toi de jouer",
+  "opponentTurn": "Tour de l’adversaire",
+  "opponentDisconnectedBanner": "Adversaire déconnecté — on l’attend…",
+  "secondsShort": "{seconds} s",
+  "@secondsShort": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "livesSemantics": "{name} : {lives} vies sur 3",
+  "@livesSemantics": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "lives": {
+        "type": "int"
+      }
+    }
+  },
+  "you": "Toi",
+  "youWithCharacter": "Toi · {name}",
+  "@youWithCharacter": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "askShort": "Question",
+  "askLong": "Poser une question",
+  "guessAction": "Deviner",
+  "logTitle": "Historique",
+  "closeLog": "Fermer l’historique",
+  "questionReceived": "Question reçue !",
+  "answerWithin": "Réponds dans les {seconds} s ou tu perds une vie",
+  "@answerWithin": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "yourCharacterIs": "Ton personnage : {name} ({universe})",
+  "@yourCharacterIs": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "universe": {
+        "type": "String"
+      }
+    }
+  },
+  "answerHonestly": "Réponds honnêtement : ton personnage et toutes tes réponses seront révélés à la fin.",
+  "yesUpper": "OUI",
+  "noUpper": "NON",
+  "waitingAnswer": "En attente de la réponse…",
+  "opponentHasSeconds": "L’adversaire a {seconds} s pour répondre",
+  "@opponentHasSeconds": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "askVerifiedHelp": "Le jeu répond à ta place à partir de la fiche du personnage : impossible de mentir.",
+  "askFreeHelp": "C’est ton adversaire qui répond : sa réponse pourra être vérifiée à la fin de la partie.",
+  "verifiedTab": "Question vérifiée",
+  "freeTab": "Question libre",
+  "pickValueHint": "Choisis une réponse possible ci-dessus.",
+  "freeQuestionHint": "ex. Ton personnage se bat-il avec une épée ?",
+  "send": "Envoyer",
+  "guessTitle": "Ton pronostic",
+  "guessBody": "Choisis un personnage puis confirme. Une mauvaise réponse te coûte 1 vie !",
+  "searchCharacter": "Rechercher un personnage…",
+  "noCharacterLeft": "Plus aucun personnage ! Remets-en un sur ta grille d’abord.",
+  "noMatch": "Aucun personnage ne correspond à « {query} ».",
+  "@noMatch": {
+    "placeholders": {
+      "query": {
+        "type": "String"
+      }
+    }
+  },
+  "guessConfirmPrompt": "Deviner {name} ?",
+  "@guessConfirmPrompt": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "tapToChoose": "Touche un personnage pour le choisir.",
+  "confirm": "Confirmer",
+  "noActionYet": "Aucune action pour l’instant.",
+  "answerToast": "Réponse : {answer}",
+  "@answerToast": {
+    "placeholders": {
+      "answer": {
+        "type": "String"
+      }
+    }
+  },
+  "ruledOutCount": "{count, plural, =1{1 personnage ne correspond pas.} other{{count} personnages ne correspondent pas.}}",
+  "@ruledOutCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "eliminateThem": "Les écarter",
+  "mySecretTitle": "Ton personnage secret",
+  "mySecretBody": "C’est lui que ton adversaire doit deviner.",
+  "attrHair": "Cheveux",
+  "attrEyes": "Yeux",
+  "attrGender": "Genre",
+  "attrAge": "Âge",
+  "attrSpecies": "Espèce",
+  "attrAlignment": "Camp",
+  "attrRole": "Rôle",
+  "attrUniverse": "Univers",
+  "@attrUniverse": {
+    "description": "Trait « anime » côté serveur : l'œuvre ou l'univers original du personnage."
+  },
+  "roleLine": "rôle {role}",
+  "@roleLine": {
+    "placeholders": {
+      "role": {
+        "type": "String"
+      }
+    }
+  },
+  "qHairBald": "Ton personnage est-il chauve ?",
+  "qHair": "Ton personnage a-t-il les cheveux {value} ?",
+  "@qHair": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
+  "qEyes": "Ton personnage a-t-il les yeux {value} ?",
+  "@qEyes": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
+  "qFemale": "Ton personnage est-il une femme ?",
+  "qMale": "Ton personnage est-il un homme ?",
+  "qAge": "Ton personnage est-il {value} ?",
+  "@qAge": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
+  "qSpecies": "Ton personnage est-il de l’espèce « {value} » ?",
+  "@qSpecies": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
+  "qAlignment": "Ton personnage est-il {value} ?",
+  "@qAlignment": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
+  "qRole": "Ton personnage est-il un personnage {value} ?",
+  "@qRole": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
+  "qUniverse": "Ton personnage vient-il de « {value} » ?",
+  "@qUniverse": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
+  "logVerified": "Vérifiée",
+  "logUnverified": "Non vérifiée",
+  "logAsker": "{name} :",
+  "@logAsker": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "logAnswer": "Réponse :",
+  "answerYesLower": "oui",
+  "answerNoLower": "non",
+  "logGuessed": "{name} a tenté :",
+  "@logGuessed": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "logMissed": "Raté ! Une vie en moins.",
+  "logTimeout": "{name} : temps écoulé — une vie en moins.",
+  "@logTimeout": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "victoryByForfeit": "Victoire par abandon",
+  "victory": "Victoire !",
+  "defeat": "Défaite",
+  "outOfLivesMe": "Tu n’as plus de vies !",
+  "outOfLivesOpponent": "L’adversaire n’a plus de vies !",
+  "guessedRight": "Bien deviné !",
+  "opponentGuessed": "L’adversaire a deviné ton personnage !",
+  "opponentQuit": "Ton adversaire a quitté la partie.",
+  "ratingLine": "Score : {rating} ({delta})",
+  "@ratingLine": {
+    "placeholders": {
+      "rating": {
+        "type": "int"
+      },
+      "delta": {
+        "type": "String"
+      }
+    }
+  },
+  "unranked": "Partie non classée — comptée dans tes statistiques",
+  "trainingGame": "Partie d’entraînement — non comptée au classement",
+  "theirSecret": "Son personnage secret :",
+  "acceptRematch": "Accepter la revanche",
+  "rematch": "Revanche",
+  "backHome": "Retour à l’accueil",
+  "recapTitle": "Récapitulatif de la partie",
+  "recapCompare": "Compare les réponses « non vérifiées » de ton adversaire avec la fiche de {name} ci-dessus.",
+  "@recapCompare": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "shardsEarned": "+{count} Éclats gagnés",
+  "@shardsEarned": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "doubleShards": "▶ Doubler mes Éclats",
+  "noVideo": "Pas de vidéo disponible",
+  "shardsDoubled": "Éclats doublés !",
+  "connectionLost": "Connexion perdue : reconnexion en cours…",
+  "connectionReplacedTitle": "Connexion interrompue",
+  "connectionReplacedBody": "Cette partie a été ouverte sur un autre appareil ou dans un autre onglet.",
+  "resumeHere": "Reprendre ici",
+  "noticeGameNotRecovered": "Connexion perdue. Ta partie n’a pas pu être récupérée.",
+  "noticeCharacterAssigned": "Temps écoulé ! Ton personnage, choisi au hasard : {name}.",
+  "@noticeCharacterAssigned": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "noticeMyTimeoutAnswering": "Pas de réponse à temps ! Tu perds une vie.",
+  "noticeMyTimeoutPlaying": "Temps écoulé ! Tu perds une vie et ton tour.",
+  "noticeOpponentTimedOut": "Ton adversaire a dépassé le temps et perd une vie.",
+  "noticeTooManyConnections": "Trop de connexions depuis ton réseau. Réessaie dans un instant.",
+  "noticeServerFull": "Le serveur est complet pour le moment. Réessaie dans un instant.",
+  "noticeMyWrongGuess": "Raté ! Tu perds une vie.",
+  "noticeOpponentWrongGuess": "L’adversaire s’est trompé !",
+  "noticeOpponentDisconnected": "Ton adversaire a perdu la connexion. On l’attend jusqu’à {seconds} s…",
+  "@noticeOpponentDisconnected": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "noticeOpponentReconnected": "Ton adversaire est de retour !",
+  "noticeOpponentLeftGame": "Ton adversaire a quitté la partie.",
+  "noticeOpponentLeftRoom": "Ton adversaire a quitté la salle.",
+  "noticeOpponentWantsRematch": "Ton adversaire veut une revanche !",
+  "reactionThumbsUp": "Pouce levé",
+  "reactionLaugh": "Mort de rire",
+  "reactionSurprised": "Surpris",
+  "reactionAwkward": "Gêné",
+  "reactionThinking": "Je réfléchis",
+  "reactionShocked": "Choqué",
+  "reactionFire": "En feu",
+  "reactionClap": "Bravo",
+  "sendReaction": "Envoyer une réaction",
+  "muteReactions": "Masquer les réactions de l’adversaire",
+  "unmuteReactions": "Afficher les réactions de l’adversaire",
+  "leaderboardBody": "Score Elo des parties rapides. Les parties privées comptent dans tes statistiques, pas dans le classement.",
+  "myStatsTitle": "Tes statistiques",
+  "statsEmpty": "Termine une partie pour commencer tes statistiques.",
+  "statsDisabled": "Les statistiques ne sont pas disponibles sur ce serveur.",
+  "statScore": "Score",
+  "statRank": "Rang",
+  "statWinRate": "Taux de victoire",
+  "statGames": "Parties",
+  "statWins": "Gagnées",
+  "statBestStreak": "Meilleure série",
+  "streakLine": "{count} victoires d’affilée !",
+  "@streakLine": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "gamesToRank": "Encore {count} partie(s) rapide(s) pour apparaître au classement.",
+  "@gamesToRank": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "topPlayers": "Meilleurs joueurs",
+  "leaderboardUnavailable": "Classement indisponible pour le moment.",
+  "leaderboardEmpty": "Personne n’est encore classé. Joue {count} parties rapides pour être le premier nom ici !",
+  "@leaderboardEmpty": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "meSuffix": "{name} (toi)",
+  "@meSuffix": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "rankedGames": "{count} parties",
+  "@rankedGames": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "shopTitle": "Boutique",
+  "shardsBalance": "{count} Éclats",
+  "@shardsBalance": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "noAdsTitle": "Sans pub",
+  "noAdsBody": "Supprime interstitiels et bannières à vie. Les vidéos récompensées restent disponibles si tu le souhaites.",
+  "noAdsOwned": "Activé — merci pour ton soutien !",
+  "starterPackTitle": "Pack de démarrage",
+  "starterPackBody": "500 Éclats + dos de carte « Aube » + cadre « Recrue ». Achetable une seule fois.",
+  "shardPacksTitle": "Packs d’Éclats",
+  "shardPackBonus": "{count} Éclats",
+  "@shardPackBonus": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "freeShardsTitle": "Éclats gratuits",
+  "freeShardsBody": "Regarde une courte vidéo pour gagner {count} Éclats.",
+  "@freeShardsBody": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "watchVideo": "▶ Regarder",
+  "restorePurchases": "Restaurer mes achats",
+  "restoreDone": "Achats restaurés.",
+  "restoreFailed": "Impossible de restaurer les achats pour le moment.",
+  "purchaseSuccess": "Merci ! Achat confirmé.",
+  "purchasePending": "Achat en cours de validation…",
+  "purchaseFailed": "L’achat n’a pas abouti.",
+  "purchaseUnavailable": "La boutique n’est pas disponible pour le moment.",
+  "buy": "Acheter",
+  "owned": "Possédé",
+  "shopFooter": "Prix TTC. Les Éclats servent uniquement aux cosmétiques, ne s’échangent pas et ne donnent aucun avantage en partie contre un humain. Aucune loot box : chaque achat a un contenu connu à l’avance.",
+  "shopDemoNotice": "Boutique de démonstration : aucun paiement réel.",
+  "privacyOptions": "Options de confidentialité",
+  "shardsCredited": "+{count} Éclats !",
+  "@shardsCredited": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "chestTitle": "Coffre du jour",
+  "chestBody": "Reviens chaque jour : la série monte jusqu’au jour 7 (100 Éclats). Un jour manqué la remet à zéro.",
+  "chestOpen": "Ouvrir le coffre",
+  "chestAlreadyOpened": "Déjà ouvert aujourd’hui. Reviens demain !",
+  "chestReward": "+{count} Éclats (jour {day} de la série)",
+  "@chestReward": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "day": {
+        "type": "int"
+      }
+    }
+  },
+  "chestBonus": "▶ Ouvrir un 2e coffre",
+  "chestStreakDay": "Jour {day}",
+  "@chestStreakDay": {
+    "placeholders": {
+      "day": {
+        "type": "int"
+      }
+    }
+  },
+  "trackingTitle": "Des pubs plus pertinentes ?",
+  "trackingBody": "AnimeWho est gratuit grâce à la publicité. À l’écran suivant, iOS te demandera si l’app peut utiliser ton identifiant publicitaire. Tu peux refuser : le jeu reste exactement le même.",
+  "upsellTitle": "Marre des pubs ?",
+  "upsellBody": "Supprime-les à vie pour {price}.",
+  "@upsellBody": {
+    "placeholders": {
+      "price": {
+        "type": "String"
+      }
+    }
+  },
+  "upsellCta": "Voir l’offre",
+  "eliminatedSemantics": "{name}, écarté",
+  "@eliminatedSemantics": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "characterSemantics": "{name} ({universe})",
+  "@characterSemantics": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "universe": {
+        "type": "String"
+      }
+    }
+  },
+  "playerOptions": "Options du joueur",
+  "reportPlayer": "Signaler",
+  "blockPlayer": "Bloquer ce joueur",
+  "reportTitle": "Signaler {name}",
+  "@reportTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "reportBody": "Le signalement est envoyé à l’équipe de modération avec les questions libres de ce joueur.",
+  "reasonInsult": "Insultes",
+  "reasonSexual": "Contenu sexuel",
+  "reasonHate": "Haine ou discrimination",
+  "reasonSpam": "Spam",
+  "reasonCheating": "Triche",
+  "reasonOther": "Autre",
+  "reportSend": "Envoyer le signalement",
+  "blockTitle": "Bloquer {name} ?",
+  "@blockTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "blockBody": "Vous ne serez plus jamais mis face à face en partie rapide, et ce joueur ne pourra plus rejoindre tes parties privées.",
+  "noticeReportSent": "Merci, ton signalement a été envoyé.",
+  "noticeReportLimit": "Tu as atteint la limite de signalements pour cette session.",
+  "noticePlayerBlocked": "{name} est bloqué.",
+  "@noticePlayerBlocked": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsTitle": "Réglages",
+  "verifiedOnlyTitle": "Questions vérifiées uniquement",
+  "verifiedOnlyBody": "Refuse les questions libres tapées par tes adversaires.",
+  "blockedPlayersTitle": "Joueurs bloqués",
+  "noBlockedPlayers": "Aucun joueur bloqué.",
+  "unblock": "Débloquer",
+  "appOutdatedTitle": "Mise à jour nécessaire",
+  "appOutdatedFallback": "Cette version d’AnimeWho n’est plus prise en charge. Mets l’app à jour pour continuer à jouer."
+}
