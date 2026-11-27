@@ -2,7 +2,9 @@
 // Vérifie le casting original (characters.originals.json) :
 //  - même schéma que artifacts/api-server/src/data/characters.json ;
 //  - aucun couple de personnages identique sur les traits vérifiables ;
+//  - au moins 2 traits vérifiables de différence entre deux personnages ;
 //  - aucune valeur qui ne concerne qu'un seul personnage (ou tous sauf un) ;
+//  - noms et prénoms uniques et pas trop proches ; jamais de barbe sur un crâne chauve ;
 //  - valeurs connues du jeu (traduites dans fr.ts / questions.ts), sinon listées à part.
 // Usage : node tools/originals/check.mjs   (code de sortie 1 en cas d'erreur)
 
@@ -64,6 +66,28 @@ for (const c of data) {
 const nameSet = new Set(data.map((c) => c.name.toLowerCase()));
 if (nameSet.size !== data.length) errors.push("deux personnages portent le même nom");
 
+// Prénoms (titres retirés) : identiques = erreur, à une lettre près = erreur aussi.
+const TITLES = new Set(["sœur", "reine", "mestre", "comte", "madame", "amiral", "bouffon", "obaba", "professeur", "sire", "dame"]);
+const norm = (s) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/œ/g, "oe");
+const firstName = (c) => norm(c.name.split(/\s+/).find((w) => !TITLES.has(w.toLowerCase())) ?? c.name).replace(/[^a-z0-9]/g, "");
+function lev(a, b) {
+  const m = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array(b.length).fill(0)]);
+  for (let j = 1; j <= b.length; j++) m[0][j] = j;
+  for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++) m[i][j] = Math.min(m[i - 1][j] + 1, m[i][j - 1] + 1, m[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+  return m[a.length][b.length];
+}
+for (let i = 0; i < data.length; i++) for (let j = i + 1; j < data.length; j++) {
+  const a = firstName(data[i]);
+  const b = firstName(data[j]);
+  if (a === b || lev(a, b) <= 1 || (a.length >= 3 && b.length >= 3 && [...a].sort().join("") === [...b].sort().join(""))) errors.push(`prénoms trop proches : ${data[i].name} / ${data[j].name}`);
+}
+
+// Un chauve n'a ni barbe ni moustache (sinon la question « chauve ? » devient ambiguë).
+for (const c of data) {
+  const a = c.appearance?.accessories ?? [];
+  if (c.hairColor === "none" && a.some((x) => ["beard", "long-beard", "mustache"].includes(x))) errors.push(`${c.id} : chauve avec barbe ou moustache`);
+}
+
 // ---- Indiscernables ----
 const groups = new Map();
 for (const c of data) {
@@ -82,6 +106,8 @@ for (let i = 0; i < data.length; i++) {
     if (d === minDist) closest.push(`${data[i].id} / ${data[j].id}`);
   }
 }
+
+if (minDist < 2) errors.push(`deux personnages ne diffèrent que d'un trait vérifiable : ${closest.join(" ; ")}`);
 
 // ---- Répartitions ----
 const n = data.length;
