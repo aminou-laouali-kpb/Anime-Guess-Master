@@ -14,9 +14,9 @@
 |---|---|---|
 | Nom de l'app (Apple, ≤ 30) / Titre (Google, ≤ 30) | **AnimeWho : duel de déduction** (28) | EN : **AnimeWho: Anime Deduction Duel** (30) |
 | Sous-titre (Apple, ≤ 30) | **Devine le perso de ton rival** (28) | EN : **Guess your rival’s character** (28) |
-| Identifiant de bundle / package | `com.animewho.app` **[Hypothèse]** | Définitif après la 1re soumission : à valider avant (dépend du nom de domaine et de la société). |
+| Identifiant de bundle / package | `com.animewho.app` **[Hypothèse]** | Définitif après la 1re soumission : à valider avant (dépend du nom de domaine et du titulaire du compte). |
 | SKU (Apple) | `ANIMEWHO-IOS-001` | Interne. |
-| Éditeur / nom du développeur affiché | Nom de la société (SASU) | À compléter. Doit être le titulaire des droits sur le casting original (Apple 5.2). |
+| Éditeur / nom du développeur affiché | Nom du titulaire du compte développeur existant (personne ou société) | À compléter. Doit être le titulaire des droits sur le casting original (Apple 5.2). |
 | Langue principale | Français (France) | + English (U.S.) |
 | Prix | Gratuit, avec achats intégrés et publicités | Cocher « Contient des publicités » (Google). |
 
@@ -74,7 +74,7 @@ Qui a le personnage aux cheveux argentés et au sabre ? Pose tes questions, éli
 AnimeWho, c'est le duel de déduction en ligne, en version anime. Chaque joueur choisit en secret un personnage parmi 24, puis vous vous posez des questions à tour de rôle : « Ton personnage a-t-il les yeux rouges ? », « Est-ce un démon ? »… À chaque réponse, tu élimines des cartes. Le premier qui trouve le personnage de l'autre gagne.
 
 DES PERSONNAGES ORIGINAUX
-• Plus de 100 personnages créés pour AnimeWho par des illustrateurs, dans 8 univers : académie de magie, ville futuriste, clan de sabreurs, lycée, pirates du ciel, robots géants, esprits et yokai, sport.
+• Plus de 100 personnages originaux créés pour AnimeWho, dans 8 univers : académie de magie, ville futuriste, clan de sabreurs, lycée, pirates du ciel, robots géants, esprits et yokai, sport.
 • Des traits pensés pour la déduction : cheveux, yeux, âge, espèce, rôle, camp…
 
 3 FAÇONS DE JOUER
@@ -136,7 +136,7 @@ Who has the silver-haired swordswoman? Ask questions, flip down cards, and guess
 AnimeWho is an online deduction duel with an anime twist. Each player secretly picks one of 24 characters, then you take turns asking questions: "Does your character have red eyes?", "Is it a demon?"… Every answer rules out cards. First to find the other player's character wins.
 
 ORIGINAL CHARACTERS
-• 100+ characters created for AnimeWho by illustrators, across 8 worlds: magic academy, future city, sword clan, high school, sky pirates, giant robots, spirits and yokai, sports.
+• 100+ original characters created for AnimeWho, across 8 worlds: magic academy, future city, sword clan, high school, sky pirates, giant robots, spirits and yokai, sports.
 • Traits built for deduction: hair, eyes, age, species, role, side…
 
 3 WAYS TO PLAY

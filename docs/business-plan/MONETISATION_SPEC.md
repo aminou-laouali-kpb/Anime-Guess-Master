@@ -3,6 +3,8 @@
 > Version 1.0 — 29 octobre 2026. Compagnon technique de [`BUSINESS_PLAN.md`](./BUSINESS_PLAN.md) (§5 et §9). Toute valeur numérique marquée `RC:` est une **clé Firebase Remote Config** avec sa valeur par défaut : elle peut être changée sans nouvelle version de l'app.
 >
 > Conventions : « Phase 1 » = v1 au lancement (M4, février 2027) ; « Phase 2 » = M10 ; « Phase 3 » = M16. **[Hypothèse]** = choix fait sans le propriétaire.
+>
+> **Révision du 27 novembre 2026** (budget zéro, voir la note en tête de `BUSINESS_PLAN.md`) : la mécanique, les prix et les plafonds publicitaires de cette spécification sont inchangés. Seul changement : les personnages, thèmes et cosmétiques sont **produits en interne, générés par code** (SVG), sans illustrateur ; le rythme de nouveaux contenus n'a donc plus de coût, mais leur rendu est plus simple. Les hypothèses chiffrées citées ici (impressions par DAU, conversion) restent celles du BUSINESS_PLAN §9.1 révisé.
 
 ---
 
@@ -13,7 +15,7 @@
 3. **Aucune loot box** : tout achat donne un contenu connu à l'avance.
 4. **Le serveur est la seule source de vérité** pour les droits (sans pub, abonnement), le solde d'Éclats, l'inventaire et les cosmétiques affichés à l'adversaire — comme il l'est déjà pour les règles du jeu.
 5. **Tout plafond publicitaire est pilotable à distance** (Remote Config) et testable en A/B.
-6. **Contenu original uniquement** : aucun cosmétique, thème ou personnage ne reprend une propriété intellectuelle tierce (voir BUSINESS_PLAN §6).
+6. **Contenu original uniquement** : aucun cosmétique, thème ou personnage ne reprend une propriété intellectuelle tierce (voir BUSINESS_PLAN §6). En phase 1, tout ce contenu est généré par code par le propriétaire (droits entièrement détenus) ; des illustrations commandées pourront s'y ajouter en phase 2/3, financées par les revenus, avec contrat de cession.
 
 ---
 

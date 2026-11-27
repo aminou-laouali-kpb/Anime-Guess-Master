@@ -1,6 +1,6 @@
 # Conditions générales d'utilisation (CGU) d'AnimeWho — BROUILLON
 
-> **Brouillon à faire relire par un avocat** avant publication (`https://animewho.app/cgu`, et en anglais `/terms`). Les éléments entre crochets `[…]` sont à compléter. Apple exige soit son contrat de licence standard (EULA), soit des conditions propres accessibles depuis la fiche : on peut garder l'EULA standard d'Apple **et** ces CGU (qui couvrent les règles de jeu et de conduite, la monnaie virtuelle et la modération, exigées par la règle 1.2).
+> **Brouillon à faire relire** (ressources gratuites au lancement, avocat dès que les revenus le permettent — BUSINESS_PLAN §6.3) avant publication (`https://animewho.app/cgu`, et en anglais `/terms`). Les éléments entre crochets `[…]` sont à compléter. Apple exige soit son contrat de licence standard (EULA), soit des conditions propres accessibles depuis la fiche : on peut garder l'EULA standard d'Apple **et** ces CGU (qui couvrent les règles de jeu et de conduite, la monnaie virtuelle et la modération, exigées par la règle 1.2).
 
 **Dernière mise à jour : [date]**
 

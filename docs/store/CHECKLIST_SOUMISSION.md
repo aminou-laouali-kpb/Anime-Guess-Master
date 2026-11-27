@@ -6,19 +6,21 @@
 
 - ☐ **Casting 100 % original** livré (BUSINESS_PLAN §6.3) : `artifacts/api-server/src/data/characters.json` remplacé par les personnages originaux ; la valeur du trait « anime » devient l'univers original. Aucun nom, visuel, tenue ou accessoire signature de personnage existant (grille anti-ressemblance remplie pour chaque portrait).
 - ☐ **Plus aucun portrait chargé depuis un service tiers** : `character-images.ts` désactivé ; images embarquées dans l'app ou servies par notre CDN.
-- ☐ Contrats de **cession de droits** signés avec chaque illustrateur (exploitation mondiale, tous supports, adaptation pour les cosmétiques) ; esquisses archivées.
+- ☐ Portraits **générés par le code du propriétaire** (BUSINESS_PLAN §6.3, révision du 27/11/2026 : pas d'illustrateur) : grille anti-ressemblance remplie pour chaque portrait ; historique Git du générateur et des données conservé (preuve d'originalité et d'antériorité). Si des illustrations commandées sont ajoutées plus tard : contrat de cession écrit avec chaque illustrateur.
 - ☐ Nom « AnimeWho » : recherche d'antériorité faite et dépôt engagé (INPI/EUIPO, classes 9, 28, 41). Sinon, renommer **avant** la première soumission (le nom d'app est réservé dans App Store Connect).
 - ☐ Aucune marque, œuvre ou jeu tiers dans : nom, sous-titre, mots-clés, descriptions, captures, vidéo, icône, notes de version, textes in-app, noms des cosmétiques (Apple 2.3.7, 4.1, 5.2.1 ; Google « Métadonnées »).
-- ☐ Le compte développeur est **au nom de la société titulaire des droits** (Apple 5.2 : l'app doit être soumise par le détenteur ou le licencié de la propriété intellectuelle).
-- ☐ Notes pour la revue Apple : une phrase indiquant que tous les personnages et illustrations sont **originaux, créés pour l'app et cédés à la société** (contrats disponibles sur demande).
+- ☐ Le compte développeur (déjà ouvert) est **au nom du titulaire des droits** (Apple 5.2 : l'app doit être soumise par le détenteur ou le licencié de la propriété intellectuelle) : compte personnel du propriétaire, auteur du code et des portraits ; ou, si le compte est celui d'une société, cession écrite des droits du propriétaire à cette société.
+- ☐ Notes pour la revue Apple : une phrase indiquant que tous les personnages et images sont **originaux, générés par un programme écrit par le développeur pour cette app**, et qu'aucun contenu tiers n'est utilisé.
 
 ## B. Comptes développeur
 
-- ☐ Société créée (SASU/SAS), numéro **D-U-N-S** obtenu (gratuit, quelques jours à 2 semaines) — requis par Apple pour un compte organisation.
-- ☐ **Apple Developer Program** (organisation) : 99 $/an. Accords « Applications payantes » signés, informations bancaires et fiscales remplies (sinon les achats intégrés ne fonctionnent pas, même en revue). Adhésion au **App Store Small Business Program** (commission 15 %).
-- ☐ **Google Play Console** (organisation) : 25 $ une fois, vérification d'identité de l'organisation (D-U-N-S), profil de paiement marchand. Un compte **personnel** créé depuis fin 2023 impose un **test fermé de 12 testeurs pendant 14 jours** avant la production : le compte organisation l'évite, mais le test fermé reste recommandé (BUSINESS_PLAN §7.3).
+> Révision du 27/11/2026 : les comptes Apple et Google sont **déjà ouverts** ; plus de société ni de D-U-N-S à créer. Les frais Apple (99 $/an) sont payés par ailleurs.
+
+- ☐ Vérifier le **titulaire** de chaque compte (personne ou société) et que c'est bien l'entité qui détient les droits (voir A) ; si nécessaire, statut de micro-entrepreneur (gratuit) pour déclarer les revenus.
+- ☐ **Apple Developer Program** (existant) : renouvellement annuel à jour (99 $/an). Accords « Applications payantes » signés, informations bancaires et fiscales remplies (sinon les achats intégrés ne fonctionnent pas, même en revue). Adhésion au **App Store Small Business Program** (commission 15 %).
+- ☐ **Google Play Console** (existante) : identité vérifiée, profil de paiement marchand. Si le compte est **personnel** et créé depuis fin 2023 : **test fermé de 12 testeurs pendant 14 jours** obligatoire avant la production (à prévoir dans le calendrier de M3, BUSINESS_PLAN §7.3), et adresse du développeur affichée publiquement dès que l'app vend quelque chose.
 - ☐ Comptes **AdMob** (même compte Google que la console de préférence), **RevenueCat**, **Firebase** ; accès partagés à au moins deux personnes (pas de compte personnel unique).
-- ☐ Domaine `animewho.app` (ou autre) : pages assistance, confidentialité, CGU, suppression de compte, `app-ads.txt`.
+- ☐ Domaine `animewho.app` (ou autre) : pages assistance, confidentialité, CGU, suppression de compte, `app-ads.txt`, adresses e-mail. **Seule dépense recommandée avant la soumission** (≈ 10-20 €/an), car ces adresses sont figées dans les fiches et dans l'app ; avec un budget strictement nul : pages sur un hébergement gratuit (GitHub Pages, dont le domaine sert alors de « site du développeur » pour `app-ads.txt`), e-mail gratuit, liens profonds retirés de la v1 (voir G).
 
 ## C. Signature et build
 
@@ -80,4 +82,4 @@ Les **questions libres** et les **pseudonymes** sont du contenu généré par le
 - ✅ Filtre de mots sur les pseudonymes.
 - ☐ Outil de revue des signalements ; sanctions (bannissement de profil).
 - ☐ Éclats de fin de partie, quêtes, coffre, indices contre l'ordinateur (voir `SERVER_CHANGES.md` §6).
-- ☐ Hébergement de production en UE (BUSINESS_PLAN §8.2 étape 1), sauvegardes de la base, supervision.
+- ☐ Hébergement de production en UE, **toujours allumé, un seul processus** (BUSINESS_PLAN §8.3 : offre gratuite ou VPS ≈ 8 €/mois ; pas d'offre qui se met en veille), sauvegarde quotidienne de la base hors de la machine, restauration testée, supervision gratuite.

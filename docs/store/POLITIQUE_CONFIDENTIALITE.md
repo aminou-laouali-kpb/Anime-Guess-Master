@@ -1,6 +1,6 @@
 # Politique de confidentialité d'AnimeWho — BROUILLON
 
-> **Brouillon à faire relire par un avocat ou un DPO avant publication** (budget juridique prévu au BUSINESS_PLAN §6.3). Les éléments entre crochets `[…]` sont à compléter. À publier à l'adresse `https://animewho.app/confidentialite` (et en anglais à `/privacy`), et à rendre accessible depuis l'app (Réglages) et depuis les fiches des stores. Version en langage clair, adaptée à un public dès 13 ans (exigence RGPD art. 12 pour les mineurs).
+> **Brouillon à faire relire par un avocat ou un DPO avant publication** (pas de budget juridique au départ : relecture avec les modèles de la CNIL et une consultation gratuite, puis avis payant dès que les revenus le permettent — BUSINESS_PLAN §6.3). Les éléments entre crochets `[…]` sont à compléter. À publier à l'adresse `https://animewho.app/confidentialite` (et en anglais à `/privacy`), et à rendre accessible depuis l'app (Réglages) et depuis les fiches des stores. Version en langage clair, adaptée à un public dès 13 ans (exigence RGPD art. 12 pour les mineurs).
 
 **Dernière mise à jour : [date]**
 
