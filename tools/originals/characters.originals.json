@@ -1,0 +1,194 @@
+[
+  {
+    "id": "hinoe-kurabashi", "name": "Hinoe Kurabashi", "anime": "Académie Vélisande",
+    "gender": "female", "hairColor": "pink", "eyeColor": "green", "ageRange": "teen", "species": "human",
+    "powers": ["star magic", "flight", "light barrier"], "alignment": "hero", "role": "main",
+    "bio": "Élève de première année qui rate tous ses sorts… sauf quand ses amis sont en danger.",
+    "appearance": { "skin": "fair", "face": "oval", "hairStyle": "twintails", "ears": "human",
+      "outfit": { "type": "robe", "color": "#3b3f8f", "trim": "#f2c94c" }, "accessories": ["star-pin", "ribbon"] }
+  },
+  {
+    "id": "rowan-isaragi", "name": "Rowan Isaragi", "anime": "Académie Vélisande",
+    "gender": "male", "hairColor": "silver", "eyeColor": "violet", "ageRange": "teen", "species": "elf",
+    "powers": ["frost magic", "runes"], "alignment": "antihero", "role": "secondary",
+    "bio": "Premier de la classe, glacial et solitaire, il cache pourquoi il a été chassé de sa forêt natale.",
+    "appearance": { "skin": "pale", "face": "sharp", "hairStyle": "ponytail", "ears": "elf",
+      "outfit": { "type": "robe", "color": "#24425e", "trim": "#bfe3f2" }, "accessories": ["earring"] }
+  },
+  {
+    "id": "tosai-mogi", "name": "Tōsai Mogi", "anime": "Académie Vélisande",
+    "gender": "male", "hairColor": "white", "eyeColor": "gray", "ageRange": "elder", "species": "human",
+    "powers": ["time magic", "alchemy"], "alignment": "neutral", "role": "secondary",
+    "bio": "Directeur distrait de l'académie, il a oublié plus de sortilèges que quiconque n'en connaîtra jamais.",
+    "appearance": { "skin": "light", "face": "square", "hairStyle": "slicked", "ears": "human",
+      "outfit": { "type": "robe", "color": "#5a2d6e", "trim": "#e6c36a" }, "accessories": ["round-glasses", "beard"] }
+  },
+  {
+    "id": "pipa-hanabusa", "name": "Pipa Hanabusa", "anime": "Académie Vélisande",
+    "gender": "female", "hairColor": "blonde", "eyeColor": "gold", "ageRange": "child", "species": "beastkin",
+    "powers": ["plant magic", "super hearing"], "alignment": "hero", "role": "secondary",
+    "bio": "La plus jeune élève de l'académie entend pousser les plantes et parle aux mandragores.",
+    "appearance": { "skin": "fair", "face": "round", "hairStyle": "bob", "ears": "rabbit",
+      "outfit": { "type": "robe", "color": "#2f6b4f", "trim": "#f5e6a8" }, "accessories": ["flower"] }
+  },
+  {
+    "id": "morvessa-tsurugaya", "name": "Morvessa Tsurugaya", "anime": "Académie Vélisande",
+    "gender": "female", "hairColor": "purple", "eyeColor": "red", "ageRange": "adult", "species": "demon",
+    "powers": ["shadow magic", "contracts"], "alignment": "villain", "role": "main",
+    "bio": "Ancienne professeure bannie, elle propose aux élèves des pactes trop beaux pour être vrais.",
+    "appearance": { "skin": "lilac", "face": "sharp", "hairStyle": "wavy", "ears": "pointed", "horns": "curved",
+      "outfit": { "type": "robe", "color": "#1d1528", "trim": "#b23a5b" }, "accessories": ["choker", "earring"] }
+  },
+  {
+    "id": "koren-ashidori", "name": "Koren Ashidori", "anime": "Clan des Joncs-Noirs",
+    "gender": "male", "hairColor": "black", "eyeColor": "teal", "ageRange": "teen", "species": "human",
+    "powers": ["water walking", "mist technique"], "alignment": "hero", "role": "main",
+    "bio": "Ninja des marais impatient, il jure de rendre au clan l'honneur que son père a perdu.",
+    "appearance": { "skin": "tan", "face": "oval", "hairStyle": "spiky", "ears": "human",
+      "outfit": { "type": "ninja", "color": "#23352f", "trim": "#7fb8a4" }, "accessories": ["scarf", "facepaint"] }
+  },
+  {
+    "id": "mokuya-tenri", "name": "Mokuya Tenri", "anime": "Clan des Joncs-Noirs",
+    "gender": "female", "hairColor": "brown", "eyeColor": "gold", "ageRange": "teen", "species": "beastkin",
+    "powers": ["shapeshifting", "illusions"], "alignment": "antihero", "role": "secondary",
+    "bio": "Espionne au sourire en coin, elle vend ses secrets au plus offrant, mais jamais ceux de ses amis.",
+    "appearance": { "skin": "light", "face": "round", "hairStyle": "ponytail", "ears": "tanuki",
+      "outfit": { "type": "ninja", "color": "#3d2f25", "trim": "#c98a4b" }, "accessories": ["bandage"] }
+  },
+  {
+    "id": "ganzo-numata", "name": "Ganzō Numata", "anime": "Clan des Joncs-Noirs",
+    "gender": "male", "hairColor": "none", "eyeColor": "brown", "ageRange": "adult", "species": "human",
+    "powers": ["iron body", "mud technique"], "alignment": "hero", "role": "secondary",
+    "bio": "Colosse au grand cœur, il entraîne les jeunes ninjas en leur faisant porter des grenouilles.",
+    "appearance": { "skin": "brown", "face": "square", "hairStyle": "bald", "ears": "human",
+      "outfit": { "type": "ninja", "color": "#3a3a2a", "trim": "#a89b5c" }, "accessories": ["beard", "scar"] }
+  },
+  {
+    "id": "sayo-mizuhiki", "name": "Sayo Mizuhiki", "anime": "Clan des Joncs-Noirs",
+    "gender": "female", "hairColor": "green", "eyeColor": "red", "ageRange": "adult", "species": "human",
+    "powers": ["poison", "leech summoning"], "alignment": "villain", "role": "main",
+    "bio": "Cheffe d'un clan rival, elle veut assécher le marais pour en vendre les terres.",
+    "appearance": { "skin": "pale", "face": "sharp", "hairStyle": "hime", "ears": "human",
+      "outfit": { "type": "kimono", "color": "#2a1f33", "trim": "#7a3fa0" }, "accessories": ["facepaint", "hairsticks"] }
+  },
+  {
+    "id": "obaba-iyori", "name": "Obaba Iyori", "anime": "Clan des Joncs-Noirs",
+    "gender": "female", "hairColor": "green", "eyeColor": "green", "ageRange": "elder", "species": "elf",
+    "powers": ["herbalism", "prophecy"], "alignment": "neutral", "role": "secondary",
+    "bio": "Doyenne du clan, elle a vu naître trois générations de ninjas et ne prend jamais parti.",
+    "appearance": { "skin": "tan", "face": "oval", "hairStyle": "bun", "ears": "elf",
+      "outfit": { "type": "kimono", "color": "#4a5a3a", "trim": "#d9c58a" }, "accessories": ["hairsticks"] }
+  },
+  {
+    "id": "marga-solvei", "name": "Marga Solvei", "anime": "Équipage du Cirrus Écarlate",
+    "gender": "female", "hairColor": "red", "eyeColor": "blue", "ageRange": "adult", "species": "human",
+    "powers": ["wind sailing", "sword"], "alignment": "antihero", "role": "main",
+    "bio": "Capitaine d'un navire volant, elle ne pille que les riches… et parfois ceux qui l'agacent.",
+    "appearance": { "skin": "tan", "face": "oval", "hairStyle": "long", "ears": "human",
+      "outfit": { "type": "coat", "color": "#7a1f2b", "trim": "#e0b04a" }, "accessories": ["tricorne", "eyepatch"] }
+  },
+  {
+    "id": "lio-lanterne", "name": "Lio Lanterne", "anime": "Équipage du Cirrus Écarlate",
+    "gender": "male", "hairColor": "blonde", "eyeColor": "blue", "ageRange": "child", "species": "human",
+    "powers": ["mechanics", "kite gliding"], "alignment": "hero", "role": "main",
+    "bio": "Mousse débrouillard, il répare le moteur du navire avec des bouts de ficelle.",
+    "appearance": { "skin": "fair", "face": "round", "hairStyle": "messy", "ears": "human",
+      "outfit": { "type": "jacket", "color": "#3f6fb0", "trim": "#f2d27a" }, "accessories": ["goggles", "bandage"] }
+  },
+  {
+    "id": "brakk-ondorin", "name": "Brakk Ondorin", "anime": "Équipage du Cirrus Écarlate",
+    "gender": "male", "hairColor": "black", "eyeColor": "gray", "ageRange": "adult", "species": "beastkin",
+    "powers": ["super strength", "keen smell"], "alignment": "antihero", "role": "secondary",
+    "bio": "Second du navire à moitié loup, il grogne beaucoup mais n'abandonne jamais un membre d'équipage.",
+    "appearance": { "skin": "dark", "face": "square", "hairStyle": "messy", "ears": "wolf",
+      "outfit": { "type": "coat", "color": "#3b3b45", "trim": "#9a7b4f" }, "accessories": ["scar", "earring"] }
+  },
+  {
+    "id": "saffi-kestrel", "name": "Saffi Kestrel", "anime": "Équipage du Cirrus Écarlate",
+    "gender": "female", "hairColor": "blue", "eyeColor": "teal", "ageRange": "teen", "species": "alien",
+    "powers": ["weather sense", "navigation"], "alignment": "hero", "role": "secondary",
+    "bio": "Venue d'une étoile tombée dans les nuages, elle lit les tempêtes comme d'autres lisent les cartes.",
+    "appearance": { "skin": "lavender", "face": "oval", "hairStyle": "short", "ears": "fin",
+      "outfit": { "type": "jacket", "color": "#2f5f6b", "trim": "#f0e6c8" }, "accessories": ["antennae", "forehead-gem"] }
+  },
+  {
+    "id": "amiral-gorvane", "name": "Amiral Gorvane", "anime": "Équipage du Cirrus Écarlate",
+    "gender": "male", "hairColor": "silver", "eyeColor": "gray", "ageRange": "elder", "species": "human",
+    "powers": ["fleet command", "cannon"], "alignment": "villain", "role": "secondary",
+    "bio": "Amiral de la flotte impériale, il traque les pirates du ciel depuis quarante ans.",
+    "appearance": { "skin": "light", "face": "square", "hairStyle": "slicked", "ears": "human",
+      "outfit": { "type": "uniform", "color": "#1f2a44", "trim": "#d4af37" }, "accessories": ["captain-cap", "mustache", "monocle"] }
+  },
+  {
+    "id": "yuzuha-komyo", "name": "Yuzuha Kōmyō", "anime": "Cité-Néon Okarvo",
+    "gender": "female", "hairColor": "blue", "eyeColor": "pink", "ageRange": "teen", "species": "human",
+    "powers": ["hacking", "drone control"], "alignment": "hero", "role": "main",
+    "bio": "Lycéenne et pirate informatique, elle pirate les écrans géants pour diffuser la vérité.",
+    "appearance": { "skin": "light", "face": "oval", "hairStyle": "bob", "ears": "human",
+      "outfit": { "type": "jacket", "color": "#2b2350", "trim": "#ff5fa2" }, "accessories": ["headphones"] }
+  },
+  {
+    "id": "orvo-6", "name": "Orvo-6", "anime": "Cité-Néon Okarvo",
+    "gender": "male", "hairColor": "none", "eyeColor": "blue", "ageRange": "adult", "species": "android",
+    "powers": ["data analysis", "shield"], "alignment": "neutral", "role": "secondary",
+    "bio": "Androïde de maintenance devenu détective, il cherche à comprendre ce qu'est une blague.",
+    "appearance": { "skin": "metal", "face": "square", "hairStyle": "bald", "ears": "robot",
+      "outfit": { "type": "android", "color": "#3a4a5c", "trim": "#5ad1ff" }, "accessories": ["antenna", "panel-lines"] }
+  },
+  {
+    "id": "vask-morundo", "name": "Vask Morundo", "anime": "Cité-Néon Okarvo",
+    "gender": "male", "hairColor": "brown", "eyeColor": "violet", "ageRange": "adult", "species": "alien",
+    "powers": ["mind control", "teleportation"], "alignment": "villain", "role": "main",
+    "bio": "Magnat de la ville venu d'ailleurs, il possède la moitié des néons… et des habitants.",
+    "appearance": { "skin": "green", "face": "sharp", "hairStyle": "slicked", "ears": "fin",
+      "outfit": { "type": "suit", "color": "#1b1b24", "trim": "#9b5cff" }, "accessories": ["implant", "forehead-gem"] }
+  },
+  {
+    "id": "tikku-12", "name": "Tikku-12", "anime": "Cité-Néon Okarvo",
+    "gender": "male", "hairColor": "pink", "eyeColor": "green", "ageRange": "child", "species": "android",
+    "powers": ["rocket boots", "translation"], "alignment": "hero", "role": "secondary",
+    "bio": "Petit robot-livreur qui a décidé tout seul de devenir un héros, sans prévenir personne.",
+    "appearance": { "skin": "porcelain", "face": "round", "hairStyle": "short", "ears": "robot",
+      "outfit": { "type": "android", "color": "#f0f3f7", "trim": "#ff8fc0" }, "accessories": ["panel-lines"] }
+  },
+  {
+    "id": "sable-ishikari", "name": "Sable Ishikari", "anime": "Cité-Néon Okarvo",
+    "gender": "female", "hairColor": "purple", "eyeColor": "red", "ageRange": "adult", "species": "android",
+    "powers": ["blade arms", "stealth"], "alignment": "villain", "role": "secondary",
+    "bio": "Garde du corps androïde du magnat, programmée pour obéir… du moins pour l'instant.",
+    "appearance": { "skin": "porcelain", "face": "sharp", "hairStyle": "long", "ears": "robot",
+      "outfit": { "type": "android", "color": "#202028", "trim": "#ff3b5c" }, "accessories": ["panel-lines", "visor-band"] }
+  },
+  {
+    "id": "amane-yukibori", "name": "Amane Yukibori", "anime": "Sanctuaire de Mikazune",
+    "gender": "female", "hairColor": "white", "eyeColor": "violet", "ageRange": "teen", "species": "beastkin",
+    "powers": ["fox fire", "barriers"], "alignment": "hero", "role": "main",
+    "bio": "Gardienne renarde du sanctuaire, elle protège la frontière entre le monde des esprits et le nôtre.",
+    "appearance": { "skin": "fair", "face": "oval", "hairStyle": "long", "ears": "fox",
+      "outfit": { "type": "kimono", "color": "#f4f1ec", "trim": "#c8323c" }, "accessories": ["ribbon", "tassel"] }
+  },
+  {
+    "id": "akaru-senba", "name": "Akaru Senba", "anime": "Sanctuaire de Mikazune",
+    "gender": "male", "hairColor": "red", "eyeColor": "gold", "ageRange": "teen", "species": "demon",
+    "powers": ["thunder", "club fighting"], "alignment": "antihero", "role": "main",
+    "bio": "Jeune oni fugueur, il s'est installé au sanctuaire pour manger gratis en échange de sa protection.",
+    "appearance": { "skin": "rose", "face": "sharp", "hairStyle": "spiky", "ears": "pointed", "horns": "oni",
+      "outfit": { "type": "kimono", "color": "#2c2c3a", "trim": "#f2c14e" }, "accessories": ["fang", "earring"] }
+  },
+  {
+    "id": "hinagi-shigure", "name": "Hinagi Shigure", "anime": "Sanctuaire de Mikazune",
+    "gender": "female", "hairColor": "black", "eyeColor": "brown", "ageRange": "child", "species": "human",
+    "powers": ["spirit sight", "paper charms"], "alignment": "hero", "role": "secondary",
+    "bio": "Fillette du village qui voit les esprits et les invite à goûter.",
+    "appearance": { "skin": "light", "face": "round", "hairStyle": "braid", "ears": "human",
+      "outfit": { "type": "kimono", "color": "#e98aa0", "trim": "#fff3e0" }, "accessories": ["flower"] }
+  },
+  {
+    "id": "genan-kuroshio", "name": "Gen'an Kuroshio", "anime": "Sanctuaire de Mikazune",
+    "gender": "male", "hairColor": "none", "eyeColor": "pink", "ageRange": "elder", "species": "demon",
+    "powers": ["curses", "soul binding"], "alignment": "villain", "role": "secondary",
+    "bio": "Vieux démon scellé sous le sanctuaire, il attend patiemment que le sceau se fissure.",
+    "appearance": { "skin": "ash", "face": "square", "hairStyle": "bald", "ears": "pointed", "horns": "ram",
+      "outfit": { "type": "kimono", "color": "#1a1420", "trim": "#8e2a3c" }, "accessories": ["long-beard", "fang"] }
+  }
+]
