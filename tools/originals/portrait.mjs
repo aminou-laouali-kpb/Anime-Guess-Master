@@ -23,7 +23,7 @@ export const EYE_HEX = {
 export const SKIN_HEX = {
   fair: "#fde4d2", light: "#f8d6be", pale: "#fcebe2", tan: "#e5b38d", brown: "#b97f59",
   dark: "#80533a", lilac: "#dcc6ea", lavender: "#c3cdf3", green: "#a9d49b", metal: "#cdd6e0",
-  porcelain: "#f4f2f6", rose: "#f4bcae", ash: "#b9acb8",
+  porcelain: "#f4f2f6", rose: "#f4bcae", ash: "#a99fb6",
 };
 
 // Fond et motif de chaque univers (couleur de repli calculée sinon).
@@ -198,6 +198,10 @@ export function portrait(c) {
     add(eyeSvg(pid, cx + s * A.eyeDx, eyeY, s, A, expr, female, species, c.ageRange, eye, s === -1 ? "l" : "r"));
   }
 
+  // sourcils (sous la frange, qui s'arrête juste au-dessus)
+  const browC = c.hairColor === "none" ? (c.ageRange === "elder" ? "#f4f1f6" : shade(skin, -0.6)) : ["white", "silver"].includes(c.hairColor) ? shade(hair, -0.3) : shade(hair, -0.4);
+  for (const s of [-1, 1]) add(brow(cx + s * A.eyeDx, browY, s, A.ew, expr, browC, female ? 2 : c.ageRange === "elder" ? 3.6 : 2.6));
+
   // nez + bouche
   const noseY = (eyeY + mouthY) / 2 + 3;
   add(`<path d="M${P(cx + 1, noseY - 2.5)}q1.8 2.6 -1 3.4" fill="none" stroke="${shade(skin, -0.32)}" stroke-width="1.3" stroke-linecap="round"/>`);
@@ -207,7 +211,7 @@ export function portrait(c) {
   // poils du visage
   if (acc.has("beard") || acc.has("long-beard")) {
     const long = acc.has("long-beard");
-    const bc = c.hairColor === "none" ? (c.ageRange === "elder" ? "#cfcad4" : "#2c2838") : hair;
+    const bc = c.hairColor === "none" ? (c.ageRange === "elder" ? "#f1eef4" : "#2c2838") : hair;
     add(beard(cx, cheekY, chin, mouthY, W, long, bc, shade(bc, -0.5)));
   }
   if (acc.has("mustache")) {
@@ -219,21 +223,27 @@ export function portrait(c) {
 
   // ---------------- cheveux avant
   if (st.fringe !== "none") {
+    if (st.side > 0) add(sideLocks(st, cx, cy, W, chin, hair, hairLine, hairDark));
     const fd = frontHair(st, cx, cy, W, R, browY, rand, female);
     add(path(fd, hair, hairLine, 1.7, ' stroke-linejoin="round"'));
     // reflet « anneau »
     add(`<path d="${arc(cx, cy - 2, R - 7, 208, 246)}${arc(cx, cy - 2, R - 7, 262, 300)}" fill="none" stroke="${hairHi}" stroke-width="3.4" stroke-linecap="round" opacity=".85"/>`);
-    if (st.side > 0) add(sideLocks(st, cx, cy, W, chin, hair, hairLine, hairDark));
+    if (st.fringe === "slick") {
+      let sd = "";
+      for (const t of [-0.75, -0.4, 0.4, 0.75]) sd += `M${P(cx + t * W * 0.8, cy - W * 0.5 + Math.abs(t) * 8)}Q${P(cx + t * W * 0.9, cy - W * 0.85)} ${P(cx + t * W * 0.45, cy - R + 2)}`;
+      add(`<path d="${sd}" fill="none" stroke="${hairDark}" stroke-width="1.2" opacity=".6"/>`);
+    }
+    if (!["blunt", "slick"].includes(st.fringe)) {
+      let sd = "";
+      for (const t of [-0.55, -0.15, 0.3, 0.65]) sd += `M${P(cx + t * W * 0.35, cy - R + 5)}Q${P(cx + t * W * 0.75, cy - W * 0.45)} ${P(cx + t * W * 0.95, browY - 8)}`;
+      add(`<path d="${sd}" fill="none" stroke="${hairDark}" stroke-width="1.1" opacity=".55"/>`);
+    }
     if (st.extra === "ahoge") add(`<path d="M${P(cx + 2, cy - R - 1)}c-2 -10 6 -16 12 -14c-6 2 -8 7 -9 14Z" fill="${hair}" stroke="${hairLine}" stroke-width="1.4" stroke-linejoin="round"/>`);
   } else {
     // crâne chauve : reflet
     add(`<path d="${arc(cx, cy, W - 6, 215, 250)}" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" opacity=".45"/>`);
   }
   if (st.extra === "braid") add(braid(cx, cy, W, cheekY, shY, hair, hairLine, hairHi, trim));
-
-  // sourcils (par-dessus la frange, convention anime)
-  const browC = c.hairColor === "none" ? (c.ageRange === "elder" ? "#bdb6c0" : shade(skin, -0.6)) : ["white", "silver"].includes(c.hairColor) ? shade(hair, -0.3) : shade(hair, -0.4);
-  for (const s of [-1, 1]) add(brow(cx + s * A.eyeDx, browY, s, A.ew, expr, browC, female ? 2 : c.ageRange === "elder" ? 3.2 : 2.6));
 
   // ---------------- cornes, oreilles mécaniques
   if (ap.horns) add(horns(ap.horns, cx, cy, W, R, eyeY));
@@ -243,7 +253,7 @@ export function portrait(c) {
   add(accessories(acc, { cx, cy, W, R, A, eyeY, browY, mouthY, chin, shY, hair, hairLine, trim, female, st, pid }));
   add(`</g>`);
 
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200" role="img" aria-label="${esc(c.name)}" stroke-linecap="round">${out.join("")}</svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200" style="overflow:hidden" role="img" aria-label="${esc(c.name)}" stroke-linecap="round">${out.join("")}</svg>`;
 }
 
 function esc(s) {
@@ -336,7 +346,8 @@ function mouth(cx, my, expr, fang, child) {
   return s;
 }
 
-function beard(cx, cheekY, chin, my, W, long, color, line) {
+function beard(cx, cheekY0, chin, my, W, long, color, line) {
+  const cheekY = cheekY0 + 9;
   const drop = long ? 34 : 12;
   return `<path d="M${P(cx - W + 3, cheekY - 1)}Q${P(cx - W + 2, chin + drop * 0.3)} ${P(cx - 4, chin + drop)}L${P(cx, chin + drop - 4)}L${P(cx + 4, chin + drop)}Q${P(cx + W - 2, chin + drop * 0.3)} ${P(cx + W - 3, cheekY - 1)}Q${P(cx + W * 0.55, my + 8)} ${P(cx + 7, my + 4)}Q${P(cx, my + 8.5)} ${P(cx - 7, my + 4)}Q${P(cx - W * 0.55, my + 8)} ${P(cx - W + 3, cheekY - 1)}Z" fill="${color}" stroke="${line}" stroke-width="1.4" stroke-linejoin="round"/>` +
     `<path d="M${P(cx - 10, chin + 2)}q2 ${r1(drop * 0.4)} 4 ${r1(drop * 0.55)}M${P(cx + 10, chin + 2)}q-2 ${r1(drop * 0.4)} -4 ${r1(drop * 0.55)}" fill="none" stroke="${line}" stroke-width=".9" opacity=".6"/>`;
@@ -364,23 +375,23 @@ function frontHair(st, cx, cy, W, R, browY, rand, female) {
     d += `A${r1(R)} ${r1(R + 2)} 0 0 1 ${P(cx + R, cy + capDrop)}`;
   }
   // côté droit (pattes)
-  const sideY = cy + W * 0.42;
+  const sideY = cy + W * (st.fringe === "slick" ? 0.22 : 0.42);
   d += `Q${P(cx + R + 0.5, sideY - 4)} ${P(cx + W + 0.5, sideY)}L${P(cx + W - 5, cy + 6)}`;
   // frange, de droite à gauche
   const x0 = cx + W - 5;
   const x1 = cx - W + 5;
-  const fy = browY + 2;
+  const fy = browY - 1.5;
   if (st.fringe === "slick") {
-    d += `Q${P(cx + W * 0.35, cy - W * 0.62)} ${P(cx, cy - W * 0.48)}Q${P(cx - W * 0.35, cy - W * 0.62)} ${P(x1, cy + 6)}`;
+    d += `L${P(cx + W - 3, cy + 1)}Q${P(cx + W * 0.5, cy - W * 0.62)} ${P(cx + 4, cy - W * 0.5)}L${P(cx, cy - W * 0.4)}L${P(cx - 4, cy - W * 0.5)}Q${P(cx - W * 0.5, cy - W * 0.62)} ${P(cx - W + 3, cy + 1)}`;
   } else if (st.fringe === "center") {
     d += `Q${P(cx + W * 0.55, fy + 2)} ${P(cx + W * 0.25, fy - 2)}Q${P(cx + W * 0.12, cy - 4)} ${P(cx + 1, cy - W * 0.55)}L${P(cx - 1, cy - W * 0.55)}Q${P(cx - W * 0.12, cy - 4)} ${P(cx - W * 0.25, fy - 2)}Q${P(cx - W * 0.55, fy + 2)} ${P(x1, cy + 6)}`;
   } else {
     const cfg = {
       blunt: { n: 7, depth: 3, lean: 0, jitter: 0.3, curve: 0 },
-      soft: { n: 6, depth: 8, lean: -1, jitter: 1.5, curve: 2 },
-      locks: { n: 5, depth: 11, lean: -2.5, jitter: 2.5, curve: 3 },
-      swept: { n: 5, depth: 12, lean: -6, jitter: 1.5, curve: 5 },
-      spiky: { n: 5, depth: 15, lean: -3, jitter: 3, curve: 2.5 },
+      soft: { n: 5, depth: 13, lean: -1.5, jitter: 1.5, curve: 2.5 },
+      locks: { n: 5, depth: 16, lean: -3, jitter: 2.5, curve: 3.5 },
+      swept: { n: 4, depth: 17, lean: -7, jitter: 1.5, curve: 6 },
+      spiky: { n: 5, depth: 18, lean: -3, jitter: 3, curve: 2.5 },
     }[st.fringe] ?? { n: 5, depth: 10, lean: 0, jitter: 2, curve: 2 };
     const n = cfg.n;
     let px = x0;
@@ -550,9 +561,10 @@ function horns(kind, cx, cy, W, R, eyeY) {
       const by = cy - R * 0.62;
       s += `<path d="M${P(bx - sd * 4, by + 4)}C${P(bx + sd * 6, by - 8)} ${P(bx + sd * 22, by - 6)} ${P(bx + sd * 22, by - 26)}C${P(bx + sd * 12, by - 14)} ${P(bx + sd * 6, by - 12)} ${P(bx - sd * 3, by - 5)}Z" fill="#30223a" stroke="${INK}" stroke-width="1.4" stroke-linejoin="round"/><path d="M${P(bx + sd * 4, by - 4)}C${P(bx + sd * 12, by - 9)} ${P(bx + sd * 17, by - 12)} ${P(bx + sd * 20, by - 22)}" fill="none" stroke="#7d5a92" stroke-width="1.4"/>`;
     } else if (kind === "ram") {
-      const bx = cx + sd * (W - 4);
-      const by = cy - 8;
-      s += `<path d="M${P(bx - sd * 6, by - 4)}C${P(bx + sd * 10, by - 20)} ${P(bx + sd * 30, by - 4)} ${P(bx + sd * 22, by + 16)}C${P(bx + sd * 16, by + 28)} ${P(bx + sd * 4, by + 18)} ${P(bx + sd * 10, by + 10)}C${P(bx + sd * 14, by + 4)} ${P(bx + sd * 12, by - 6)} ${P(bx + sd * 2, by + 4)}Z" fill="#7a6552" stroke="${INK}" stroke-width="1.5" stroke-linejoin="round"/><path d="M${P(bx + sd * 6, by - 9)}l${P(sd * 2, 6)}M${P(bx + sd * 14, by - 9)}l${P(-sd * 1, 6)}M${P(bx + sd * 21, by - 2)}l${P(-sd * 5, 3)}" stroke="#4a3a2e" stroke-width="1.1"/>`;
+      // corne enroulée qui sort du haut du crâne et s'enroule vers l'extérieur
+      const bx = cx + sd * (W - 12);
+      const by = cy - W * 0.72;
+      s += `<path d="M${P(bx - sd * 6, by + 6)}C${P(bx + sd * 4, by - 16)} ${P(bx + sd * 34, by - 14)} ${P(bx + sd * 34, by + 12)}C${P(bx + sd * 34, by + 30)} ${P(bx + sd * 14, by + 32)} ${P(bx + sd * 14, by + 18)}C${P(bx + sd * 14, by + 10)} ${P(bx + sd * 24, by + 8)} ${P(bx + sd * 24, by + 15)}C${P(bx + sd * 26, by + 2)} ${P(bx + sd * 10, by - 2)} ${P(bx + sd * 6, by + 10)}Z" fill="#8a7258" stroke="${INK}" stroke-width="1.6" stroke-linejoin="round"/><path d="M${P(bx + sd * 6, by - 6)}l${P(sd * 1, 7)}M${P(bx + sd * 15, by - 9)}l${P(-sd * 1, 8)}M${P(bx + sd * 25, by - 6)}l${P(-sd * 4, 7)}M${P(bx + sd * 32, by + 6)}l${P(-sd * 6, 2)}" stroke="#5a4636" stroke-width="1.2"/>`;
     }
   }
   return s;
@@ -617,6 +629,9 @@ function accessories(acc, g) {
   let s = "";
   const exL = cx - A.eyeDx;
   const exR = cx + A.eyeDx;
+  if (acc.has("eyepatch")) {
+    s += `<path d="M${P(cx - R, cy - 10)}L${P(cx + R, cy + 6)}" stroke="#1a1418" stroke-width="2.2"/><ellipse cx="${r1(exL)}" cy="${r1(eyeY)}" rx="${r1(A.ew * 0.62)}" ry="${r1(A.eh * 0.8 + 2)}" fill="#1a1418" stroke="${INK}" stroke-width="1.2"/><path d="M${P(exL - 3, eyeY - 4)}q3 -2 6 0" stroke="#4a3a44" stroke-width="1.2" fill="none"/>`;
+  }
   if (acc.has("star-pin")) {
     const x = cx + R * 0.6;
     const y = cy - R * 0.6;
@@ -663,9 +678,6 @@ function accessories(acc, g) {
     s += `<path d="M${P(cx - R - 2, y)}Q${P(cx - R - 8, y - 26)} ${P(cx, y - 30)}Q${P(cx + R + 8, y - 26)} ${P(cx + R + 2, y)}Z" fill="#f4f4f6" stroke="${INK}" stroke-width="1.6" stroke-linejoin="round"/>` +
       `<rect x="${r1(cx - R - 1)}" y="${r1(y - 7)}" width="${r1(2 * R + 2)}" height="9" fill="#1f2a44" stroke="${INK}" stroke-width="1.4"/><path d="M${P(cx - R + 4, y + 2)}Q${P(cx, y + 14)} ${P(cx + R - 4, y + 2)}Z" fill="#14141c" stroke="${INK}" stroke-width="1.4"/>` +
       `<path d="M${P(cx - 6, y - 4)}h12l-6 -9Z" fill="${trim}" stroke="${INK}" stroke-width=".9"/><path d="M${P(cx - R, y + 1)}h${r1(2 * R)}" stroke="${trim}" stroke-width="1.4"/>`;
-  }
-  if (acc.has("eyepatch")) {
-    s += `<path d="M${P(cx - R, cy - 10)}L${P(cx + R, cy + 6)}" stroke="#1a1418" stroke-width="2.2"/><ellipse cx="${r1(exL)}" cy="${r1(eyeY)}" rx="${r1(A.ew * 0.62)}" ry="${r1(A.eh * 0.8 + 2)}" fill="#1a1418" stroke="${INK}" stroke-width="1.2"/><path d="M${P(exL - 3, eyeY - 4)}q3 -2 6 0" stroke="#4a3a44" stroke-width="1.2" fill="none"/>`;
   }
   if (acc.has("round-glasses")) {
     const r = A.ew * 0.66;

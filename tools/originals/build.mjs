@@ -58,13 +58,13 @@ h1{margin:0;font-size:clamp(24px,5vw,36px);letter-spacing:.5px}
 h1 span{background:linear-gradient(90deg,var(--primary),var(--pink));-webkit-background-clip:text;background-clip:text;color:transparent}
 header p{color:var(--muted);margin:6px 0 0;max-width:70ch}
 .unis{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 0;padding:0;list-style:none}
-.unis li,.uni{font-size:12px;padding:3px 10px;border-radius:999px;background:linear-gradient(90deg,var(--u1,#333),var(--u2,#555));color:#fff;text-shadow:0 1px 2px #0008}
+.unis li,.uni{font-size:12px;padding:3px 10px;border-radius:999px;background:linear-gradient(#0006,#0006),linear-gradient(90deg,var(--u1,#333),var(--u2,#555));color:#fff;text-shadow:0 1px 2px #000a;font-weight:600}
 main{display:grid;gap:16px;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));padding:16px;max-width:1280px;margin:0 auto}
 .card{background:var(--card);border:1px solid var(--border);border-radius:16px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 8px 24px #0006}
 .pic svg{display:block;width:100%;height:auto}
 .body{padding:12px 14px 14px}
 h2{margin:0;font-size:18px}
-.uni{display:inline-block;margin:6px 0 10px}
+.uni{display:inline-block;max-width:100%;margin:6px 0 10px}
 dl{display:grid;grid-template-columns:1fr 1fr;gap:4px 10px;margin:0;font-size:13px}
 dl div{display:flex;justify-content:space-between;gap:6px;border-bottom:1px dashed #262850;padding:2px 0}
 dt{color:var(--muted)}dd{margin:0;font-weight:600;text-align:right}
@@ -72,7 +72,7 @@ dt{color:var(--muted)}dd{margin:0;font-weight:600;text-align:right}
 footer{color:var(--muted);text-align:center;font-size:12px;padding:8px 16px 28px}
 @media (max-width:520px){main{grid-template-columns:1fr 1fr;gap:10px;padding:10px}.body{padding:8px 9px 10px}h2{font-size:15px}dl{grid-template-columns:1fr;font-size:12px}.bio{font-size:12px}}
 </style></head><body>
-<header><h1>Anime<span>Who</span> Originals — lot n° 1</h1>
+<header><h1>Anime<span>Who</span> Originals — lot&nbsp;n°&nbsp;1</h1>
 <p>${data.length} personnages 100 % originaux, portraits générés par code (SVG), ${universes.length} univers inventés.</p>
 <ul class="unis">${universes.map((u) => { const x = UNIVERSES[u]; return `<li ${x ? `style="--u1:${x.bg[0]};--u2:${x.bg[1]}"` : ""}>${esc(u)}</li>`; }).join("")}</ul></header>
 <main>
